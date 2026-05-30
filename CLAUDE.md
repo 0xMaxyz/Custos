@@ -46,7 +46,10 @@ Forge · Docker + Caddy · Anthropic API (Claude, `@anthropic-ai/sdk`) · 1delta
 purple accent, light+dark themes — see `UI.md`.
 
 ## Workflow
-Branch `claude/features`; one logical change per commit; draft PRs
-via the PR tool; keep `PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` /
-`CLAUDE.md` / the Cursor rule in sync. When unsure about guardrails, custody, the
-1delta boundary, or scope — **ask first.**
+Branch `claude/features`; one logical change per commit. **Create a GitHub PR
+after every completed task or logical step** — include phase, task number(s),
+what was built, and which gate passes. Mark tasks `[x] DONE` in `ROADMAP.md`
+and record the PR number so future sessions know current state. Keep
+`PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` / `CLAUDE.md` /
+the Cursor rule in sync. When unsure about guardrails, custody, the 1delta
+boundary, or scope — **ask first.**

@@ -53,7 +53,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 external dependency exists and is usable.** This is a go/no-go gate; if the
 liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 
-### 0.1 — Monorepo scaffold · _PR-0a_ · `[x] DONE`
+### 0.1 — Monorepo scaffold · _PR-0a_ · `[x] DONE` · [PR #2](https://github.com/0xMaxyz/miu/pull/2)
 - **What:** workspace layout `/contracts` (Foundry), `/agent` (Node/TS + Fastify),
   `/web` (React/Vite/Tailwind/daisyUI), `/packages/shared` (types + addresses);
   root tooling (workspaces, eslint, prettier, base tsconfig), `.gitignore`

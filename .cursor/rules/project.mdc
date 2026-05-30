@@ -1,14 +1,15 @@
 ---
-description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide is AGENTS.md; plan is PLAN.md; execution breakdown is ROADMAP.md.
+description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide AGENTS.md; plan PLAN.md; execution ROADMAP.md; specs SPEC.md.
 alwaysApply: true
 ---
 
 # Sentinel — Cursor Project Rules
 
-`AGENTS.md` is the **canonical operating guide**, `PLAN.md` is the **full plan**, and
-`ROADMAP.md` is the **PR-sized execution breakdown** (per-phase tasks with What /
-Goal / How-to-test). Read all three. This rule restates the non-negotiables and
-always applies.
+`AGENTS.md` is the **canonical operating guide**, `PLAN.md` the **full plan**,
+`ROADMAP.md` the **PR-sized execution breakdown** (per-phase tasks with What / Goal /
+How-to-test), and `SPEC.md` the **technical spec** (guardrail parameters, contract
+interfaces, Z.AI prompt + risk-signal schema). Read all four. This rule restates the
+non-negotiables and always applies.
 
 ## Project (one line)
 **Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
@@ -25,10 +26,12 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
   happens only via our own adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`)
   that call protocols/DEXs directly with on-chain `minOut`/guardrail checks.
 - **Guardrails are final.** LLM proposes → deterministic validator checks against
-  guardrails → immutable on-chain guardrails are the backstop. The model is never
-  the last line of defense. Guardrails: max weight/bucket, min idle+Aave liquidity
-  buffer, max slippage, token/venue whitelist, rebalance-frequency cap, per-tx caps,
-  pause/kill switch, add-strategy timelock, depeg/oracle-deviation guard.
+  guardrails → immutable on-chain guardrails are the backstop. The LLM may only
+  **tighten** risk, never loosen it (`SPEC.md` §3). On-chain `Guardrails` + TS
+  validator share constants from `packages/shared`. Guardrails: max weight/bucket,
+  min idle+Aave liquidity buffer, max slippage, token/venue whitelist,
+  rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy timelock,
+  depeg/oracle-deviation guard (values in `SPEC.md` §1).
 - **AI only where it beats an algorithm.** Keep yield/optimization/peg/oracle/
   liquidity/execution deterministic. Use the LLM only for: unstructured→structured
   RWA risk signals, written rationale, novel-event judgment, conversational UX.
@@ -57,7 +60,7 @@ API + Mantle RPC.
 ## Conventions
 - TypeScript strict; no plain JS source. Solidity: explicit visibility, custom
   errors, NatSpec, checks-effects-interactions, reentrancy guards on fund-moving
-  functions, prefer OpenZeppelin/Solmate.
+  functions, prefer OpenZeppelin/Solmate; match `SPEC.md` §2 interface sketches.
 - Comments explain non-obvious intent only; never narrate code or "explain the change."
 - Every fund-moving contract needs Forge fork tests (happy path + guardrail
   violation + depeg/de-risk + liquidity-crunch withdrawal). Risk engine + validator
@@ -66,5 +69,5 @@ API + Mantle RPC.
 ## Workflow
 Branches `cursor/<descriptive-name>-46a8` (lowercase); one logical change per
 commit; one PR per ROADMAP PR-group where practical; draft PRs via the PR tool. Keep
-`PLAN.md` / `ROADMAP.md` / `AGENTS.md` / `CLAUDE.md` / this rule in sync. When unsure
-about guardrails, custody, the 1delta boundary, or scope — **ask first.**
+`PLAN.md` / `ROADMAP.md` / `SPEC.md` / `AGENTS.md` / `CLAUDE.md` / this rule in sync.
+When unsure about guardrails, custody, the 1delta boundary, or scope — **ask first.**

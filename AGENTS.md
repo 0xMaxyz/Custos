@@ -2,10 +2,10 @@
 
 This file is the **single source of truth** for how any AI agent (Claude, Cursor,
 Codex, etc.) or human contributor must work in this repository. `CLAUDE.md` and
-`.cursor/rules/project.mdc` point here. **Read `PLAN.md` for the full project plan
-and `ROADMAP.md` for the PR-sized execution breakdown (per-phase tasks with
-What / Goal / How-to-test); this file defines the rules you must follow while
-executing them.**
+`.cursor/rules/project.mdc` point here. **Before executing, read: `PLAN.md` (full
+plan), `ROADMAP.md` (PR-sized per-phase tasks with What/Goal/Test), and `SPEC.md`
+(guardrail parameters, contract interfaces, Z.AI prompt + risk-signal schema). This
+file defines the rules you must follow while executing them.**
 
 If a request conflicts with these rules, **stop and ask** rather than silently
 deviating.
@@ -34,13 +34,15 @@ product. See `PLAN.md`.
    calldata.** Execution happens only through our own audited adapters
    (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`) that call protocols/DEXs
    directly with on-chain `minOut`/guardrail checks.
-2. **Guardrails are the final authority.** On-chain guardrails (max weight/bucket,
-   min idle+Aave liquidity buffer, max slippage, token/venue whitelist,
-   rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy timelock,
-   depeg/oracle-deviation guard) are **immutable limits**. The AI **proposes**; a
-   **deterministic validator** checks against guardrails **before signing**; the
-   on-chain guardrails are the final backstop. **Never** let the LLM be the only
-   thing standing between funds and a bad action.
+2. **Guardrails are the final authority.** On-chain guardrails (see `SPEC.md` §1:
+   max weight/bucket, min idle+Aave liquidity buffer, max slippage, token/venue
+   whitelist, rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy
+   timelock, depeg/oracle-deviation guard) are **immutable limits**. The AI
+   **proposes**; a **deterministic validator** checks against guardrails **before
+   signing**; the on-chain guardrails are the final backstop. The LLM may only
+   **tighten** risk, never loosen it. On-chain `Guardrails` and the TS validator
+   share constants from `packages/shared`. **Never** let the LLM be the only thing
+   standing between funds and a bad action.
 3. **AI only where it genuinely beats an algorithm.** Keep yield/optimization/peg/
    oracle/liquidity/execution **deterministic**. Use the LLM only for: unstructured→
    structured RWA risk signals, written rationale/explainability, judgment on novel
@@ -91,6 +93,7 @@ product. See `PLAN.md`.
 - **Solidity:** explicit visibility, custom errors over revert strings, NatSpec on
   external/public functions, checks-effects-interactions, reentrancy guards on
   fund-moving functions. Prefer well-audited libraries (OpenZeppelin/Solmate).
+  Match the interface sketches in `SPEC.md` §2 (refine as needed; keep names stable).
 - **Naming:** contracts `PascalCase`; TS files `kebab-case`; React components
   `PascalCase`. Be descriptive.
 - **Comments:** explain non-obvious intent/trade-offs/constraints only. Do **not**
@@ -111,14 +114,15 @@ product. See `PLAN.md`.
   amend unless explicitly asked.
 - **Push:** `git push -u origin <branch>`; retry network failures with backoff.
 - **PRs:** open/update via the PR tool; default to draft. One PR per `ROADMAP.md`
-  PR-group where practical. Keep `PLAN.md`, `ROADMAP.md`, `AGENTS.md`, `CLAUDE.md`,
-  and the Cursor rule in sync when the plan changes.
+  PR-group where practical. Keep `PLAN.md`, `ROADMAP.md`, `SPEC.md`, `AGENTS.md`,
+  `CLAUDE.md`, and the Cursor rule in sync when the plan changes.
 
 ---
 
 ## 6. When in doubt
 
-- Re-read `PLAN.md` (strategy), `ROADMAP.md` (tasks/tests), and this file (rules).
+- Re-read `PLAN.md` (strategy), `ROADMAP.md` (tasks/tests), `SPEC.md` (params &
+  interfaces), and this file (rules).
 - If a decision isn't covered, pick the option that best protects **custody safety**
   and the **2026-06-12 freeze**, note it, and flag it.
 - Anything touching guardrails, custody, the 1delta boundary, or scope → **ask

@@ -1,5 +1,5 @@
 ---
-description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide AGENTS.md; plan PLAN.md; execution ROADMAP.md; specs SPEC.md.
+description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide AGENTS.md; plan PLAN.md; execution ROADMAP.md; specs SPEC.md; UI UI.md.
 alwaysApply: true
 ---
 
@@ -7,9 +7,9 @@ alwaysApply: true
 
 `AGENTS.md` is the **canonical operating guide**, `PLAN.md` the **full plan**,
 `ROADMAP.md` the **PR-sized execution breakdown** (per-phase tasks with What / Goal /
-How-to-test), and `SPEC.md` the **technical spec** (guardrail parameters, contract
-interfaces, Z.AI prompt + risk-signal schema). Read all four. This rule restates the
-non-negotiables and always applies.
+How-to-test), `SPEC.md` the **technical spec** (guardrail parameters, contract
+interfaces, Z.AI prompt + risk-signal schema), and `UI.md` the **UI/UX plan**. Read
+all. This rule restates the non-negotiables and always applies.
 
 ## Project (one line)
 **Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
@@ -53,9 +53,10 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
   exit criteria are met. Feature-freeze **2026-06-12**.
 
 ## Stack (do not substitute without asking)
-Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI · Node.js
-+ TypeScript + Fastify · Vitest + Forge tests · Docker + Caddy/nginx · Z.AI · 1delta
-API + Mantle RPC.
+Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI ·
+**RainbowKit + wagmi + viem (frontend)** · Node.js + TypeScript + Fastify + **viem
+(backend/agent — no ethers)** · Vitest + Forge tests · Docker + Caddy/nginx · Z.AI ·
+1delta API + Mantle RPC. UI: clean/professional, purple accent, light+dark — `UI.md`.
 
 ## Conventions
 - TypeScript strict; no plain JS source. Solidity: explicit visibility, custom
@@ -64,10 +65,12 @@ API + Mantle RPC.
 - Comments explain non-obvious intent only; never narrate code or "explain the change."
 - Every fund-moving contract needs Forge fork tests (happy path + guardrail
   violation + depeg/de-risk + liquidity-crunch withdrawal). Risk engine + validator
-  need Vitest.
+  need Vitest. Frontend follows `UI.md` (tokens, two themes, a11y); build with mock
+  data first.
 
 ## Workflow
 Branches `cursor/<descriptive-name>-46a8` (lowercase); one logical change per
 commit; one PR per ROADMAP PR-group where practical; draft PRs via the PR tool. Keep
-`PLAN.md` / `ROADMAP.md` / `SPEC.md` / `AGENTS.md` / `CLAUDE.md` / this rule in sync.
-When unsure about guardrails, custody, the 1delta boundary, or scope — **ask first.**
+`PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` / `CLAUDE.md` / this rule
+in sync. When unsure about guardrails, custody, the 1delta boundary, or scope —
+**ask first.**

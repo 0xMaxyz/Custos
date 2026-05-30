@@ -2,8 +2,9 @@
 
 **Read these before doing anything:** `AGENTS.md` (canonical operating guide),
 `PLAN.md` (full plan), `ROADMAP.md` (PR-sized per-phase tasks with What/Goal/Test),
-and `SPEC.md` (guardrail parameters, contract interfaces, Z.AI prompt + risk-signal
-schema). This file restates only the non-negotiables so they are never missed.
+`SPEC.md` (guardrail parameters, contract interfaces, Z.AI prompt + risk-signal
+schema), and `UI.md` (UI/UX plan). This file restates only the non-negotiables so
+they are never missed.
 
 ## Project (one line)
 **Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
@@ -39,11 +40,13 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
    phase's exit criteria are met.
 
 ## Stack (do not substitute)
-Solidity + Foundry · React/Vite/Tailwind/daisyUI · Node/TS + Fastify · Vitest +
-Forge · Docker + Caddy · Z.AI · 1delta API + Mantle RPC.
+Solidity + Foundry · React + Vite + Tailwind + daisyUI · **RainbowKit + wagmi + viem
+(frontend)** · Node/TS + Fastify + **viem (backend/agent — no ethers)** · Vitest +
+Forge · Docker + Caddy · Z.AI · 1delta API + Mantle RPC. UI: clean/professional,
+purple accent, light+dark themes — see `UI.md`.
 
 ## Workflow
 Branches `cursor/<name>-46a8` (lowercase); one logical change per commit; draft PRs
-via the PR tool; keep `PLAN.md` / `ROADMAP.md` / `SPEC.md` / `AGENTS.md` /
+via the PR tool; keep `PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` /
 `CLAUDE.md` / the Cursor rule in sync. When unsure about guardrails, custody, the
 1delta boundary, or scope — **ask first.**

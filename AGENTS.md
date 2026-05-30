@@ -3,9 +3,10 @@
 This file is the **single source of truth** for how any AI agent (Claude, Cursor,
 Codex, etc.) or human contributor must work in this repository. `CLAUDE.md` and
 `.cursor/rules/project.mdc` point here. **Before executing, read: `PLAN.md` (full
-plan), `ROADMAP.md` (PR-sized per-phase tasks with What/Goal/Test), and `SPEC.md`
-(guardrail parameters, contract interfaces, Z.AI prompt + risk-signal schema). This
-file defines the rules you must follow while executing them.**
+plan), `ROADMAP.md` (PR-sized per-phase tasks with What/Goal/Test), `SPEC.md`
+(guardrail parameters, contract interfaces, Z.AI prompt + risk-signal schema), and
+`UI.md` (UI/UX plan). This file defines the rules you must follow while executing
+them.**
 
 If a request conflicts with these rules, **stop and ask** rather than silently
 deviating.
@@ -62,8 +63,8 @@ product. See `PLAN.md`.
    USDY NAV via `RWADynamicOracle`, USDY DEX price, AUSD proof-of-reserves), read
    **directly via RPC** as the accounting source of truth; 1delta is breadth/UX only.
 8. **Secrets.** Never commit secrets (RPC keys, Z.AI keys, 1delta API key,
-   deployer/ALLOCATOR private keys). Use `.env` (git-ignored) + documented
-   `.env.example`. Never log secrets.
+   deployer/ALLOCATOR private keys, WalletConnect projectId if private). Use `.env`
+   (git-ignored) + documented `.env.example`. Never log secrets.
 9. **Scope & execution discipline (MoSCoW + ROADMAP).** Finish all **Must** items
    before any **Should**; **Should** before **Could**. Work in the PR-sized tasks
    defined in `ROADMAP.md`; **do not start a phase before the prior phase's exit
@@ -78,8 +79,10 @@ product. See `PLAN.md`.
 ## 3. Tech stack (do not substitute without asking)
 
 - **Contracts:** Solidity + **Foundry** (forge, anvil, cast). Tests in Forge.
-- **Frontend:** **React + Vite + Tailwind + daisyUI**.
-- **Backend/agent/API:** **Node.js + TypeScript + Fastify**.
+- **Frontend:** **React + Vite + Tailwind + daisyUI**; wallet via **RainbowKit +
+  wagmi + viem**; reads via wagmi hooks, writes via viem. Clean/professional,
+  purple accent, light+dark themes — see `UI.md`.
+- **Backend/agent/API:** **Node.js + TypeScript + Fastify** + **viem** (no ethers).
 - **TS tests:** **Vitest**.
 - **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
 - **LLM:** **Z.AI**. **Data:** **1delta API** + **Mantle RPC**.
@@ -101,6 +104,8 @@ product. See `PLAN.md`.
 - **Tests:** every contract that moves funds needs Forge tests on a Mantle fork
   (happy path + guardrail-violation + depeg/de-risk + liquidity-crunch withdrawal).
   Agent logic needs Vitest coverage for the risk engine + guardrail validator.
+- **UI:** follow `UI.md` (tokens, two daisyUI themes, components, a11y). Build
+  screens with typed mock data first, then wire to chain/agent.
 - **Money math:** never trust floats for on-chain amounts; use bigint/fixed-point;
   always enforce `minOut`/slippage on swaps.
 
@@ -114,15 +119,15 @@ product. See `PLAN.md`.
   amend unless explicitly asked.
 - **Push:** `git push -u origin <branch>`; retry network failures with backoff.
 - **PRs:** open/update via the PR tool; default to draft. One PR per `ROADMAP.md`
-  PR-group where practical. Keep `PLAN.md`, `ROADMAP.md`, `SPEC.md`, `AGENTS.md`,
-  `CLAUDE.md`, and the Cursor rule in sync when the plan changes.
+  PR-group where practical. Keep `PLAN.md`, `ROADMAP.md`, `SPEC.md`, `UI.md`,
+  `AGENTS.md`, `CLAUDE.md`, and the Cursor rule in sync when the plan changes.
 
 ---
 
 ## 6. When in doubt
 
 - Re-read `PLAN.md` (strategy), `ROADMAP.md` (tasks/tests), `SPEC.md` (params &
-  interfaces), and this file (rules).
+  interfaces), `UI.md` (UI/UX), and this file (rules).
 - If a decision isn't covered, pick the option that best protects **custody safety**
   and the **2026-06-12 freeze**, note it, and flag it.
 - Anything touching guardrails, custody, the 1delta boundary, or scope → **ask

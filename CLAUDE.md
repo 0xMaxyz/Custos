@@ -42,7 +42,7 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
 ## Stack (do not substitute)
 Solidity + Foundry · React + Vite + Tailwind + daisyUI · **RainbowKit + wagmi + viem
 (frontend)** · Node/TS + Fastify + **viem (backend/agent — no ethers)** · Vitest +
-Forge · Docker + Caddy · Z.ai GLM-4 (primary) / Anthropic Claude (fallback, pluggable) · 1delta API + Mantle RPC. UI: clean/professional,
+Forge · Docker + Caddy · Anthropic API (Claude, `@anthropic-ai/sdk`) · 1delta API + Mantle RPC. UI: clean/professional,
 purple accent, light+dark themes — see `UI.md`.
 
 ## Workflow

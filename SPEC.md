@@ -241,10 +241,9 @@ interface IReputationRegistry {
 
 ## 3. LLM prompt + risk-signal schema
 
-**LLM provider:** Z.ai GLM-4 (primary) / Anthropic Claude (fallback), selected via
-`LLM_PROVIDER` env var. Both implementations satisfy the `LLMClient` interface in
-`agent/src/llm/` and produce identical JSON per §3.2. The prompt, schema, and
-validation below apply to both providers.
+**LLM provider:** Anthropic API (Claude) via the official `@anthropic-ai/sdk`,
+wrapped in a thin `LLMClient` interface in `agent/src/llm/` so it can be mocked in
+tests. The prompt, schema, and validation below define that single contract.
 
 **Role of the LLM:** turn structured market state + fetched unstructured items
 (attestation PDFs, regulatory/issuer news) into (a) a human-readable rationale and
@@ -317,7 +316,7 @@ marketState and evidence; never invent data or sources. If evidence is insuffici
 Recommend deRisk=true only for a concrete, cited threat (depeg, oracle issue, issuer/regulatory event).
 ```
 **User:** the JSON from §3.1.
-**Decoding:** `temperature 0–0.2`, `response_format: json` (both Z.ai and Anthropic support this), hard `max_tokens`, single retry on invalid JSON, then deterministic fallback. On Z.ai timeout/error, auto-fallback to Anthropic; on both failing, deterministic-only path.
+**Decoding:** `temperature 0–0.2`, JSON enforced via a tool/`response_format`-style schema, hard `max_tokens`, single retry on invalid JSON, then deterministic fallback. On API timeout/error, deterministic-only path.
 
 ### 3.5 Failure & safety modes
 | Condition | Behavior |

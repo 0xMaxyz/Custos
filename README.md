@@ -47,13 +47,13 @@ docker compose config        # validate the deploy stack
 ## Stack
 
 Solidity + Foundry · React + Vite + Tailwind + daisyUI · RainbowKit + wagmi + viem
-(frontend) · Node/TS + Fastify + viem (backend) · Z.ai GLM-4 primary / Anthropic
-Claude fallback · 1delta API + Mantle RPC.
+(frontend) · Node/TS + Fastify + viem (backend) · Anthropic API (Claude,
+`@anthropic-ai/sdk`) · 1delta API + Mantle RPC.
 
 ## Note for Claude Code on the web / restricted environments
 
 This environment's network allowlist permits npm, GitHub, and the Anthropic API,
-but **blocks the Mantle RPC, 1delta API, Z.ai, and `binaries.soliditylang.org`.**
+but **blocks the Mantle RPC, 1delta API, and `binaries.soliditylang.org`.**
 Consequences:
 
 - **Solidity compiler:** `forge build` cannot fetch solc from the Solidity binary
@@ -65,6 +65,7 @@ Consequences:
   chmod +x ~/.svm/0.8.28/solc-0.8.28
   forge build --root contracts --offline
   ```
-- **On-chain work** (fork tests, `cast` calls, the agent's RPC/1delta/LLM calls)
+- **On-chain work** (fork tests, `cast` calls, the agent's RPC/1delta calls)
   requires adding these hosts to the environment's network policy:
-  `rpc.mantle.xyz` (+ mirrors), `api.1delta.io`, `api.z.ai`.
+  `rpc.mantle.xyz` (+ mirrors), `api.1delta.io`. (`api.anthropic.com` is already
+  allowed.)

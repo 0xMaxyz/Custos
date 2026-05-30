@@ -28,7 +28,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-2a | 2.1–2.3 | DEX lib + USDY valuation + UsdyAdapter |
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline** |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine |
-| PR-3b | 3.4–3.6 | **Pluggable LLM interface (Z.ai/Anthropic)** + news/attestation hero path + guardrail validator |
+| PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator |
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads |
@@ -242,13 +242,13 @@ LLM rationale (news/attestation hero path) → guardrail validator → signer �
 - **Test:** Vitest table-driven (normal / depeg / stale / low-liquidity) → expected
   weights & flags; pure, no network.
 
-### 3.4 — Pluggable LLM interface · _PR-3b_
-- **What:** `LLMClient` interface (`complete(prompt): Promise<RiskVerdict>`); two
-  implementations: `ZaiClient` (Z.ai GLM-4, primary) and `AnthropicClient` (fallback).
-  Both produce the same JSON per SPEC §3.2. Selected via `LLM_PROVIDER` env var.
-- **Goal:** swap LLM providers with one env change, no logic change.
-- **Test:** Vitest: both clients satisfy the same contract tests; provider selection
-  works; fallback activates on Z.ai timeout/error.
+### 3.4 — Anthropic LLM client · _PR-3b_
+- **What:** `LLMClient` interface (`complete(prompt): Promise<RiskVerdict>`) with a
+  single `AnthropicClient` implementation using `@anthropic-ai/sdk`. JSON output per
+  SPEC §3.2; thin interface kept only so tests can inject a mock.
+- **Goal:** a typed, mockable LLM call; never the last line of defense.
+- **Test:** Vitest with a mocked client: contract tests pass; on API error the caller
+  falls back to the deterministic allocation (SPEC §3.5).
 
 ### 3.5 — LLM rationale + signal layer (news/attestation hero path) · _PR-3b_
 - **What:** fetch unstructured items (Ondo attestation PDFs, AUSD PoR reports,

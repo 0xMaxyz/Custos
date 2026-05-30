@@ -1,0 +1,112 @@
+# AGENTS.md — Operating Guide (canonical)
+
+This file is the **single source of truth** for how any AI agent (Claude, Cursor,
+Codex, etc.) or human contributor must work in this repository. `CLAUDE.md` and
+`.cursor/rules/project.mdc` point here. **Read `PLAN.md` for the full project plan;
+this file defines the rules you must follow while executing it.**
+
+If a request conflicts with these rules, **stop and ask** rather than silently
+deviating.
+
+---
+
+## 1. What we are building (one paragraph)
+
+**Sentinel** — an autonomous, risk-managed RWA yield vault on **Mantle**. An AI
+agent (powered by **Z.AI**) allocates **USDC** across **USDY** (tokenized US
+Treasuries), **Aave v3**, and **INIT**, rebalancing **only within hard on-chain
+guardrails**, and recording every decision + outcome **on-chain** under an
+**ERC-8004** agent identity. Target track: **AI × RWA**. See `PLAN.md`.
+
+---
+
+## 2. Non-negotiable rules
+
+1. **Data vs. execution boundary.** The **1delta API** may be used for **reading
+   data** and **optional swap routing only**. It must **NEVER** be in the
+   custody/execution path. The vault must **never execute arbitrary third-party
+   calldata.** Execution happens only through our own audited adapters
+   (`AaveV3Adapter`, `UsdyAdapter`, `InitAdapter`) that call protocols directly
+   with on-chain `minOut`/guardrail checks.
+2. **Guardrails are the final authority.** On-chain guardrails (max weight/strategy,
+   min idle buffer, max slippage, token/strategy whitelist, rebalance-frequency
+   cap, per-tx caps, pause/kill switch, add-strategy timelock) are **immutable
+   limits**. The AI **proposes**; a **deterministic validator** checks against
+   guardrails **before signing**; the on-chain guardrails are the final backstop.
+   **Never** let the LLM be the only thing standing between funds and a bad action.
+3. **AI only where it genuinely beats an algorithm.** Keep yield/optimization/peg/
+   utilization/execution **deterministic**. Use the LLM only for: unstructured→
+   structured risk signals, written rationale/explainability, judgment on novel
+   events, and conversational UX. **No AI-washing.**
+4. **Mantle-only.** Deploy on Mantle (chain ID **5000**). Do not introduce other
+   execution chains. (Solana/Byreal is explicitly out of scope.)
+5. **Custody safety.** USDC is the only deposit asset. USDY is sourced via **DEX,
+   blocklist-aware**, never via KYC-gated mint in the vault path. The ALLOCATOR is
+   a guardrail-bounded hot key with a working **kill switch**.
+6. **Verify before integrating.** Treat every external address in `PLAN.md` as
+   **unverified** until confirmed on-chain. Develop and test against `anvil --fork`
+   of Mantle mainnet before deploying.
+7. **Ground-truth reads.** For assets the vault actually holds (Aave position,
+   USDY), read state **directly via RPC** as the accounting source of truth; 1delta
+   is breadth/UX only.
+8. **Secrets.** Never commit secrets (RPC keys, Z.AI keys, 1delta API key,
+   deployer/ALLOCATOR private keys). Use `.env` (git-ignored) + documented
+   `.env.example`. Never log secrets.
+9. **Scope discipline (MoSCoW).** Finish all **Must** items before any **Should**;
+   **Should** before **Could**. Feature-freeze target **2026-06-12**. Do not start
+   speculative features that threaten the freeze.
+10. **Definition of done includes the submission bars.** A feature is not "done"
+    until it is testable and moves us toward the §11 checklist in `PLAN.md`
+    (deployed + verified + AI function on-chain + public demo + video + README).
+
+---
+
+## 3. Tech stack (do not substitute without asking)
+
+- **Contracts:** Solidity + **Foundry** (forge, anvil, cast). Tests in Forge.
+- **Frontend:** **React + Vite + Tailwind + daisyUI**.
+- **Backend/agent/API:** **Node.js + TypeScript + Fastify**.
+- **TS tests:** **Vitest**.
+- **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
+- **LLM:** **Z.AI**. **Data:** **1delta API** + **Mantle RPC**.
+
+---
+
+## 4. Repository conventions
+
+- **Languages:** TypeScript (strict mode on) for all JS-land code; Solidity for
+  contracts. No JavaScript source files.
+- **Solidity:** explicit visibility, custom errors over revert strings, NatSpec on
+  external/public functions, checks-effects-interactions, reentrancy guards on
+  fund-moving functions. Prefer well-audited libraries (OpenZeppelin/Solmate).
+- **Naming:** contracts `PascalCase`; TS files `kebab-case`; React components
+  `PascalCase`. Be descriptive.
+- **Comments:** explain non-obvious intent/trade-offs/constraints only. Do **not**
+  narrate what the code does. Never leave "explaining the change" comments.
+- **Tests:** every contract that moves funds needs Forge tests on a Mantle fork
+  (happy path + guardrail-violation + liquidity-crunch withdrawal). Agent logic
+  needs Vitest coverage for the risk engine + guardrail validator.
+- **Money math:** never trust floats for on-chain amounts; use bigint/fixed-point;
+  always enforce `minOut`/slippage on swaps.
+
+---
+
+## 5. Git & workflow
+
+- **Branches:** `cursor/<descriptive-name>-46a8`, lowercase. Stay on the working
+  branch; do not switch branches unless asked.
+- **Commits:** one logical change per commit, clear messages. Do not force-push or
+  amend unless explicitly asked.
+- **Push:** `git push -u origin <branch>`; retry network failures with backoff.
+- **PRs:** open/update via the PR tool; default to draft. Keep `PLAN.md`,
+  `AGENTS.md`, `CLAUDE.md`, and the Cursor rule in sync when the plan changes.
+
+---
+
+## 6. When in doubt
+
+- Re-read `PLAN.md` (the plan) and this file (the rules).
+- If a decision isn't covered, pick the option that best protects **custody safety**
+  and the **2026-06-12 freeze**, note it, and flag it.
+- Anything touching guardrails, custody, the 1delta boundary, or scope → **ask
+  first.**

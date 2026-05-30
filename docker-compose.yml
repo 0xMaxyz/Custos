@@ -1,0 +1,38 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENT_PORT: 8080
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - agent
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web/dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

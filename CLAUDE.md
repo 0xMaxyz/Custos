@@ -5,24 +5,30 @@ Read both before doing anything.** This file restates only the non-negotiables s
 they are never missed.
 
 ## Project (one line)
-**Sentinel** — an autonomous, risk-managed RWA yield vault on **Mantle** (chain ID
-5000). An AI agent (Z.AI) allocates **USDC** across **USDY** (tokenized US
-Treasuries), **Aave v3**, and **INIT**, rebalancing only within hard on-chain
-guardrails and logging every decision on-chain under an **ERC-8004** identity.
-Track: **AI × RWA**.
+**Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
+5000). Users deposit **USDC**; an AI agent (Z.AI) earns tokenized-Treasury
+(**USDY**) yield with an **Aave v3** USDC liquidity floor, and **autonomously
+de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle staleness,
+issuer/regulatory shock), recording every decision **and its evidence** on-chain
+under an **ERC-8004** identity. Track: **AI × RWA (Application path)**. The
+verifiable autonomous defense — not the swap-to-USDY — is the product.
 
 ## Top non-negotiables (full list in `AGENTS.md` §2)
 1. **1delta = data + optional swap routing ONLY.** Never in the custody/execution
    path. The vault never executes arbitrary third-party calldata. Execution =
-   our own adapters calling protocols directly with on-chain `minOut`/guardrails.
+   our own adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`) calling
+   protocols/DEXs directly with on-chain `minOut`/guardrails.
 2. **Guardrails are final.** LLM proposes → deterministic validator checks →
-   immutable on-chain guardrails backstop. The model is never the last line of defense.
-3. **AI only where it beats an algorithm.** Keep yield/optimization/peg/utilization/
-   execution deterministic. No AI-washing.
+   immutable on-chain guardrails (incl. depeg/oracle guard) backstop. The model is
+   never the last line of defense.
+3. **AI only where it beats an algorithm.** Keep yield/optimization/peg/oracle/
+   liquidity/execution deterministic. No AI-washing.
 4. **Mantle-only.** No other execution chains.
-5. **Custody safety.** USDC deposit asset; USDY via DEX (blocklist-aware), not
-   KYC mint; ALLOCATOR is a guardrail-bounded hot key with a kill switch.
+5. **Custody safety.** USDC deposit asset; USDY & AUSD via DEX (blocklist-aware),
+   not KYC mint; **no leverage/looping**; ALLOCATOR is a guardrail-bounded hot key
+   with a kill switch.
 6. **Verify addresses on-chain; develop on `anvil --fork` of Mantle mainnet.**
+   Phase-0 liquidity/oracle gates are mandatory.
 7. **Never commit secrets** (RPC/Z.AI/1delta keys, private keys). Use git-ignored
    `.env` + `.env.example`.
 8. **Scope discipline:** Must → Should → Could. Feature-freeze **2026-06-12**.

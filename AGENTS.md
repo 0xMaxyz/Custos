@@ -12,11 +12,15 @@ deviating.
 
 ## 1. What we are building (one paragraph)
 
-**Sentinel** — an autonomous, risk-managed RWA yield vault on **Mantle**. An AI
-agent (powered by **Z.AI**) allocates **USDC** across **USDY** (tokenized US
-Treasuries), **Aave v3**, and **INIT**, rebalancing **only within hard on-chain
-guardrails**, and recording every decision + outcome **on-chain** under an
-**ERC-8004** agent identity. Target track: **AI × RWA**. See `PLAN.md`.
+**Sentinel** — an **AI risk-guardian real-yield account** on **Mantle**. Users
+deposit **USDC**; an AI agent (powered by **Z.AI**) earns tokenized-Treasury
+(**USDY**) yield with an **Aave v3** USDC floor for liquidity, and **autonomously
+de-risks on-chain** into **AUSD**/USDC when RWA risk appears (depeg, oracle
+staleness, issuer/regulatory shock) — **only within hard on-chain guardrails** —
+recording every decision **and its triggering evidence** on-chain under an
+**ERC-8004** identity. Target track: **AI × RWA, Application path**. The swap-to-
+USDY is only the resting state; the **verifiable autonomous defense** is the
+product. See `PLAN.md`.
 
 ---
 
@@ -26,29 +30,33 @@ guardrails**, and recording every decision + outcome **on-chain** under an
    data** and **optional swap routing only**. It must **NEVER** be in the
    custody/execution path. The vault must **never execute arbitrary third-party
    calldata.** Execution happens only through our own audited adapters
-   (`AaveV3Adapter`, `UsdyAdapter`, `InitAdapter`) that call protocols directly
-   with on-chain `minOut`/guardrail checks.
-2. **Guardrails are the final authority.** On-chain guardrails (max weight/strategy,
-   min idle buffer, max slippage, token/strategy whitelist, rebalance-frequency
-   cap, per-tx caps, pause/kill switch, add-strategy timelock) are **immutable
-   limits**. The AI **proposes**; a **deterministic validator** checks against
-   guardrails **before signing**; the on-chain guardrails are the final backstop.
-   **Never** let the LLM be the only thing standing between funds and a bad action.
+   (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`) that call protocols/DEXs
+   directly with on-chain `minOut`/guardrail checks.
+2. **Guardrails are the final authority.** On-chain guardrails (max weight/bucket,
+   min idle+Aave liquidity buffer, max slippage, token/venue whitelist,
+   rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy timelock,
+   depeg/oracle-deviation guard) are **immutable limits**. The AI **proposes**; a
+   **deterministic validator** checks against guardrails **before signing**; the
+   on-chain guardrails are the final backstop. **Never** let the LLM be the only
+   thing standing between funds and a bad action.
 3. **AI only where it genuinely beats an algorithm.** Keep yield/optimization/peg/
-   utilization/execution **deterministic**. Use the LLM only for: unstructured→
-   structured risk signals, written rationale/explainability, judgment on novel
+   oracle/liquidity/execution **deterministic**. Use the LLM only for: unstructured→
+   structured RWA risk signals, written rationale/explainability, judgment on novel
    events, and conversational UX. **No AI-washing.**
-4. **Mantle-only.** Deploy on Mantle (chain ID **5000**). Do not introduce other
-   execution chains. (Solana/Byreal is explicitly out of scope.)
-5. **Custody safety.** USDC is the only deposit asset. USDY is sourced via **DEX,
-   blocklist-aware**, never via KYC-gated mint in the vault path. The ALLOCATOR is
-   a guardrail-bounded hot key with a working **kill switch**.
+4. **Mantle-only.** Deploy on Mantle (chain ID **5000**). No other execution chains.
+   (Solana/Byreal is explicitly out of scope.)
+5. **Custody safety.** USDC is the only deposit asset. USDY and AUSD are sourced via
+   **DEX, blocklist-aware** (USDY uses a blocklist transfer hook), never via
+   KYC-gated mint in the vault path. **No leverage/looping** (no RWA market on
+   Mantle supports it). The ALLOCATOR is a guardrail-bounded hot key with a working
+   **kill switch**.
 6. **Verify before integrating.** Treat every external address in `PLAN.md` as
    **unverified** until confirmed on-chain. Develop and test against `anvil --fork`
-   of Mantle mainnet before deploying.
+   of Mantle mainnet before deploying. The Phase-0 liquidity/oracle gates are
+   mandatory.
 7. **Ground-truth reads.** For assets the vault actually holds (Aave position,
-   USDY), read state **directly via RPC** as the accounting source of truth; 1delta
-   is breadth/UX only.
+   USDY NAV via `RWADynamicOracle`, USDY DEX price, AUSD proof-of-reserves), read
+   **directly via RPC** as the accounting source of truth; 1delta is breadth/UX only.
 8. **Secrets.** Never commit secrets (RPC keys, Z.AI keys, 1delta API key,
    deployer/ALLOCATOR private keys). Use `.env` (git-ignored) + documented
    `.env.example`. Never log secrets.
@@ -57,7 +65,8 @@ guardrails**, and recording every decision + outcome **on-chain** under an
    speculative features that threaten the freeze.
 10. **Definition of done includes the submission bars.** A feature is not "done"
     until it is testable and moves us toward the §11 checklist in `PLAN.md`
-    (deployed + verified + AI function on-chain + public demo + video + README).
+    (deployed + verified + AI function on-chain + public demo + de-risk-event video
+    + README).
 
 ---
 
@@ -84,8 +93,8 @@ guardrails**, and recording every decision + outcome **on-chain** under an
 - **Comments:** explain non-obvious intent/trade-offs/constraints only. Do **not**
   narrate what the code does. Never leave "explaining the change" comments.
 - **Tests:** every contract that moves funds needs Forge tests on a Mantle fork
-  (happy path + guardrail-violation + liquidity-crunch withdrawal). Agent logic
-  needs Vitest coverage for the risk engine + guardrail validator.
+  (happy path + guardrail-violation + depeg/de-risk + liquidity-crunch withdrawal).
+  Agent logic needs Vitest coverage for the risk engine + guardrail validator.
 - **Money math:** never trust floats for on-chain amounts; use bigint/fixed-point;
   always enforce `minOut`/slippage on swaps.
 

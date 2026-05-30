@@ -27,7 +27,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger |
 | PR-2c | 2.7 | AUSD adapter (Should) |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine |
-| PR-3b | 3.4–3.5 | Z.AI rationale + guardrail validator |
+| PR-3b | 3.4–3.5 | Anthropic API (Claude) rationale + guardrail validator |
 | PR-3c | 3.6–3.7 | Executor/signer + scheduler + e2e on fork |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads |
@@ -205,7 +205,7 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 ## Phase 3 — AI agent (off-chain)
 
 **Phase goal:** the Fastify service: ingest data → deterministic risk engine →
-Z.AI rationale → guardrail validator → signer → scheduler, driving the contracts on
+Anthropic API (Claude) rationale → guardrail validator → signer → scheduler, driving the contracts on
 a fork.
 
 ### 3.1 — Config & types · _PR-3a_
@@ -229,12 +229,12 @@ a fork.
 - **Test:** Vitest table-driven (normal / depeg / stale / low-liquidity) → expected
   weights & flags; pure, no network.
 
-### 3.4 — Z.AI rationale + signal layer · _PR-3b_
-- **What:** Z.AI client; prompt taking structured inputs + fetched unstructured
+### 3.4 — Anthropic API (Claude) rationale + signal layer · _PR-3b_
+- **What:** Anthropic API (Claude) client; prompt taking structured inputs + fetched unstructured
   items (attestation/news) → JSON `{rationale, riskVerdict}` (schema-validated). The
   LLM verdict may only **tighten** risk, never exceed guardrails.
 - **Goal:** human-readable rationale + a bounded verdict.
-- **Test:** Vitest with mocked Z.AI: schema validation; malformed output rejected;
+- **Test:** Vitest with mocked Anthropic API (Claude): schema validation; malformed output rejected;
   verdict clamped to safe bounds.
 
 ### 3.5 — Guardrail validator · _PR-3b_

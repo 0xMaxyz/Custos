@@ -5,7 +5,7 @@ Concrete specifications referenced by `PLAN.md` (strategy) and `ROADMAP.md`
 
 1. Guardrail parameters
 2. Contract interfaces
-3. Z.AI prompt + risk-signal schema
+3. Anthropic API prompt + risk-signal schema
 
 > All numeric values are **initial defaults for the demo** — conservative on
 > purpose — to be tuned during Phase 0 (after the liquidity/oracle gate) and
@@ -239,7 +239,7 @@ interface IReputationRegistry {
 
 ---
 
-## 3. Z.AI prompt + risk-signal schema
+## 3. Anthropic API prompt + risk-signal schema
 
 **Role of the LLM:** turn structured market state + fetched unstructured items into
 (a) a human-readable rationale and (b) a **bounded risk verdict that may only
@@ -315,7 +315,7 @@ Recommend deRisk=true only for a concrete, cited threat (depeg, oracle issue, is
 ### 3.5 Failure & safety modes
 | Condition | Behavior |
 |-----------|----------|
-| Z.AI down / timeout | Deterministic allocation only; `riskLevel` from deterministic flags. |
+| Anthropic API down / timeout | Deterministic allocation only; `riskLevel` from deterministic flags. |
 | Invalid/unparseable output | Reject, retry once, then deterministic fallback. |
 | Model requests higher exposure | Ignored (clamped); logged. |
 | `deRisk` without cited evidence | Ignored; logged. |

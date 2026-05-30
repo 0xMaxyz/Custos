@@ -48,7 +48,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 
 **Deterministic / on-chain (algorithmic):** yield & APY math, allocation under constraints, peg/NAV deviation thresholds, liquidity-buffer sizing, slippage caps, guardrail enforcement, execution.
 
-**AI / LLM (Z.AI) — only where it genuinely wins:**
+**AI / LLM (Anthropic API (Claude)) — only where it genuinely wins:**
 1. **Unstructured → structured RWA risk signals** — Ondo/USDY attestations & reserve composition, AUSD proof-of-reserves status, sanctions/regulatory/issuer headlines, macro/Treasury-rate context.
 2. **Explainability** — a human-readable rationale + the evidence that triggered each action.
 3. **Judgment on novel/ambiguous events** — depeg, oracle staleness, issuer/regulatory shocks — always bounded by on-chain guardrails.
@@ -86,7 +86,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 ### 4.4 Backend AI agent (Node.js + TypeScript + Fastify)
 - **Data ingestion (read):** 1delta API (Aave/market data; see §5) + **direct RPC** for held-asset ground-truth (Aave position, USDY `RWADynamicOracle` NAV, USDY DEX price, AUSD proof-of-reserves).
 - **Deterministic risk engine:** yield-spread calc, peg/NAV deviation, oracle-staleness check, liquidity-buffer math.
-- **LLM layer (Z.AI):** ingest unstructured RWA signals (attestations, reserve/regulatory/issuer news) → structured risk flags; propose weights + written rationale + de-risk verdict.
+- **LLM layer (Anthropic API (Claude)):** ingest unstructured RWA signals (attestations, reserve/regulatory/issuer news) → structured risk flags; propose weights + written rationale + de-risk verdict.
 - **Guardrail validator:** rejects/repairs any proposal that violates limits **before** signing.
 - **Scheduler:** periodic + **event-triggered** (depeg / oracle-staleness / utilization spike).
 - **Execution:** signs and submits `rebalance`; pins rationale + evidence to IPFS; writes outcome to `AgentBenchmark`.
@@ -138,14 +138,14 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 3. **Assets:** USDY (primary RWA yield) + Aave USDC (DeFi floor + liquidity) + idle USDC buffer + AUSD (safety). _Fallback: AUSD-primary if USDY liquidity degrades — not expected, liquidity confirmed._
 4. **Sourcing:** all RWA legs via **DEX** (USDY/AUSD), on-chain `minOut`; no KYC-gated mint in the vault path.
 5. **Agent execution:** guardrail-bounded **ALLOCATOR** hot key + kill switch.
-6. **LLM:** Z.AI.
+6. **LLM:** Anthropic API (Claude).
 7. **Data:** 1delta API (data + optional swap routing) + direct RPC ground-truth; own adapters for execution.
 
 ---
 
 ## 8. Scope (MoSCoW)
 
-**Must (core demo):** ERC-4626 `YieldVault` + `UsdyAdapter` + `AaveV3Adapter` + idle buffer + `Guardrails` (incl. depeg/oracle guard) + `Decision`/`AgentBenchmark` logging; AI risk-guardian service (USDY oracle/peg + Aave data via 1delta+RPC, deterministic risk engine, Z.AI rationale, validator, on-chain rebalance, **event-triggered de-risk**); ERC-8004 identity; frontend account dashboard + **risk-guardian feed** + deposit/withdraw + identity card; deployed + **verified on mantlescan**; public frontend; **demo showing a live de-risk event**; ≥2-min video; README; one-line pitch.
+**Must (core demo):** ERC-4626 `YieldVault` + `UsdyAdapter` + `AaveV3Adapter` + idle buffer + `Guardrails` (incl. depeg/oracle guard) + `Decision`/`AgentBenchmark` logging; AI risk-guardian service (USDY oracle/peg + Aave data via 1delta+RPC, deterministic risk engine, Anthropic API (Claude) rationale, validator, on-chain rebalance, **event-triggered de-risk**); ERC-8004 identity; frontend account dashboard + **risk-guardian feed** + deposit/withdraw + identity card; deployed + **verified on mantlescan**; public frontend; **demo showing a live de-risk event**; ≥2-min video; README; one-line pitch.
 
 **Should:** `AusdAdapter` (safety leg) + AUSD proof-of-reserves into the risk radar; RWA risk radar viz; conversational agent; Telegram/Discord risk alerts.
 
@@ -160,7 +160,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 - **Phase 0 — Foundations & gates:** repo + Foundry/Vite/Docker scaffold; Mantle mainnet-fork harness (`anvil --fork`); **verify on-chain**: USDY/AUSD DEX pools + slippage for $100–$1k, USDY `RWADynamicOracle`, Aave Pool/DataProvider, AUSD proof-of-reserves, 0x8004 presence. _Exit: forked tests read Aave reserves, USDY NAV, and a USDC↔USDY quote._
 - **Phase 1 — Vault core:** ERC-4626 vault + guardrails + `AaveV3Adapter` + idle buffer; Forge/Vitest tests on fork. _Exit: deposit → Aave → withdraw works._
 - **Phase 2 — RWA + risk guard:** `UsdyAdapter` (DEX, `minOut`, blocklist-aware) + depeg/oracle-deviation guard + `Decision`/`AgentBenchmark`. _Exit: a USDY↔safe rotation emits a verifiable on-chain decision with evidence hash._
-- **Phase 3 — AI agent:** 1delta+RPC ingestion + deterministic risk engine + Z.AI rationale + validator + scheduler (periodic + event-triggered). _Exit: autonomous detect→de-risk loop on fork._
+- **Phase 3 — AI agent:** 1delta+RPC ingestion + deterministic risk engine + Anthropic API (Claude) rationale + validator + scheduler (periodic + event-triggered). _Exit: autonomous detect→de-risk loop on fork._
 - **Phase 4 — ERC-8004 + frontend:** register identity; build dashboard, **risk-guardian feed**, identity card, deposit/withdraw. _Exit: clickable end-to-end app on testnet._
 - **Phase 5 — Mainnet + Should-haves:** deploy + **verify on mantlescan**, fund a small real position; add `AusdAdapter` + risk radar + conversational agent. _Exit: live mainnet demo._
 - **Phase 6 — Freeze & polish (≈06-12):** public frontend (Docker/Caddy), README (setup + architecture + addresses), one-line pitch, **≥2-min demo video featuring a live de-risk event**, X/Twitter assets.
@@ -204,4 +204,4 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 - **Backend/agent/API:** Node.js + TypeScript + Fastify.
 - **Testing:** Vitest (TS) + Forge (Solidity).
 - **Deploy:** Docker (backend + frontend) behind Caddy (or nginx).
-- **LLM:** Z.AI. **Data:** 1delta API + Mantle RPC.
+- **LLM:** Anthropic API (Claude). **Data:** 1delta API + Mantle RPC.

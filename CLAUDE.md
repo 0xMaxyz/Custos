@@ -2,13 +2,13 @@
 
 **Read these before doing anything:** `AGENTS.md` (canonical operating guide),
 `PLAN.md` (full plan), `ROADMAP.md` (PR-sized per-phase tasks with What/Goal/Test),
-`SPEC.md` (guardrail parameters, contract interfaces, Z.AI prompt + risk-signal
+`SPEC.md` (guardrail parameters, contract interfaces, Anthropic API (Claude) prompt + risk-signal
 schema), and `UI.md` (UI/UX plan). This file restates only the non-negotiables so
 they are never missed.
 
 ## Project (one line)
 **Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
-5000). Users deposit **USDC**; an AI agent (Z.AI) earns tokenized-Treasury
+5000). Users deposit **USDC**; an AI agent (Anthropic API (Claude)) earns tokenized-Treasury
 (**USDY**) yield with an **Aave v3** USDC liquidity floor, and **autonomously
 de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle staleness,
 issuer/regulatory shock), recording every decision **and its evidence** on-chain
@@ -33,7 +33,7 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
    with a kill switch.
 6. **Verify addresses on-chain; develop on `anvil --fork` of Mantle mainnet.**
    Phase-0 liquidity/oracle gates are mandatory.
-7. **Never commit secrets** (RPC/Z.AI/1delta keys, private keys). Use git-ignored
+7. **Never commit secrets** (RPC/Anthropic API (Claude)/1delta keys, private keys). Use git-ignored
    `.env` + `.env.example`.
 8. **Scope discipline:** Must → Should → Could. Feature-freeze **2026-06-12**.
    Work in PR-sized tasks per `ROADMAP.md`; don't start a phase before the prior
@@ -42,7 +42,7 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
 ## Stack (do not substitute)
 Solidity + Foundry · React + Vite + Tailwind + daisyUI · **RainbowKit + wagmi + viem
 (frontend)** · Node/TS + Fastify + **viem (backend/agent — no ethers)** · Vitest +
-Forge · Docker + Caddy · Z.AI · 1delta API + Mantle RPC. UI: clean/professional,
+Forge · Docker + Caddy · Anthropic API (Claude) · 1delta API + Mantle RPC. UI: clean/professional,
 purple accent, light+dark themes — see `UI.md`.
 
 ## Workflow

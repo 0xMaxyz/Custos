@@ -116,13 +116,13 @@ chosen); ERC-8004 path decided; depeg can be injected cleanly.
 **Phase goal:** a working ERC-4626 USDC vault with the Aave leg, idle buffer,
 guardrails, and deposit/withdraw.
 
-### 1.1 — Roles & access control · _PR-1a_
+### 1.1 — Roles & access control · _PR-1a_ · `[x] DONE`
 - **What:** `ADMIN`, `ALLOCATOR`, `GUARDIAN` roles; `Pausable`; kill switch.
 - **Goal:** only ALLOCATOR rebalances; GUARDIAN can pause; ADMIN manages config.
 - **Test:** Forge unit tests: unauthorized calls revert; pause blocks
   deposit/rebalance; kill switch enables emergency withdraw-only.
 
-### 1.2 — Guardrails module · _PR-1a_
+### 1.2 — Guardrails module · _PR-1a_ · `[x] DONE`
 - **What:** params: `maxWeightPerBucket`, `minLiquidityBufferBps`, `maxSlippageBps`,
   token/venue whitelist, `maxRebalanceFreq`, `perTxCap`, `addStrategyTimelock`;
   pure validation helpers.
@@ -130,14 +130,14 @@ guardrails, and deposit/withdraw.
 - **Test:** Forge unit tests: over-cap/over-slippage/non-whitelisted proposals
   revert; within-bounds pass; timelock enforced for new strategies.
 
-### 1.3 — `YieldVault` ERC-4626 skeleton · _PR-1a_
+### 1.3 — `YieldVault` ERC-4626 skeleton · _PR-1a_ · `[x] DONE`
 - **What:** USDC asset; deposit/mint/withdraw/redeem; `totalAssets()` = idle +
   Σ adapter assets; idle-buffer accounting; reentrancy guards.
 - **Goal:** deposit/withdraw works with idle-only; share math correct.
 - **Test:** Forge: deposit→redeem round-trip; `totalAssets` tracks; fuzz that share
   price is non-decreasing absent losses.
 
-### 1.4 — Strategy adapter interface · _PR-1a_
+### 1.4 — Strategy adapter interface · _PR-1a_ · `[x] DONE`
 - **What:** `IStrategyAdapter` (`deposit`, `withdraw`, `totalAssets`,
   `maxWithdrawable`); vault registry of adapters + target weights.
 - **Goal:** pluggable adapters behind a stable interface.

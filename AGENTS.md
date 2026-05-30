@@ -85,7 +85,7 @@ product. See `PLAN.md`.
 - **Backend/agent/API:** **Node.js + TypeScript + Fastify** + **viem** (no ethers).
 - **TS tests:** **Vitest**.
 - **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
-- **LLM:** **Anthropic API (Claude)**. **Data:** **1delta API** + **Mantle RPC**.
+- **LLM:** **Z.ai GLM-4 (primary) / Anthropic Claude (fallback)** — pluggable `LLMClient` interface; same JSON contract per SPEC §3. **Data:** **1delta API** + **Mantle RPC**.
 
 ---
 

@@ -239,13 +239,20 @@ interface IReputationRegistry {
 
 ---
 
-## 3. Anthropic API prompt + risk-signal schema
+## 3. LLM prompt + risk-signal schema
 
-**Role of the LLM:** turn structured market state + fetched unstructured items into
-(a) a human-readable rationale and (b) a **bounded risk verdict that may only
-*tighten* risk** (lower the USDY weight / raise the risk level) — it can never
-loosen guardrails or raise exposure. The deterministic engine + on-chain guardrails
-own all hard limits.
+**LLM provider:** Z.ai GLM-4 (primary) / Anthropic Claude (fallback), selected via
+`LLM_PROVIDER` env var. Both implementations satisfy the `LLMClient` interface in
+`agent/src/llm/` and produce identical JSON per §3.2. The prompt, schema, and
+validation below apply to both providers.
+
+**Role of the LLM:** turn structured market state + fetched unstructured items
+(attestation PDFs, regulatory/issuer news) into (a) a human-readable rationale and
+(b) a **bounded risk verdict that may only *tighten* risk** (lower the USDY weight /
+raise the risk level) — it can never loosen guardrails or raise exposure. Reading
+unstructured documents is the task the LLM owns; the oracle-deviation trigger is
+deterministic and does not go through the LLM. The deterministic engine + on-chain
+guardrails own all hard limits.
 
 ### 3.1 Agent input (assembled deterministically, passed to the model)
 ```jsonc
@@ -310,7 +317,7 @@ marketState and evidence; never invent data or sources. If evidence is insuffici
 Recommend deRisk=true only for a concrete, cited threat (depeg, oracle issue, issuer/regulatory event).
 ```
 **User:** the JSON from §3.1.
-**Decoding:** `temperature 0–0.2`, `response_format: json`, hard `max_tokens`, single retry on invalid JSON, then deterministic fallback.
+**Decoding:** `temperature 0–0.2`, `response_format: json` (both Z.ai and Anthropic support this), hard `max_tokens`, single retry on invalid JSON, then deterministic fallback. On Z.ai timeout/error, auto-fallback to Anthropic; on both failing, deterministic-only path.
 
 ### 3.5 Failure & safety modes
 | Condition | Behavior |

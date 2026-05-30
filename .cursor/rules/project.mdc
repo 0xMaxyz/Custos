@@ -1,60 +1,76 @@
 ---
-description: Sentinel project rules — autonomous RWA yield vault on Mantle. Canonical guide is AGENTS.md; full plan is PLAN.md.
+description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide AGENTS.md; plan PLAN.md; execution ROADMAP.md; specs SPEC.md; UI UI.md.
 alwaysApply: true
 ---
 
 # Sentinel — Cursor Project Rules
 
-`AGENTS.md` is the **canonical operating guide** and `PLAN.md` is the **full plan**.
-Read both. This rule restates the non-negotiables and always applies.
+`AGENTS.md` is the **canonical operating guide**, `PLAN.md` the **full plan**,
+`ROADMAP.md` the **PR-sized execution breakdown** (per-phase tasks with What / Goal /
+How-to-test), `SPEC.md` the **technical spec** (guardrail parameters, contract
+interfaces, Z.AI prompt + risk-signal schema), and `UI.md` the **UI/UX plan**. Read
+all. This rule restates the non-negotiables and always applies.
 
 ## Project (one line)
-**Sentinel** — an autonomous, risk-managed RWA yield vault on **Mantle** (chain ID
-5000). An AI agent (Z.AI) allocates **USDC** across **USDY** (tokenized US
-Treasuries), **Aave v3**, and **INIT**, rebalancing only within hard on-chain
-guardrails and logging every decision on-chain under an **ERC-8004** identity.
-Track: **AI × RWA**.
+**Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
+5000). Users deposit **USDC**; an AI agent (Z.AI) earns tokenized-Treasury
+(**USDY**) yield with an **Aave v3** USDC liquidity floor, and **autonomously
+de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle staleness,
+issuer/regulatory shock), recording every decision **and its evidence** on-chain
+under an **ERC-8004** identity. Track: **AI × RWA (Application path)**. The
+verifiable autonomous defense — not the swap-to-USDY — is the product.
 
 ## Non-negotiables
 - **1delta = data + optional swap routing ONLY.** Never in the custody/execution
   path. The vault must never execute arbitrary third-party calldata. Execution
-  happens only via our own adapters (`AaveV3Adapter`, `UsdyAdapter`, `InitAdapter`)
-  that call protocols directly with on-chain `minOut`/guardrail checks.
+  happens only via our own adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`)
+  that call protocols/DEXs directly with on-chain `minOut`/guardrail checks.
 - **Guardrails are final.** LLM proposes → deterministic validator checks against
-  guardrails → immutable on-chain guardrails are the backstop. The model is never
-  the last line of defense. Guardrails: max weight/strategy, min idle buffer, max
-  slippage, token/strategy whitelist, rebalance-frequency cap, per-tx caps,
-  pause/kill switch, add-strategy timelock.
-- **AI only where it beats an algorithm.** Keep yield/optimization/peg/utilization/
-  execution deterministic. Use the LLM only for: unstructured→structured risk
-  signals, written rationale, novel-event judgment, conversational UX. No AI-washing.
+  guardrails → immutable on-chain guardrails are the backstop. The LLM may only
+  **tighten** risk, never loosen it (`SPEC.md` §3). On-chain `Guardrails` + TS
+  validator share constants from `packages/shared`. Guardrails: max weight/bucket,
+  min idle+Aave liquidity buffer, max slippage, token/venue whitelist,
+  rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy timelock,
+  depeg/oracle-deviation guard (values in `SPEC.md` §1).
+- **AI only where it beats an algorithm.** Keep yield/optimization/peg/oracle/
+  liquidity/execution deterministic. Use the LLM only for: unstructured→structured
+  RWA risk signals, written rationale, novel-event judgment, conversational UX.
+  No AI-washing.
 - **Mantle-only** (chain ID 5000). No other execution chains. Solana/Byreal is out.
-- **Custody safety.** USDC is the only deposit asset. USDY is sourced via **DEX,
-  blocklist-aware**, never KYC-gated mint in the vault path. ALLOCATOR is a
-  guardrail-bounded hot key with a kill switch.
+- **Custody safety.** USDC is the only deposit asset. USDY & AUSD are sourced via
+  **DEX, blocklist-aware**, never KYC-gated mint in the vault path. **No leverage/
+  looping** (no RWA market on Mantle supports it). ALLOCATOR is a guardrail-bounded
+  hot key with a kill switch.
 - **Verify before integrating.** Treat addresses in `PLAN.md` as unverified until
-  confirmed on-chain. Develop/test against `anvil --fork` of Mantle mainnet first.
-- **Ground-truth reads via RPC** for held assets (Aave position, USDY); 1delta is
-  breadth/UX only.
+  confirmed on-chain. Develop/test against `anvil --fork` of Mantle mainnet first;
+  Phase-0 liquidity/oracle gates are mandatory.
+- **Ground-truth reads via RPC** for held assets (Aave position, USDY NAV/DEX price,
+  AUSD proof-of-reserves); 1delta is breadth/UX only.
 - **Never commit secrets.** Git-ignored `.env` + documented `.env.example`. No
   secret logging.
-- **Scope discipline (MoSCoW):** Must → Should → Could. Feature-freeze **2026-06-12**.
+- **Scope & execution discipline (MoSCoW + ROADMAP):** Must → Should → Could. Work
+  in PR-sized tasks per `ROADMAP.md`; don't start a phase before the prior phase's
+  exit criteria are met. Feature-freeze **2026-06-12**.
 
 ## Stack (do not substitute without asking)
-Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI · Node.js
-+ TypeScript + Fastify · Vitest + Forge tests · Docker + Caddy/nginx · Z.AI · 1delta
-API + Mantle RPC.
+Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI ·
+**RainbowKit + wagmi + viem (frontend)** · Node.js + TypeScript + Fastify + **viem
+(backend/agent — no ethers)** · Vitest + Forge tests · Docker + Caddy/nginx · Z.AI ·
+1delta API + Mantle RPC. UI: clean/professional, purple accent, light+dark — `UI.md`.
 
 ## Conventions
 - TypeScript strict; no plain JS source. Solidity: explicit visibility, custom
   errors, NatSpec, checks-effects-interactions, reentrancy guards on fund-moving
-  functions, prefer OpenZeppelin/Solmate.
+  functions, prefer OpenZeppelin/Solmate; match `SPEC.md` §2 interface sketches.
 - Comments explain non-obvious intent only; never narrate code or "explain the change."
 - Every fund-moving contract needs Forge fork tests (happy path + guardrail
-  violation + liquidity-crunch withdrawal). Risk engine + validator need Vitest.
+  violation + depeg/de-risk + liquidity-crunch withdrawal). Risk engine + validator
+  need Vitest. Frontend follows `UI.md` (tokens, two themes, a11y); build with mock
+  data first.
 
 ## Workflow
 Branches `cursor/<descriptive-name>-46a8` (lowercase); one logical change per
-commit; draft PRs via the PR tool. Keep `PLAN.md` / `AGENTS.md` / `CLAUDE.md` / this
-rule in sync. When unsure about guardrails, custody, the 1delta boundary, or scope —
+commit; one PR per ROADMAP PR-group where practical; draft PRs via the PR tool. Keep
+`PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` / `CLAUDE.md` / this rule
+in sync. When unsure about guardrails, custody, the 1delta boundary, or scope —
 **ask first.**

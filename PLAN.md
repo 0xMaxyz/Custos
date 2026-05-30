@@ -1,11 +1,13 @@
 # Sentinel — Project Plan
 
-> Autonomous, risk-managed RWA yield vault on Mantle. An AI agent allocates
-> stablecoins across tokenized US Treasuries (USDY) and Mantle lending markets
-> (Aave v3, INIT), rebalancing within hard on-chain guardrails and recording
-> every decision + outcome on-chain under an ERC-8004 agent identity.
+> An AI risk-guardian real-yield account on Mantle. Users deposit USDC; an AI
+> agent earns tokenized-Treasury (USDY) yield while continuously watching
+> real-world RWA risk and **autonomously de-risking on-chain** — rotating into a
+> DeFi yield floor (Aave) or a reserve-backed safe asset (AUSD) when danger
+> appears. Every decision and its triggering evidence are recorded on-chain under
+> an ERC-8004 agent identity.
 
-**Status:** Plan locked. No code written yet.
+**Status:** Plan locked (v2 — pivoted to real, available Mantle RWAs). No code yet.
 **Working name:** _Sentinel_ (placeholder; may rename).
 
 ---
@@ -14,136 +16,155 @@
 
 - **Event:** The Turing Test Hackathon 2026 (Mantle), DoraHacks.
 - **Deadline:** **2026-06-15 15:59 UTC.** Target **feature-freeze by 2026-06-12**, leaving 2–3 days for testing, the demo video, and submission/marketing.
-- **Primary track:** **AI × RWA** (Exclusively Supported by Mantle Network).
+- **Primary track:** **AI × RWA** (Exclusively Supported by Mantle Network) — **Path B: [AI-Driven] RWA Application** ("end-user-facing AI × RWA products that lower the barrier to real-asset investing").
 - **Also eligible from the same codebase:** Grand Champion, Best UI/UX, Community Voting, and the **20 Project Deployment Award**.
 - **The three "defining features" we deliberately lean into:**
   1. **On-chain benchmarking of AI** — every agent decision + outcome recorded on Mantle.
-  2. **ERC-8004 agent identity** — the agent is issued an on-chain identity NFT and accrues reputation.
-  3. **Radical transparency** — human-readable rationale for every action, surfaced in the UI.
+  2. **ERC-8004 agent identity** — the agent is issued an on-chain identity NFT and accrues reputation from its risk-management track record.
+  3. **Radical transparency** — human-readable rationale + the triggering evidence for every action, surfaced in the UI.
 
-### Scoring weights we are optimizing against (AI × RWA, General 60% + Track-specific 40%)
-- AI × RWA integration depth, technical completeness, Mantle integration, **compliance awareness**.
-- Grand Champion rubric (for cross-track eligibility): Technical Depth 30%, Innovation 25%, Mantle Ecosystem Contribution 25%, Product Completeness 20%.
+### Scoring we optimize against
+- **AI × RWA General (60%):** depth of AI × RWA integration, technical completeness, Mantle integration, **compliance awareness**.
+- **AI × RWA Track-specific (40%, Application):** **Real-World Validity** — clear asset category + well-defined target users + complete user experience.
+- **Grand Champion (cross-track):** Technical Depth 30%, Innovation 25%, Mantle Ecosystem Contribution 25%, Product Completeness 20%.
 
 ---
 
 ## 2. Product
 
-**One-liner:** _An autonomous, risk-managed RWA yield vault on Mantle that earns real-asset-backed yield and proves — on-chain — why every move was made._
+**One-liner:** _Set-and-forget real-yield on tokenized US Treasuries, with an AI that watches the risks a stablecoin holder can't — and defends your money on-chain, verifiably._
 
-**User / JTBD:** A DeFi-literate-but-busy holder or a small DAO/treasury that wants stable, real-asset-backed yield without babysitting utilization/peg risk across protocols, and without trusting an opaque black box. _"Earn the best risk-adjusted yield on my dollars using real assets, and show me exactly why every move was made — verifiably."_
+**Target user:** Non-US retail seeking safe dollar yield without babysitting RWA risk, and small DAO/treasuries wanting a productive, defensible cash position with an auditable decision trail.
+
+**JTBD:** _"Earn real-asset-backed yield on my dollars, automatically protect me from RWA-specific tail risks (depeg, oracle/issuer/regulatory events), and prove every move was justified."_
+
+**Why it's not "just a USDY wrapper":** the swap-to-USDY is only the resting state. The product is the **autonomous, verifiable management and defense** around it (see §4.2): risk-aware allocation, automatic de-risking, and an on-chain evidence ledger. Remove the AI and the product can't read an oracle deviation, an attestation, or a regulatory headline.
 
 ---
 
-## 3. The honest "AI vs algorithm" split (our innovation story)
+## 3. The honest "AI vs algorithm" split (innovation story)
 
-We deliberately do **not** put AI where a deterministic algorithm is better. This is a core design value and a scoring advantage (real Innovation, not AI-washing).
+We do **not** put AI where a deterministic algorithm is better. The AI is the **risk guardian**, not a black box that touches money directly.
 
-**Deterministic / on-chain (algorithmic):**
-- Yield & APY math, allocation optimization under constraints.
-- Utilization / liquidity tracking, peg-deviation thresholds.
-- Slippage caps, guardrail enforcement, execution.
+**Deterministic / on-chain (algorithmic):** yield & APY math, allocation under constraints, peg/NAV deviation thresholds, liquidity-buffer sizing, slippage caps, guardrail enforcement, execution.
 
 **AI / LLM (Z.AI) — only where it genuinely wins:**
-1. **Unstructured → structured risk signals** — parse Aave/INIT governance posts, incident/exploit news, Ondo/USDY disclosures, and social sentiment into structured risk flags.
-2. **Explainability** — a human-readable rationale for every rebalance (the "radical transparency" feature).
-3. **Judgment on novel/ambiguous events** — depegs, exploits, governance attacks — always bounded by on-chain guardrails.
-4. **Conversational UX** — "explain my risk," "what changed today."
+1. **Unstructured → structured RWA risk signals** — Ondo/USDY attestations & reserve composition, AUSD proof-of-reserves status, sanctions/regulatory/issuer headlines, macro/Treasury-rate context.
+2. **Explainability** — a human-readable rationale + the evidence that triggered each action.
+3. **Judgment on novel/ambiguous events** — depeg, oracle staleness, issuer/regulatory shocks — always bounded by on-chain guardrails.
+4. **Conversational UX** — "why am I in AUSD right now?", "what changed today?".
 
-**Safety model:** the LLM **proposes**; a deterministic validator checks the proposal against guardrails **before** anything is signed; on-chain guardrails are the final, immutable backstop. Safety is never the model alone.
+**Safety model:** the LLM **proposes** target weights + a de-risk verdict; a **deterministic validator** checks the proposal against guardrails **before** signing; **immutable on-chain guardrails** are the final backstop. The model is never the last line of defense.
 
 ---
 
 ## 4. Architecture
 
-### 4.1 Smart contracts (Foundry — forge/anvil/cast)
-- **`YieldVault`** — ERC-4626, asset = **USDC**. Holds an idle buffer + positions via adapters. `rebalance(targetWeights, decisionURI, rationaleHash)` is the **AI-powered on-chain function**, callable **only by the ALLOCATOR role**, emitting a `Decision` event. Withdrawals: idle → unwind strategies in queue order, **respecting available (non-borrowed) liquidity** (see §6 — the Morpho misconception).
-- **Strategy adapters** (execution is trustless, protocol-direct):
+### 4.1 Assets & allocation buckets
+- **USDY (Ondo)** — RWA yield core (tokenized US Treasuries, ~4.5%, NAV/price-accruing).
+- **Aave v3 USDC supply** — DeFi-yield leg **and** instant withdrawal liquidity (deep, redeemable on demand).
+- **Idle USDC buffer** — instant small withdrawals.
+- **AUSD (Agora)** — flight-to-safety leg (reserve-backed: cash + T-bills + repo; on-chain proof-of-reserves).
+
+### 4.2 The managed-allocation mechanism (the product)
+1. User deposits **USDC**, receives ERC-4626 **shares**.
+2. The AI sets **target weights** across the buckets from (a) the **yield spread** (USDY Treasury yield vs Aave supply APY, risk-adjusted) and (b) **RWA risk signals**.
+3. **Yield reaches users via share-price appreciation** (USDY NAV accrual + Aave interest) — no rebasing, no claim step.
+4. **Risk-guardian action:** on a danger signal (USDY DEX price vs `RWADynamicOracle` NAV deviation = depeg, oracle staleness, attestation/regulatory shock), the agent **auto-rotates out of USDY into AUSD/USDC**, or **pauses**, and writes the decision + **evidence hash/URI** on-chain.
+5. **Withdrawals** are served from **idle + Aave first** (instant); only large redemptions unwind USDY via DEX. The buffer is sized so normal withdrawals never wait on USDY liquidity.
+
+### 4.3 Smart contracts (Foundry — forge/anvil/cast)
+- **`YieldVault`** — ERC-4626, asset = **USDC**. `rebalance(targetWeights, decisionURI, rationaleHash)` is the **AI-powered on-chain function**, callable **only by the ALLOCATOR role**, emitting a `Decision` event. Withdraw queue respects available liquidity.
+- **Strategy adapters (trustless, protocol-direct execution):**
+  - `UsdyAdapter` — USDC↔USDY via DEX (USDY/USDC, USDY/WMNT have millions in liquidity), on-chain `minOut`, blocklist-aware.
   - `AaveV3Adapter` — supply/withdraw USDC on Aave v3 Mantle.
-  - `UsdyAdapter` — USDC↔USDY via DEX, **blocklist-aware**, on-chain `minOut`.
-  - `InitAdapter` — _Should-have_ third strategy.
-- **`Guardrails`** (immutable params): max weight per strategy, min idle buffer, max slippage, strategy/token whitelist, max rebalance frequency, per-tx caps, **pause/kill switch**, timelock for adding strategies.
-- **`AgentBenchmark`** — logs each decision + later writes realized outcome (APY vs benchmark) → the **on-chain benchmarking** record.
-- **ERC-8004 registries** — register the agent in the Identity (ERC-721) + Reputation registries. **If the 0x8004 singletons are not deployed on Mantle, we deploy them ourselves** — bringing the Trustless Agents standard to Mantle is itself a headline ecosystem contribution and matches the organizers' stated narrative. _(Registry presence on Mantle: TO VERIFY ON-CHAIN.)_
+  - `AusdAdapter` — USDC↔AUSD via DEX (Merchant Moe), on-chain `minOut`.
+- **`Guardrails`** (immutable params): max weight per bucket, **min idle/Aave liquidity buffer**, max slippage, token/venue whitelist, max rebalance frequency, per-tx caps, **pause/kill switch**, add-strategy timelock, and a **depeg/oracle-deviation guard** that can force de-risk.
+- **`AgentBenchmark`** — logs each decision + the triggering evidence + later the realized outcome (APY, drawdown avoided) → the **on-chain benchmarking** record.
+- **ERC-8004 registries** — register the agent in Identity (ERC-721) + Reputation registries. **If the 0x8004 singletons are not on Mantle, deploy them ourselves** (bringing the Trustless Agents standard to Mantle is itself a headline ecosystem contribution). _(Mantle presence: TO VERIFY ON-CHAIN.)_
 
-### 4.2 Backend AI agent (Node.js + TypeScript + Fastify)
-- **Data ingestion (read):** 1delta API (primary; see §5) + direct RPC ground-truth for held assets.
-- **Deterministic risk engine:** risk scores, liquidity-stress, peg deviation, risk-adjusted yield; IRM-curve simulation ("if I withdraw X, utilization → Y, rate → Z").
-- **LLM layer (Z.AI):** unstructured-signal ingestion → structured flags; proposed allocation + written rationale.
-- **Guardrail validator:** rejects/repairs any proposal that violates on-chain limits **before** signing.
-- **Scheduler:** periodic + event-triggered (peg break / utilization spike).
-- **Execution:** signs and submits `rebalance`; pins rationale to IPFS; writes outcome to `AgentBenchmark`.
+### 4.4 Backend AI agent (Node.js + TypeScript + Fastify)
+- **Data ingestion (read):** 1delta API (Aave/market data; see §5) + **direct RPC** for held-asset ground-truth (Aave position, USDY `RWADynamicOracle` NAV, USDY DEX price, AUSD proof-of-reserves).
+- **Deterministic risk engine:** yield-spread calc, peg/NAV deviation, oracle-staleness check, liquidity-buffer math.
+- **LLM layer (Z.AI):** ingest unstructured RWA signals (attestations, reserve/regulatory/issuer news) → structured risk flags; propose weights + written rationale + de-risk verdict.
+- **Guardrail validator:** rejects/repairs any proposal that violates limits **before** signing.
+- **Scheduler:** periodic + **event-triggered** (depeg / oracle-staleness / utilization spike).
+- **Execution:** signs and submits `rebalance`; pins rationale + evidence to IPFS; writes outcome to `AgentBenchmark`.
 
-### 4.3 Frontend (React + Vite + Tailwind + daisyUI)
-- **Vault dashboard** — TVL, live allocation, APY, your position.
-- **Agent decision feed** — AI rationale per decision (the "wow" + transparency).
-- **Risk radar** — Mantle lending-market health (utilization / liquidity / peg / risk score) across lenders — the data-edge visualization (Insight Value).
-- **Agent identity card** — ERC-8004 NFT + verifiable track record (realized APY vs benchmark).
+### 4.5 Frontend (React + Vite + Tailwind + daisyUI)
+- **Account dashboard** — balance, blended APY, current allocation (USDY / Aave / idle / AUSD), share price.
+- **Risk-guardian feed** — the hero: each decision with AI rationale **and the evidence that triggered it** (depeg reading, oracle status, headline) — radical transparency.
+- **RWA risk radar** — USDY NAV-vs-DEX peg, oracle freshness, AUSD proof-of-reserves, Aave utilization (absorbs Option B's insight layer).
+- **Agent identity card** — ERC-8004 NFT + verifiable track record (yield earned, de-risk events handled).
 - **Deposit/withdraw**, testnet/mainnet toggle, conversational "Ask the agent."
 
 ---
 
 ## 5. Data vs. execution boundary (1delta) — non-negotiable
 
-**Principle: separate _data_ (read) from _execution_ (money movement); they have different trust profiles.**
-
-- **Data layer → use 1delta API heavily.** Endpoints we rely on:
-  - `GET /v1/data/lending/pools?chainId=5000` — per-pool deposit rate, utilization, TVL, liquidity, **risk score (1–5)** across all 21 Mantle lenders → the risk radar.
-  - `GET /v1/data/lending/irm?marketUids=…` — **IRM rate curves** → rate-impact simulation.
-  - `Data › User Positions` — health factors / positions.
-  - `Data › Yields`, `Data › Prices`, `Data › Vaults` (ERC-4626 across Morpho/Silo/Euler) → benchmarking context.
-  - Get an API key (`auth.1delta.io`) to lift the 10-req/15-min limit; **cache server-side**.
-- **Execution layer → our own adapters only. 1delta is NEVER in the custody/execution path.** The vault must not execute arbitrary third-party calldata (security + availability + judging reasons).
-  - **One bounded exception:** the off-chain agent may query 1delta `Actions › Swap` for the best USDC↔USDY route, then pass it into `UsdyAdapter`, which enforces `minOut` on-chain. A direct router call (Agni/Merchant Moe) with `minOut` is the simple fallback.
-- **Ground-truth reads:** for assets we actually hold (Aave position, USDY), also read **directly via RPC** (Aave `DataProvider`, USDY `RWADynamicOracle`) so vault accounting is trustless and a 1delta outage degrades the _radar_, not the _vault_.
+**Separate _data_ (read) from _execution_ (money movement).**
+- **Data layer → use 1delta API** for Aave/market data on Mantle (rates, utilization, TVL, risk scores, IRM curves), backstopped by **direct RPC** for assets we hold.
+  - `GET /v1/data/lending/pools?chainId=5000`, `/lending/irm`, `Data › Yields`, `Data › Prices`, `Data › User Positions`. API key from `auth.1delta.io`; cache server-side.
+- **Execution layer → our own adapters only. 1delta is NEVER in the custody/execution path.** The vault must not execute arbitrary third-party calldata.
+  - **One bounded exception:** the agent may query 1delta `Actions › Swap` for best USDC↔USDY / USDC↔AUSD routing, then pass the route into our adapter, which enforces `minOut` on-chain. A direct router call (Merchant Moe / Agni) with `minOut` is the fallback.
 
 ---
 
-## 6. Verified Mantle infrastructure (as of research, 2026-05)
+## 6. Verified Mantle reality (research, 2026-05 — re-verify on-chain before integrating)
 
-> Addresses below are from research and **must be re-verified on-chain before integration** (mark in code as such).
+**Usable RWAs:**
+- **USDY (Ondo)** — live. **Blocklist-based** transfer hook (NOT allowlist); post-40-day-lockup tokens transfer permissionlessly and DEXs list USDY without gating buyers, so a non-blocked contract **can buy/hold via DEX without KYC**. Only **mint/redeem** needs `OndoIDRegistry` whitelist (we avoid that path). Yield-bearing; on-chain `RWADynamicOracle`; monthly attestations. **Liquidity confirmed: USDY/USDC and USDY/WMNT have millions on Mantle DEXs.** → **Primary RWA.**
+- **AUSD (Agora)** — live, native on Mantle (`0x00000000efe302beaa2b3e6e1b18d08d69a9012a`, 6 decimals). Reserve-backed (cash + T-bills + repo; VanEck / State Street / PwC), **on-chain proof-of-reserves (Chaos Labs)**. Permissionless to hold; DEX pairs with USDe/USDT (Merchant Moe). Stablecoin (no native holder yield). → **Safety leg + rich risk-data source.**
 
-- **Network:** Mantle mainnet — chain ID **5000** (`0x1388`), RPC `https://rpc.mantle.xyz`, explorer `https://mantlescan.xyz` / `https://explorer.mantle.xyz`. EVM-equivalent.
-- **Aave v3 on Mantle** — live, ~$1.34B market size (3rd-largest Aave market globally). Assets incl. USDC, USDe, GHO, wETH, FBTC, wrsETH; mETH/cmETH + RWAs on roadmap. **Primary lending integration.**
-- **USDY (Ondo)** — live on Mantle. Tokenized US Treasuries, ~4–4.5% APY. Accumulating `USDY` (price-appreciating) + rebasing `rUSDY/mUSD`. On-chain `USDY_InstantManager` (USDC↔USDY, KYC-gated) and `RWADynamicOracle` (price). **Compliance: blocklist + non-US KYC at mint/redeem → we source via DEX, blocklist-aware.** Our RWA leg.
-- **INIT Capital** — live. Pools incl. `POOL_METH` `0x5071c003bB45e49110a905c1915EbdD2383A89dF`, `POOL_USDC` `0x00A55649E597d463fD212fBE48a3B40f0E227d06`, `POOL_USDT` `0xadA66a8722B5cdfe3bC504007A5d793e7100ad09`, plus USDe pool. Secondary lending venue.
-- **mETH / cmETH** — native Mantle LST; yield + collateral (future leg).
-- **ERC-8004 registries (deterministic, cross-chain):** Identity `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`, Reputation `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` (observed on other chains). **Presence on Mantle: TO VERIFY; deploy if absent.**
+**RWAs we ruled out:**
+- **syrupUSDT/USDC (Maple)** — deposits **not supported on Mantle** (ETH/Base/Arb/Plasma only) + auth required. Out.
+- **MI4 (Mantle's fund)** — Reg S, accredited/authorized-participants only, transfers restricted. Out (permissioned).
+
+**Lending reality (composability is thin):**
+- **Aave v3** — the only deep market on Mantle (~$1.34B; 3rd-largest Aave market globally). USDC/USDe/GHO/wETH/FBTC/wrsETH; mETH/cmETH + RWAs on roadmap. → **Our DeFi-yield + liquidity leg.**
+- **Compound USDe (Comet)** — second, smaller (base USDe; ETH/FBTC/mETH collateral). Optional later.
+- **INIT** disabling new borrows; **Lendle** shutting down; **Dolomite** tiny / 100% utilized. **No RWA collateral markets; no USDY looping.** → leveraged-Treasury angle is **dropped** for this hackathon.
+
+**Network:** Mantle mainnet — chain ID **5000** (`0x1388`), RPC `https://rpc.mantle.xyz`, explorer `https://mantlescan.xyz`. EVM-equivalent.
+
+**ERC-8004 registries (deterministic, cross-chain):** Identity `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`, Reputation `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` (observed elsewhere). **Mantle presence: TO VERIFY; deploy if absent.**
 
 ---
 
 ## 7. Locked decisions
 
-1. **Deposit asset:** USDC.
-2. **USDY sourcing:** DEX (blocklist-aware, on-chain `minOut`).
-3. **Agent execution:** a hot ALLOCATOR key, bounded by on-chain guardrails + kill switch.
-4. **LLM provider:** Z.AI (a hackathon partner).
-5. **Data:** 1delta API for data + optional swap routing; direct RPC for held-asset ground-truth; our own adapters for execution.
+1. **Track / shape:** AI × RWA, **Application path** — consumer AI risk-guardian real-yield account.
+2. **Deposit asset:** USDC.
+3. **Assets:** USDY (primary RWA yield) + Aave USDC (DeFi floor + liquidity) + idle USDC buffer + AUSD (safety). _Fallback: AUSD-primary if USDY liquidity degrades — not expected, liquidity confirmed._
+4. **Sourcing:** all RWA legs via **DEX** (USDY/AUSD), on-chain `minOut`; no KYC-gated mint in the vault path.
+5. **Agent execution:** guardrail-bounded **ALLOCATOR** hot key + kill switch.
+6. **LLM:** Z.AI.
+7. **Data:** 1delta API (data + optional swap routing) + direct RPC ground-truth; own adapters for execution.
 
 ---
 
 ## 8. Scope (MoSCoW)
 
-**Must (core demo):** own ERC-4626 vault + `AaveV3Adapter` + `UsdyAdapter` + idle buffer + guardrails + `Decision` log; AI allocator service (Aave + USDY data via 1delta + RPC, risk engine, Z.AI rationale, validator, on-chain rebalance); ERC-8004 identity + benchmark writes; frontend dashboard + decision feed + deposit/withdraw + identity card; deployed + **verified on mantlescan**; public frontend; ≥2-min demo video; README; one-line pitch.
+**Must (core demo):** ERC-4626 `YieldVault` + `UsdyAdapter` + `AaveV3Adapter` + idle buffer + `Guardrails` (incl. depeg/oracle guard) + `Decision`/`AgentBenchmark` logging; AI risk-guardian service (USDY oracle/peg + Aave data via 1delta+RPC, deterministic risk engine, Z.AI rationale, validator, on-chain rebalance, **event-triggered de-risk**); ERC-8004 identity; frontend account dashboard + **risk-guardian feed** + deposit/withdraw + identity card; deployed + **verified on mantlescan**; public frontend; **demo showing a live de-risk event**; ≥2-min video; README; one-line pitch.
 
-**Should:** `InitAdapter` (3rd strategy); risk-radar viz; conversational agent; event-triggered rebalances; Telegram/Discord alerts.
+**Should:** `AusdAdapter` (safety leg) + AUSD proof-of-reserves into the risk radar; RWA risk radar viz; conversational agent; Telegram/Discord risk alerts.
 
-**Could:** per-user EIP-712 signed mandates (intent pattern); mETH leg; historical backtest/simulation (agent vs benchmark); multi-agent reputation leaderboard.
+**Could:** Compound USDe leg; historical backtest/simulation (yield + drawdowns-avoided vs passive USDY); per-user EIP-712 signed risk-profile mandates; multi-agent reputation leaderboard.
 
-**Won't (this hackathon):** cross-chain; direct KYC'd USDY minting; production audit; full intent-solver infra.
+**Won't (this hackathon):** RWA looping/leverage (no market on Mantle); cross-chain; KYC'd USDY minting; syrup/MI4 (unavailable/permissioned); production audit.
 
 ---
 
 ## 9. Phased milestone plan (freeze ≈ 2026-06-12)
 
-- **Phase 0 — Foundations:** repo + Foundry/Vite/Docker scaffold; Mantle mainnet-fork harness (`anvil --fork`); pin + verify live addresses; confirm 0x8004 presence on Mantle. _Exit: forked tests read Aave reserves + USDY price._
-- **Phase 1 — Vault core:** ERC-4626 vault + guardrails + `AaveV3Adapter` + idle buffer; full Forge/Vitest tests on fork. _Exit: deposit → allocate to Aave → withdraw works on fork._
-- **Phase 2 — RWA + decisions:** `UsdyAdapter` (DEX, blocklist-aware) + `Decision`/`AgentBenchmark` logging + ALLOCATOR role. _Exit: a USDY/Aave rebalance emits a verifiable on-chain decision._
-- **Phase 3 — AI agent:** 1delta + RPC ingestion + deterministic risk engine + Z.AI rationale + validator + scheduler; agent executes a real rebalance on fork. _Exit: end-to-end autonomous loop on fork._
-- **Phase 4 — ERC-8004 + frontend:** deploy/register identity + reputation; dashboard, decision feed, identity card, deposit/withdraw. _Exit: clickable end-to-end app on testnet._
-- **Phase 5 — Mainnet + Should-haves:** deploy + **verify on mantlescan**, fund a small real position; add `InitAdapter` + risk radar + conversational agent. _Exit: live mainnet demo._
-- **Phase 6 — Freeze & polish (≈06-12):** public frontend (Docker/Caddy), README (setup + architecture + deployed addresses), one-line pitch, **≥2-min demo video**, X/Twitter assets for Community Voting.
-- **Phase 7 — Buffer (06-13/14):** bug-fixing, submission dry-run, re-record video if needed.
+- **Phase 0 — Foundations & gates:** repo + Foundry/Vite/Docker scaffold; Mantle mainnet-fork harness (`anvil --fork`); **verify on-chain**: USDY/AUSD DEX pools + slippage for $100–$1k, USDY `RWADynamicOracle`, Aave Pool/DataProvider, AUSD proof-of-reserves, 0x8004 presence. _Exit: forked tests read Aave reserves, USDY NAV, and a USDC↔USDY quote._
+- **Phase 1 — Vault core:** ERC-4626 vault + guardrails + `AaveV3Adapter` + idle buffer; Forge/Vitest tests on fork. _Exit: deposit → Aave → withdraw works._
+- **Phase 2 — RWA + risk guard:** `UsdyAdapter` (DEX, `minOut`, blocklist-aware) + depeg/oracle-deviation guard + `Decision`/`AgentBenchmark`. _Exit: a USDY↔safe rotation emits a verifiable on-chain decision with evidence hash._
+- **Phase 3 — AI agent:** 1delta+RPC ingestion + deterministic risk engine + Z.AI rationale + validator + scheduler (periodic + event-triggered). _Exit: autonomous detect→de-risk loop on fork._
+- **Phase 4 — ERC-8004 + frontend:** register identity; build dashboard, **risk-guardian feed**, identity card, deposit/withdraw. _Exit: clickable end-to-end app on testnet._
+- **Phase 5 — Mainnet + Should-haves:** deploy + **verify on mantlescan**, fund a small real position; add `AusdAdapter` + risk radar + conversational agent. _Exit: live mainnet demo._
+- **Phase 6 — Freeze & polish (≈06-12):** public frontend (Docker/Caddy), README (setup + architecture + addresses), one-line pitch, **≥2-min demo video featuring a live de-risk event**, X/Twitter assets.
+- **Phase 7 — Buffer (06-13/14):** bug-fixing, submission dry-run, re-record if needed.
 
 ---
 
@@ -151,13 +172,15 @@ We deliberately do **not** put AI where a deterministic algorithm is better. Thi
 
 | Risk | Mitigation |
 | --- | --- |
-| Withdrawal liquidity crunch (high underlying utilization) | Idle buffer + utilization-aware AI de-allocation + withdraw queue + on-chain caps. |
-| USDY compliance (blocklist/KYC) | Source via DEX, blocklist-aware checks; document compliance posture (scored). |
-| 1delta outage / rate limits | Data-only dependency; API key + server-side cache; RPC ground-truth fallback for held assets. |
+| "It's just a USDY wrapper" perception | Risk-guardian + verifiable de-risk event is the demo hero; multi-bucket managed allocation, not static holding. |
+| USDY liquidity on large withdrawals | Serve withdrawals from idle + Aave first; size buffer; only large redemptions touch USDY DEX. |
+| Depeg/false-positive de-risk | Deterministic thresholds (DEX-price vs oracle NAV + staleness) gate the action; AI explains, doesn't decide alone. |
+| AUSD is not yield-bearing | AUSD is a *safety* leg, not the yield core; yield comes from USDY + Aave. |
+| USDY blocklist hook reverts vault transfers | Confirm vault address is non-blocked; handle hook reverts gracefully; tests on fork. |
+| 1delta outage / rate limits | Data-only dependency; API key + cache; RPC ground-truth fallback for held assets. |
 | AI proposes unsafe allocation | Deterministic validator + immutable on-chain guardrails + kill switch. |
-| Hot ALLOCATOR key compromise | Guardrail-bounded role (cannot exceed caps/whitelist); pausable; small mainnet funds. |
-| Live-protocol integration edge cases | Develop/test on `anvil --fork` against real mainnet contracts before deploying. |
-| Scope creep | MoSCoW discipline; freeze by 06-12; Should/Could only after Must is green. |
+| Live-protocol edge cases | Develop/test on `anvil --fork` of Mantle mainnet before deploying. |
+| Scope creep | MoSCoW; freeze 06-12; Should/Could only after Must is green. |
 
 ---
 
@@ -165,12 +188,12 @@ We deliberately do **not** put AI where a deterministic algorithm is better. Thi
 
 - [ ] Smart contract deployed on Mantle (mainnet or testnet).
 - [ ] Contract **verified on Mantle Explorer**.
-- [ ] At least one **AI-powered function callable on-chain** (`rebalance` driven by the agent).
+- [ ] At least one **AI-powered function callable on-chain** (`rebalance`/de-risk, agent-driven).
 - [ ] Frontend demo **publicly accessible** (not localhost).
-- [ ] **Deployment address** included in the DoraHacks submission.
-- [ ] **Demo video ≥ 2 min** walking through the core use case (screen capture + voiceover is sufficient).
-- [ ] Open-source GitHub repo with **README** (setup, architecture, deployed addresses).
-- [ ] One-line pitch + answers to: data sources used / role of AI / how it's realized on Mantle.
+- [ ] **Deployment address** in the DoraHacks submission.
+- [ ] **Demo video ≥ 2 min** (screen capture + voiceover ok) showing the core use case + a de-risk event.
+- [ ] Open-source repo with **README** (setup, architecture, deployed addresses).
+- [ ] One-line pitch + answers: what RWA / role of AI / how it's realized on Mantle.
 
 ---
 
@@ -178,8 +201,7 @@ We deliberately do **not** put AI where a deterministic algorithm is better. Thi
 
 - **Contracts:** Solidity + Foundry (forge, anvil, cast).
 - **Frontend:** React + Vite + Tailwind + daisyUI.
-- **Backend (agent/API):** Node.js + TypeScript + Fastify.
+- **Backend/agent/API:** Node.js + TypeScript + Fastify.
 - **Testing:** Vitest (TS) + Forge (Solidity).
-- **Deploy:** Docker (backend + frontend) behind Caddy (or nginx) for routing.
-- **LLM:** Z.AI.
-- **Data:** 1delta API + Mantle RPC.
+- **Deploy:** Docker (backend + frontend) behind Caddy (or nginx).
+- **LLM:** Z.AI. **Data:** 1delta API + Mantle RPC.

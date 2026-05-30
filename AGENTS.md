@@ -85,7 +85,7 @@ product. See `PLAN.md`.
 - **Backend/agent/API:** **Node.js + TypeScript + Fastify** + **viem** (no ethers).
 - **TS tests:** **Vitest**.
 - **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
-- **LLM:** **Z.ai GLM-4 (primary) / Anthropic Claude (fallback)** — pluggable `LLMClient` interface; same JSON contract per SPEC §3. **Data:** **1delta API** + **Mantle RPC**.
+- **LLM:** **Anthropic API (Claude)** via `@anthropic-ai/sdk`, wrapped in a thin mockable `LLMClient` interface (`agent/src/llm/`). **Data:** **1delta API** + **Mantle RPC**.
 
 ---
 
@@ -113,14 +113,19 @@ product. See `PLAN.md`.
 
 ## 5. Git & workflow
 
-- **Branches:** `cursor/<descriptive-name>-46a8`, lowercase. Stay on the working
-  branch; do not switch branches unless asked.
+- **Branches:** develop on `claude/features`. Stay on the working branch; do not
+  switch branches unless asked.
 - **Commits:** one logical change per commit, clear messages. Do not force-push or
   amend unless explicitly asked.
 - **Push:** `git push -u origin <branch>`; retry network failures with backoff.
-- **PRs:** open/update via the PR tool; default to draft. One PR per `ROADMAP.md`
-  PR-group where practical. Keep `PLAN.md`, `ROADMAP.md`, `SPEC.md`, `UI.md`,
+- **PRs:** **Create a GitHub PR after every completed task or logical step** (one
+  PR per `ROADMAP.md` task/PR-group). PR body must state: which phase, which
+  task number(s), what was built, and which gate/test passes. Default to draft
+  until the gate passes. Keep `PLAN.md`, `ROADMAP.md`, `SPEC.md`, `UI.md`,
   `AGENTS.md`, `CLAUDE.md`, and the Cursor rule in sync when the plan changes.
+  Update the relevant MD files (mark task `[x] DONE`, record the PR number) so
+  every subsequent agent session picks up current state without re-reading
+  history.
 
 ---
 

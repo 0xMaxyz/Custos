@@ -42,11 +42,14 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
 ## Stack (do not substitute)
 Solidity + Foundry · React + Vite + Tailwind + daisyUI · **RainbowKit + wagmi + viem
 (frontend)** · Node/TS + Fastify + **viem (backend/agent — no ethers)** · Vitest +
-Forge · Docker + Caddy · Z.ai GLM-4 (primary) / Anthropic Claude (fallback, pluggable) · 1delta API + Mantle RPC. UI: clean/professional,
+Forge · Docker + Caddy · Anthropic API (Claude, `@anthropic-ai/sdk`) · 1delta API + Mantle RPC. UI: clean/professional,
 purple accent, light+dark themes — see `UI.md`.
 
 ## Workflow
-Branches `cursor/<name>-46a8` (lowercase); one logical change per commit; draft PRs
-via the PR tool; keep `PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` /
-`CLAUDE.md` / the Cursor rule in sync. When unsure about guardrails, custody, the
-1delta boundary, or scope — **ask first.**
+Branch `claude/features`; one logical change per commit. **Create a GitHub PR
+after every completed task or logical step** — include phase, task number(s),
+what was built, and which gate passes. Mark tasks `[x] DONE` in `ROADMAP.md`
+and record the PR number so future sessions know current state. Keep
+`PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` / `CLAUDE.md` /
+the Cursor rule in sync. When unsure about guardrails, custody, the 1delta
+boundary, or scope — **ask first.**

@@ -140,7 +140,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 3. **Assets:** USDY (primary RWA yield) + Aave USDC (DeFi floor + liquidity) + idle USDC buffer + AUSD (safety). _Fallback: AUSD-primary if USDY liquidity degrades — not expected, liquidity confirmed._
 4. **Sourcing:** all RWA legs via **DEX** (USDY/AUSD), on-chain `minOut`; no KYC-gated mint in the vault path.
 5. **Agent execution:** guardrail-bounded **ALLOCATOR** hot key + kill switch.
-6. **LLM:** **Z.ai (GLM-4, primary)** / Anthropic Claude (fallback) — behind a pluggable `LLMClient` interface in `agent/src/llm/`; same JSON contract per SPEC §3 for both. Z.ai is on the judging panel; no bounty confirmed but affinity is a real factor. Swap is a one-file change.
+6. **LLM:** **Anthropic API (Claude)** via the official `@anthropic-ai/sdk`. Wrapped behind a thin `LLMClient` interface in `agent/src/llm/` so it stays mockable in tests; single provider, no fallback chain.
 7. **Data:** 1delta API (data + optional swap routing) + direct RPC ground-truth; own adapters for execution.
 
 ---
@@ -155,7 +155,7 @@ Everything below must be done before any Addendum work begins.
 - `Decision` + `AgentBenchmark` ledger with **agent-vs-passive-USDY baseline** (passive = no rebalancing; compare realized bps vs what a static USDY holder would have done — this is the Turing Test answer)
 - AI risk-guardian service: 1delta+RPC ingestion → deterministic risk engine → **LLM rationale (hero path: news/attestation → structured risk signal)** → guardrail validator → on-chain rebalance + event-triggered de-risk
 - **Demo-trigger harness**: fork-injectable depeg/oracle-staleness condition that fires the hero de-risk moment on demand for the video
-- Pluggable `LLMClient` interface (Z.ai primary / Anthropic fallback)
+- Anthropic LLM client (`@anthropic-ai/sdk`) behind a thin, mockable `LLMClient` interface
 - ERC-8004 identity (use 0x8004 singletons if on Mantle; else minimal own registry)
 - Frontend: account dashboard + **risk-guardian feed** (rationale + evidence) + deposit/withdraw + identity card + **baseline counter** ("passive USDY holder: +X bps / Sentinel: +Y bps, de-risk avoided Z bps drawdown")
 - Deployed + **verified on mantlescan**; public frontend (Docker/Caddy)
@@ -186,7 +186,7 @@ All phases are Core until Phase 5b. Addendum work only starts after Phase 5a exi
 - **Phase 0 — Foundations & gates:** repo + Foundry/Vite/Docker scaffold; Mantle mainnet-fork harness (`anvil --fork`); **verify on-chain**: USDY/AUSD DEX pools + slippage $100–$1k, USDY `RWADynamicOracle`, Aave Pool/DataProvider, 0x8004 presence; **demo-trigger harness** (fork helper to inject depeg/oracle-staleness on demand). _Exit: forked tests read Aave reserves, USDY NAV, USDC↔USDY quote; depeg can be injected cleanly._
 - **Phase 1 — Vault core:** ERC-4626 vault + guardrails + `AaveV3Adapter` + idle buffer. _Exit: deposit → Aave → withdraw works on fork._
 - **Phase 2 — RWA + risk guard:** `UsdyAdapter` (DEX, `minOut`, blocklist-aware) + depeg/oracle guard + `Decision`/`AgentBenchmark` (including **passive-USDY baseline** tracking). _Exit: USDY↔safe rotation emits on-chain decision with evidence; baseline delta computed._
-- **Phase 3 — AI agent:** 1delta+RPC ingestion + deterministic risk engine + **pluggable LLM interface (Z.ai primary / Anthropic fallback)** + **news/attestation → de-risk hero path** + guardrail validator + scheduler. _Exit: autonomous detect→de-risk loop on fork, triggered by an injected attestation/news signal._
+- **Phase 3 — AI agent:** 1delta+RPC ingestion + deterministic risk engine + **Anthropic LLM client** + **news/attestation → de-risk hero path** + guardrail validator + scheduler. _Exit: autonomous detect→de-risk loop on fork, triggered by an injected attestation/news signal._
 - **Phase 4 — ERC-8004 + frontend:** register identity; build dashboard, **risk-guardian feed**, **baseline counter**, identity card, deposit/withdraw. _Exit: clickable end-to-end app on testnet with baseline visible._
 - **Phase 5a — Mainnet deploy (Core):** deploy + **verify on mantlescan**, fund small real position, trigger one real de-risk cycle. _Exit: live mainnet loop proven; Deployment-Award bars ticking._
 - **Phase 5b — Addendum (time-permitting):** `AusdAdapter` + AUSD PoR signal; risk radar viz; conversational agent; alerts. Work from the Addendum list in priority order; stop when time runs out. _Exit: whatever shipped._
@@ -208,7 +208,7 @@ All phases are Core until Phase 5b. Addendum work only starts after Phase 5a exi
 | USDY blocklist hook reverts vault transfers | Confirm vault address is non-blocked; handle hook reverts gracefully; tests on fork. |
 | 1delta outage / rate limits | Data-only dependency; API key + cache; RPC ground-truth fallback for held assets. |
 | AI proposes unsafe allocation | Deterministic validator + immutable on-chain guardrails + kill switch. |
-| Z.ai API reliability / compatibility | Both Z.ai and Anthropic implement the same `LLMClient` interface; fallback is a one-line env change. |
+| Anthropic API down / timeout | LLM is advisory only; on failure the agent falls back to the deterministic allocation + flags (SPEC §3.5). The model is never the last line of defense. |
 | Scope creep / not finishing | Core / Addendum split is hard. Addendum doesn't start until Phase 5a exits. Freeze 06-12. |
 
 ---
@@ -233,4 +233,4 @@ All phases are Core until Phase 5b. Addendum work only starts after Phase 5a exi
 - **Backend/agent/API:** Node.js + TypeScript + Fastify.
 - **Testing:** Vitest (TS) + Forge (Solidity).
 - **Deploy:** Docker (backend + frontend) behind Caddy (or nginx).
-- **LLM:** Z.ai GLM-4 (primary) / Anthropic Claude (fallback) — pluggable interface. **Data:** 1delta API + Mantle RPC.
+- **LLM:** Anthropic API (Claude) via `@anthropic-ai/sdk`. **Data:** 1delta API + Mantle RPC.

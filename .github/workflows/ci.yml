@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: ["claude/features", "claude/**", "cursor/**", "main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── TypeScript / Node workspaces ─────────────────────────────────────────────
+  ts:
+    name: TS — typecheck · lint · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm -r build
+
+  # ── Solidity / Foundry ────────────────────────────────────────────────────────
+  solidity:
+    name: Solidity — build · unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.4.1
+
+      - name: Build
+        working-directory: contracts
+        run: forge build
+
+      - name: Unit tests (offline — no fork)
+        working-directory: contracts
+        run: forge test --no-match-contract ForkTest -vv
+
+  # ── Fork tests (live Mantle RPC — only on pushes to main/feature branches) ───
+  fork-tests:
+    name: Solidity — fork tests (Mantle mainnet)
+    runs-on: ubuntu-latest
+    # Skip if the secret is absent (forks, first-time contributors).
+    if: ${{ vars.MANTLE_RPC_URL != '' || secrets.MANTLE_RPC_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.4.1
+
+      - name: Fork tests
+        working-directory: contracts
+        env:
+          MANTLE_RPC_URL: ${{ secrets.MANTLE_RPC_URL }}
+        run: |
+          forge test --fork-url "$MANTLE_RPC_URL" \
+            --match-contract ForkTest \
+            -vv

@@ -1,0 +1,8 @@
+node_modules
+dist
+build
+coverage
+contracts/out
+contracts/cache
+contracts/lib
+pnpm-lock.yaml

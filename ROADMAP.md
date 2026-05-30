@@ -12,7 +12,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 - **Do not start a phase until the prior phase's exit criteria are met.** Phase 0 is
   a hard go/no-go gate.
 - Status legend: `[ ]` todo · `[~]` in progress · `[x]` done.
-- Branch per PR: `cursor/<short-name>-46a8`. Keep `PLAN.md`/`ROADMAP.md` in sync if
+- Develop on `claude/features`. Keep `PLAN.md`/`ROADMAP.md` in sync if
   scope shifts.
 
 ## PR map (suggested)
@@ -53,7 +53,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 external dependency exists and is usable.** This is a go/no-go gate; if the
 liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 
-### 0.1 — Monorepo scaffold · _PR-0a_
+### 0.1 — Monorepo scaffold · _PR-0a_ · `[x] DONE`
 - **What:** workspace layout `/contracts` (Foundry), `/agent` (Node/TS + Fastify),
   `/web` (React/Vite/Tailwind/daisyUI), `/packages/shared` (types + addresses);
   root tooling (workspaces, eslint, prettier, base tsconfig), `.gitignore`

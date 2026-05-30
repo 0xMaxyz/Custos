@@ -46,7 +46,7 @@ Forge · Docker + Caddy · Z.ai GLM-4 (primary) / Anthropic Claude (fallback, pl
 purple accent, light+dark themes — see `UI.md`.
 
 ## Workflow
-Branches `cursor/<name>-46a8` (lowercase); one logical change per commit; draft PRs
+Branch `claude/features`; one logical change per commit; draft PRs
 via the PR tool; keep `PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` /
 `CLAUDE.md` / the Cursor rule in sync. When unsure about guardrails, custody, the
 1delta boundary, or scope — **ask first.**

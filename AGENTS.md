@@ -113,8 +113,8 @@ product. See `PLAN.md`.
 
 ## 5. Git & workflow
 
-- **Branches:** `cursor/<descriptive-name>-46a8`, lowercase. Stay on the working
-  branch; do not switch branches unless asked.
+- **Branches:** develop on `claude/features`. Stay on the working branch; do not
+  switch branches unless asked.
 - **Commits:** one logical change per commit, clear messages. Do not force-push or
   amend unless explicitly asked.
 - **Push:** `git push -u origin <branch>`; retry network failures with backoff.

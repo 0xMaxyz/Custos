@@ -1,0 +1,16 @@
+# Sentinel reverse proxy. Replace :80 with your domain for automatic TLS.
+:80 {
+	# Agent API
+	handle_path /api/* {
+		reverse_proxy agent:8080
+	}
+
+	# Static frontend (SPA fallback to index.html)
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip zstd
+}

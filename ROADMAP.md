@@ -17,27 +17,33 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 
 ## PR map (suggested)
 
+**Core PRs** (must ship):
+
 | PR | Tasks | Theme |
 |----|-------|-------|
 | PR-0a | 0.1 | Monorepo scaffold |
-| PR-0b | 0.2–0.5 | Fork harness + verification GATE |
+| PR-0b | 0.2–0.6 | Fork harness + verification GATE + **demo-trigger harness** |
 | PR-1a | 1.1–1.4 | Roles, guardrails, vault skeleton, adapter interface |
 | PR-1b | 1.5–1.6 | Aave adapter + rebalance/withdraw |
 | PR-2a | 2.1–2.3 | DEX lib + USDY valuation + UsdyAdapter |
-| PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger |
-| PR-2c | 2.7 | AUSD adapter (Should) |
+| PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline** |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine |
-| PR-3b | 3.4–3.5 | Z.AI rationale + guardrail validator |
-| PR-3c | 3.6–3.7 | Executor/signer + scheduler + e2e on fork |
+| PR-3b | 3.4–3.6 | **Pluggable LLM interface (Z.ai/Anthropic)** + news/attestation hero path + guardrail validator |
+| PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads |
-| PR-4c | 4.5–4.7 | Deposit/withdraw + risk-guardian feed + identity card |
-| PR-4d | 4.8 | Risk radar viz (Should) |
-| PR-5a | 5.1–5.2 | Deploy scripts + mainnet deploy + verify |
-| PR-5b | 5.3 | Real-funds smoke test |
-| PR-5c | 5.4–5.5 | Conversational agent + alerts (Should) |
+| PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card |
+| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test |
 | PR-6a | 6.1–6.5 | Public deploy, docs, video, submission |
 | PR-7  | 7.1–7.4 | Buffer / contingency |
+
+**Addendum PRs** (only after Phase 5a exits):
+
+| PR | Tasks | Theme |
+|----|-------|-------|
+| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal |
+| PR-A2 | A2.1 | Risk radar viz |
+| PR-A3 | A3.1–A3.2 | Conversational agent + alerts |
 
 ---
 
@@ -90,8 +96,18 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 - **Test:** fork test swaps USDC→USDY into a test contract, transfers out, asserts
   success and `Blocklist.isBlocked(testContract) == false`.
 
+### 0.6 — Demo-trigger harness · _PR-0b_
+- **What:** a Forge/Vitest test-helper that injects a controllable depeg or
+  oracle-staleness condition into the fork — e.g. mock the DEX router to return a
+  low USDY spot, or `vm.warp` past the oracle range end. Used during the demo video
+  to fire the de-risk on demand without waiting for a real-world event.
+- **Goal:** reliably trigger the hero de-risk moment on a fork (and testnet if
+  possible) at any time.
+- **Test:** Forge helper: call `injectDepeg(bps)` → oracle-guard fires → `deRisk`
+  succeeds; call `clearDepeg()` → normal operation resumes.
+
 **Exit:** scaffold builds; fork tests read Aave/USDY/AUSD; liquidity GO (or fallback
-chosen); ERC-8004 path decided.
+chosen); ERC-8004 path decided; depeg can be injected cleanly.
 
 ---
 
@@ -185,28 +201,25 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Test:** fork test: trip guard → `deRisk` → USDY balance 0, safe bucket up,
   `Decision` carries evidence fields.
 
-### 2.6 — `AgentBenchmark` ledger · _PR-2b_
+### 2.6 — `AgentBenchmark` ledger + passive-USDY baseline · _PR-2b_
 - **What:** record each decision (pre/post weights, `rationaleHash`, `evidenceURI`,
-  timestamp); `updateOutcome()` writes realized APY / drawdown-avoided later.
-- **Goal:** verifiable on-chain decision + outcome ledger.
-- **Test:** Forge: events emitted with expected fields; `updateOutcome` access-gated
-  and stored.
+  timestamp); `updateOutcome()` writes realized APY / drawdown-avoided; **baseline
+  tracking**: each cycle snapshots what a 100%-USDY passive holder would hold
+  (by oracle NAV), so the contract can emit the bps delta Sentinel outperformed
+  or protected vs passive.
+- **Goal:** verifiable on-chain decision + outcome ledger **with a meaningful
+  benchmark** — the Turing Test answer on-chain.
+- **Test:** Forge: events emitted with expected fields; passive-baseline delta
+  computed correctly on de-risk; `updateOutcome` access-gated and stored.
 
-### 2.7 — `AusdAdapter` (Should) · _PR-2c_
-- **What:** swap USDC↔AUSD; AUSD as safety bucket; optionally read proof-of-reserves
-  status.
-- **Goal:** a second safe bucket for de-risk.
-- **Test:** fork test: allocate to AUSD and withdraw back.
-
-**Exit:** a USDY→safe rotation emits a verifiable on-chain decision with evidence.
+**Exit:** a USDY→safe rotation emits a verifiable on-chain decision with evidence; passive-USDY baseline delta is recorded.
 
 ---
 
 ## Phase 3 — AI agent (off-chain)
 
 **Phase goal:** the Fastify service: ingest data → deterministic risk engine →
-Z.AI rationale → guardrail validator → signer → scheduler, driving the contracts on
-a fork.
+LLM rationale (news/attestation hero path) → guardrail validator → signer → scheduler, driving the contracts on a fork.
 
 ### 3.1 — Config & types · _PR-3a_
 - **What:** shared types (`Allocation`, `RiskSignal`, `Decision`); env/config loader;
@@ -229,37 +242,50 @@ a fork.
 - **Test:** Vitest table-driven (normal / depeg / stale / low-liquidity) → expected
   weights & flags; pure, no network.
 
-### 3.4 — Z.AI rationale + signal layer · _PR-3b_
-- **What:** Z.AI client; prompt taking structured inputs + fetched unstructured
-  items (attestation/news) → JSON `{rationale, riskVerdict}` (schema-validated). The
-  LLM verdict may only **tighten** risk, never exceed guardrails.
-- **Goal:** human-readable rationale + a bounded verdict.
-- **Test:** Vitest with mocked Z.AI: schema validation; malformed output rejected;
-  verdict clamped to safe bounds.
+### 3.4 — Pluggable LLM interface · _PR-3b_
+- **What:** `LLMClient` interface (`complete(prompt): Promise<RiskVerdict>`); two
+  implementations: `ZaiClient` (Z.ai GLM-4, primary) and `AnthropicClient` (fallback).
+  Both produce the same JSON per SPEC §3.2. Selected via `LLM_PROVIDER` env var.
+- **Goal:** swap LLM providers with one env change, no logic change.
+- **Test:** Vitest: both clients satisfy the same contract tests; provider selection
+  works; fallback activates on Z.ai timeout/error.
 
-### 3.5 — Guardrail validator · _PR-3b_
+### 3.5 — LLM rationale + signal layer (news/attestation hero path) · _PR-3b_
+- **What:** fetch unstructured items (Ondo attestation PDFs, AUSD PoR reports,
+  regulatory/issuer news); pass structured market state + fetched items to the LLM
+  via SPEC §3.1 prompt; parse + validate the `{rationale, riskVerdict}` JSON response.
+  The LLM verdict may only **tighten** risk, never exceed guardrails. **This is the
+  path the demo is built around — an AI that reads a document or headline that a
+  pure threshold would miss.**
+- **Goal:** human-readable rationale + a bounded verdict triggered by unstructured input.
+- **Test:** Vitest with mocked LLM: schema validation; malformed output rejected;
+  verdict clamped to safe bounds; an injected "issuer downgrade" headline tightens
+  the verdict vs the deterministic baseline.
+
+### 3.6 — Guardrail validator · _PR-3b_
 - **What:** TS mirror of on-chain guardrails; validates/repairs the final proposal
   before signing.
 - **Goal:** never sign a tx that would revert on-chain.
 - **Test:** Vitest: proposals violating each guardrail are rejected/repaired;
   property tests vs the on-chain bounds.
 
-### 3.6 — Executor / signer · _PR-3c_
+### 3.7 — Executor / signer · _PR-3c_
 - **What:** build + sign `rebalance`/`deRisk` with ALLOCATOR key; optional 1delta
   swap route passed as adapter param (`minOut` enforced on-chain); IPFS-pin
-  rationale/evidence; write `AgentBenchmark` outcome.
+  rationale/evidence; write `AgentBenchmark` outcome + passive-USDY baseline delta.
 - **Goal:** agent executes a rebalance end-to-end on the fork.
 - **Test:** integration vs anvil fork: one agent run emits an on-chain `Decision`;
   weights change within guardrails.
 
-### 3.7 — Scheduler + event triggers · _PR-3c_
+### 3.8 — Scheduler + event triggers · _PR-3c_
 - **What:** periodic loop + event triggers (poll depeg/oracle/utilization → immediate
-  `deRisk` on breach).
-- **Goal:** autonomous loop reacting to a simulated depeg within one cycle.
-- **Test:** integration: inject depeg (mock spot on fork) → agent fires `deRisk` →
-  on-chain USDY = 0.
+  `deRisk` on breach); integrate demo-trigger harness for fork-injectable conditions.
+- **Goal:** autonomous loop reacting to a simulated de-risk within one cycle.
+- **Test:** integration: use demo-trigger harness → agent fires `deRisk` → on-chain
+  USDY = 0; news/attestation path demonstrated end-to-end.
 
-**Exit:** end-to-end autonomous detect→de-risk loop on fork.
+**Exit:** autonomous detect→de-risk loop on fork, triggered by injected news/attestation
+signal; passive-baseline delta recorded on-chain.
 
 ---
 
@@ -305,26 +331,27 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
 - **Goal:** the transparency hero view.
 - **Test:** Vitest with mocked events/IPFS; manual vs real testnet decisions.
 
-### 4.7 — Identity card · _PR-4c_
+### 4.7 — Baseline counter · _PR-4c_
+- **What:** UI widget showing "Sentinel vs passive USDY holder" — running bps delta
+  since the last de-risk event; pulled from `AgentBenchmark` baseline data.
+- **Goal:** the Turing Test answer visible to anyone visiting the app.
+- **Test:** Vitest mocked; correct delta rendered; manual vs testnet.
+
+### 4.8 — Identity card · _PR-4c_
 - **What:** show the ERC-8004 NFT + track record (decisions handled, de-risk events,
-  realized yield).
+  realized yield vs passive).
 - **Goal:** verifiable agent reputation surfaced in the UI.
 - **Test:** Vitest mocked; manual.
 
-### 4.8 — Risk radar viz (Should) · _PR-4d_
-- **What:** USDY peg (NAV vs spot), oracle freshness, AUSD PoR, Aave utilization
-  charts.
-- **Goal:** the insight layer (absorbs the Option-B value).
-- **Test:** Vitest mocked; manual.
-
-**Exit:** clickable end-to-end app on testnet.
+**Exit:** clickable end-to-end app on testnet with baseline counter visible.
 
 ---
 
-## Phase 5 — Mainnet + Should-haves
+## Phase 5 — Mainnet (Core) + Addendum
 
-**Phase goal:** deploy + verify on mainnet, prove the loop with small real funds, add
-the AUSD leg + conversational agent + alerts.
+### Phase 5a — Mainnet deploy (Core) · _PR-5a_
+
+**Phase goal:** deploy + verify on mainnet; prove the full loop with small real funds.
 
 ### 5.1 — Deploy scripts · _PR-5a_
 - **What:** `forge script` deploy (vault, adapters, guardrails, benchmark, identity),
@@ -340,24 +367,46 @@ the AUSD leg + conversational agent + alerts.
 - **Test:** mantlescan shows "verified"; `cast call` reads; a tiny rebalance tx
   succeeds → Deployment-Award bars start ticking.
 
-### 5.3 — Real-funds smoke test · _PR-5b_
+### 5.3 — Real-funds smoke test · _PR-5a_
 - **What:** deposit small USDC; agent runs one cycle (USDY + Aave); trigger a
-  controlled de-risk; withdraw.
-- **Goal:** full loop proven with real funds on mainnet.
+  controlled de-risk using the demo-trigger harness; withdraw.
+- **Goal:** full loop proven with real funds on mainnet; baseline counter updates.
 - **Test:** recorded tx hashes; `Decision` events on mainnet; funds returned intact.
 
-### 5.4 — Conversational agent (Should) · _PR-5c_
-- **What:** Fastify endpoint + UI panel ("why am I in AUSD?", "what changed?") over
-  decision history + snapshot.
+**Phase 5a exit:** live mainnet loop proven; Deployment-Award bars ticking. → **Core is done. Start Addendum only now.**
+
+---
+
+### Phase 5b — Addendum (time-permitting, in priority order) · _PR-A1, PR-A2, PR-A3_
+
+Work through the Addendum list from §8 in order. Stop when time runs out. Each item is independent.
+
+#### A1.1 — `AusdAdapter` · _PR-A1_
+- **What:** swap USDC↔AUSD; AUSD as safety bucket in de-risk.
+- **Goal:** second safe bucket; de-risk can route to AUSD.
+- **Test:** fork test: allocate to AUSD and withdraw back.
+
+#### A1.2 — AUSD proof-of-reserves signal · _PR-A1_
+- **What:** fetch AUSD PoR status (Chaos Labs); feed into risk engine + UI.
+- **Goal:** AUSD PoR is a live risk input.
+- **Test:** Vitest mocked; manual.
+
+#### A2.1 — Risk radar viz · _PR-A2_
+- **What:** USDY peg (NAV vs spot), oracle freshness, AUSD PoR, Aave utilization charts.
+- **Goal:** insight layer surfaced in the UI.
+- **Test:** Vitest mocked; manual.
+
+#### A3.1 — Conversational agent · _PR-A3_
+- **What:** Fastify endpoint + UI panel ("why am I in AUSD?", "what changed?").
 - **Goal:** natural-language transparency.
 - **Test:** Vitest mocked LLM; manual.
 
-### 5.5 — Alerts (Should) · _PR-5c_
+#### A3.2 — Alerts · _PR-A3_
 - **What:** Telegram/Discord webhook on de-risk events.
-- **Goal:** off-platform transparency + reach.
-- **Test:** trigger event → message delivered; unit test for the formatter.
+- **Goal:** off-platform transparency.
+- **Test:** trigger event → message delivered.
 
-**Exit:** live mainnet demo.
+**Phase 5b exit:** whatever shipped.
 
 ---
 
@@ -377,10 +426,14 @@ the AUSD leg + conversational agent + alerts.
 - **Test:** fresh-clone dry run following the README in a clean container.
 
 ### 6.3 — Demo video (≥2 min) · _PR-6a_
-- **What:** script + screen+voiceover recording: deposit → earning → **live de-risk
-  event** → on-chain decision + identity.
-- **Goal:** a compelling ≥2-min walkthrough.
-- **Test:** review against the Deployment-Award + UI/UX criteria checklist.
+- **What:** script + screen+voiceover recording. Sequence: deposit → earning →
+  **AI reads attestation/news signal** → de-risk fires (via demo-trigger harness) →
+  on-chain decision with evidence → **baseline counter** ("passive holder: –X bps /
+  Sentinel: avoided it") → identity card. Use the harness to fire the de-risk on cue.
+- **Goal:** a compelling ≥2-min walkthrough that directly answers "can this AI beat
+  a passive USDY holder at managing risk?"
+- **Test:** review against the Deployment-Award + UI/UX criteria checklist; the hero
+  moment (news → de-risk → baseline delta) must be clearly visible.
 
 ### 6.4 — Submission package · _PR-6a_
 - **What:** DoraHacks submission: one-line pitch, repo, demo link, video, deployed

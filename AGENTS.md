@@ -4,7 +4,7 @@ This file is the **single source of truth** for how any AI agent (Claude, Cursor
 Codex, etc.) or human contributor must work in this repository. `CLAUDE.md` and
 `.cursor/rules/project.mdc` point here. **Before executing, read: `PLAN.md` (full
 plan), `ROADMAP.md` (PR-sized per-phase tasks with What/Goal/Test), `SPEC.md`
-(guardrail parameters, contract interfaces, Z.AI prompt + risk-signal schema), and
+(guardrail parameters, contract interfaces, Anthropic API prompt + risk-signal schema), and
 `UI.md` (UI/UX plan). This file defines the rules you must follow while executing
 them.**
 
@@ -16,7 +16,7 @@ deviating.
 ## 1. What we are building (one paragraph)
 
 **Sentinel** — an **AI risk-guardian real-yield account** on **Mantle**. Users
-deposit **USDC**; an AI agent (powered by **Z.AI**) earns tokenized-Treasury
+deposit **USDC**; an AI agent (powered by the **Anthropic API**) earns tokenized-Treasury
 (**USDY**) yield with an **Aave v3** USDC floor for liquidity, and **autonomously
 de-risks on-chain** into **AUSD**/USDC when RWA risk appears (depeg, oracle
 staleness, issuer/regulatory shock) — **only within hard on-chain guardrails** —
@@ -62,7 +62,7 @@ product. See `PLAN.md`.
 7. **Ground-truth reads.** For assets the vault actually holds (Aave position,
    USDY NAV via `RWADynamicOracle`, USDY DEX price, AUSD proof-of-reserves), read
    **directly via RPC** as the accounting source of truth; 1delta is breadth/UX only.
-8. **Secrets.** Never commit secrets (RPC keys, Z.AI keys, 1delta API key,
+8. **Secrets.** Never commit secrets (RPC keys, Anthropic API keys, 1delta API key,
    deployer/ALLOCATOR private keys, WalletConnect projectId if private). Use `.env`
    (git-ignored) + documented `.env.example`. Never log secrets.
 9. **Scope & execution discipline (MoSCoW + ROADMAP).** Finish all **Must** items
@@ -85,7 +85,7 @@ product. See `PLAN.md`.
 - **Backend/agent/API:** **Node.js + TypeScript + Fastify** + **viem** (no ethers).
 - **TS tests:** **Vitest**.
 - **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
-- **LLM:** **Z.AI**. **Data:** **1delta API** + **Mantle RPC**.
+- **LLM:** **Z.ai GLM-4 (primary) / Anthropic Claude (fallback)** — pluggable `LLMClient` interface; same JSON contract per SPEC §3. **Data:** **1delta API** + **Mantle RPC**.
 
 ---
 

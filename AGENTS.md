@@ -2,8 +2,10 @@
 
 This file is the **single source of truth** for how any AI agent (Claude, Cursor,
 Codex, etc.) or human contributor must work in this repository. `CLAUDE.md` and
-`.cursor/rules/project.mdc` point here. **Read `PLAN.md` for the full project plan;
-this file defines the rules you must follow while executing it.**
+`.cursor/rules/project.mdc` point here. **Read `PLAN.md` for the full project plan
+and `ROADMAP.md` for the PR-sized execution breakdown (per-phase tasks with
+What / Goal / How-to-test); this file defines the rules you must follow while
+executing them.**
 
 If a request conflicts with these rules, **stop and ask** rather than silently
 deviating.
@@ -60,13 +62,14 @@ product. See `PLAN.md`.
 8. **Secrets.** Never commit secrets (RPC keys, Z.AI keys, 1delta API key,
    deployer/ALLOCATOR private keys). Use `.env` (git-ignored) + documented
    `.env.example`. Never log secrets.
-9. **Scope discipline (MoSCoW).** Finish all **Must** items before any **Should**;
-   **Should** before **Could**. Feature-freeze target **2026-06-12**. Do not start
-   speculative features that threaten the freeze.
+9. **Scope & execution discipline (MoSCoW + ROADMAP).** Finish all **Must** items
+   before any **Should**; **Should** before **Could**. Work in the PR-sized tasks
+   defined in `ROADMAP.md`; **do not start a phase before the prior phase's exit
+   criteria are met.** Feature-freeze target **2026-06-12**.
 10. **Definition of done includes the submission bars.** A feature is not "done"
-    until it is testable and moves us toward the §11 checklist in `PLAN.md`
-    (deployed + verified + AI function on-chain + public demo + de-risk-event video
-    + README).
+    until its `ROADMAP.md` Test passes and it moves us toward the §11 checklist in
+    `PLAN.md` (deployed + verified + AI function on-chain + public demo +
+    de-risk-event video + README).
 
 ---
 
@@ -107,14 +110,15 @@ product. See `PLAN.md`.
 - **Commits:** one logical change per commit, clear messages. Do not force-push or
   amend unless explicitly asked.
 - **Push:** `git push -u origin <branch>`; retry network failures with backoff.
-- **PRs:** open/update via the PR tool; default to draft. Keep `PLAN.md`,
-  `AGENTS.md`, `CLAUDE.md`, and the Cursor rule in sync when the plan changes.
+- **PRs:** open/update via the PR tool; default to draft. One PR per `ROADMAP.md`
+  PR-group where practical. Keep `PLAN.md`, `ROADMAP.md`, `AGENTS.md`, `CLAUDE.md`,
+  and the Cursor rule in sync when the plan changes.
 
 ---
 
 ## 6. When in doubt
 
-- Re-read `PLAN.md` (the plan) and this file (the rules).
+- Re-read `PLAN.md` (strategy), `ROADMAP.md` (tasks/tests), and this file (rules).
 - If a decision isn't covered, pick the option that best protects **custody safety**
   and the **2026-06-12 freeze**, note it, and flag it.
 - Anything touching guardrails, custody, the 1delta boundary, or scope → **ask

@@ -1,12 +1,14 @@
 ---
-description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide is AGENTS.md; full plan is PLAN.md.
+description: Sentinel project rules — AI risk-guardian real-yield account on Mantle. Canonical guide is AGENTS.md; plan is PLAN.md; execution breakdown is ROADMAP.md.
 alwaysApply: true
 ---
 
 # Sentinel — Cursor Project Rules
 
-`AGENTS.md` is the **canonical operating guide** and `PLAN.md` is the **full plan**.
-Read both. This rule restates the non-negotiables and always applies.
+`AGENTS.md` is the **canonical operating guide**, `PLAN.md` is the **full plan**, and
+`ROADMAP.md` is the **PR-sized execution breakdown** (per-phase tasks with What /
+Goal / How-to-test). Read all three. This rule restates the non-negotiables and
+always applies.
 
 ## Project (one line)
 **Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
@@ -43,7 +45,9 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
   AUSD proof-of-reserves); 1delta is breadth/UX only.
 - **Never commit secrets.** Git-ignored `.env` + documented `.env.example`. No
   secret logging.
-- **Scope discipline (MoSCoW):** Must → Should → Could. Feature-freeze **2026-06-12**.
+- **Scope & execution discipline (MoSCoW + ROADMAP):** Must → Should → Could. Work
+  in PR-sized tasks per `ROADMAP.md`; don't start a phase before the prior phase's
+  exit criteria are met. Feature-freeze **2026-06-12**.
 
 ## Stack (do not substitute without asking)
 Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI · Node.js
@@ -61,6 +65,6 @@ API + Mantle RPC.
 
 ## Workflow
 Branches `cursor/<descriptive-name>-46a8` (lowercase); one logical change per
-commit; draft PRs via the PR tool. Keep `PLAN.md` / `AGENTS.md` / `CLAUDE.md` / this
-rule in sync. When unsure about guardrails, custody, the 1delta boundary, or scope —
-**ask first.**
+commit; one PR per ROADMAP PR-group where practical; draft PRs via the PR tool. Keep
+`PLAN.md` / `ROADMAP.md` / `AGENTS.md` / `CLAUDE.md` / this rule in sync. When unsure
+about guardrails, custody, the 1delta boundary, or scope — **ask first.**

@@ -20,25 +20,25 @@ export const TOKENS = {
   USDC: {
     symbol: "USDC",
     name: "USD Coin",
-    address: "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9",
+    address: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9",
     decimals: 6,
   },
   USDY: {
     symbol: "USDY",
     name: "Ondo U.S. Dollar Yield",
-    address: "0x5be26527e817998a7206475496fde1e68957c5a6",
+    address: "0x5bE26527e817998A7206475496fDE1E68957c5A6",
     decimals: 18,
   },
   AUSD: {
     symbol: "AUSD",
     name: "AUSD (Agora)",
-    address: "0x00000000efe302beaa2b3e6e1b18d08d69a9012a",
+    address: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
     decimals: 6,
   },
   WMNT: {
     symbol: "WMNT",
     name: "Wrapped Mantle",
-    address: "0x78c1b0c915c4faa5fffa6cabf0219da63d7f4cb8",
+    address: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8",
     decimals: 18,
   },
 } as const satisfies Record<string, TokenInfo>;

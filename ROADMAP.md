@@ -63,7 +63,7 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 - **Test:** `forge build`, `pnpm -r typecheck`, `pnpm -r lint`, and
   `docker compose config` all succeed; CI script documented.
 
-### 0.2 — Mantle fork test harness · _PR-0b_
+### 0.2 — Mantle fork test harness · _PR-0b_ · `[~] IN PROGRESS`
 - **What:** Foundry fork profile using `MANTLE_RPC_URL` at a pinned block; base test
   utilities (token labels, `deal`-via-swap helper).
 - **Goal:** tests run against a deterministic Mantle mainnet fork.
@@ -96,7 +96,7 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 - **Test:** fork test swaps USDC→USDY into a test contract, transfers out, asserts
   success and `Blocklist.isBlocked(testContract) == false`.
 
-### 0.6 — Demo-trigger harness · _PR-0b_
+### 0.6 — Demo-trigger harness · _PR-0b_ · `[x] DONE` (offline mock; wire to vault oracle Phase 2+)
 - **What:** a Forge/Vitest test-helper that injects a controllable depeg or
   oracle-staleness condition into the fork — e.g. mock the DEX router to return a
   low USDY spot, or `vm.warp` past the oracle range end. Used during the demo video

@@ -279,7 +279,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
      * @param decisionURI       IPFS URI for the rationale + evidence bundle.
      * @param rationaleHash     keccak256 of the rationale text (on-chain anchor).
      * @param usdyDexSpotUsdc   Current USDY/USDC DEX spot price (18-dec, agent-supplied).
-     *                          Pass 0 to disable the DEX-spot deviation guard.
+     *                          Required when increasing USDY weight (Guardrails will revert
+     *                          UsdySpotRequired if oracle NAV is live but spot is 0). Safe to
+     *                          pass 0 only when USDY weight is flat or decreasing.
      * @return decisionId       Monotonic id for this decision.
      */
     function rebalance(

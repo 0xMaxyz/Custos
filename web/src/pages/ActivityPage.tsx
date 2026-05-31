@@ -8,6 +8,7 @@ import { Modal } from "../modals/Modals";
 import * as fmt from "../lib/fmt";
 import { RISK, explorer, type Decision } from "../lib/data";
 import { useDecisions } from "../lib/useGuardianData";
+import { resolveDecisionUri } from "../lib/decisionUri";
 
 const KIND: Record<number, { label: string; icon: string }> = {
   0: { label: "Rebalance", icon: "refresh-cw" },
@@ -136,7 +137,13 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
         <div className="kvrow"><span className="k">Transaction</span><AddressChip address={d.txHash} kind="tx" /></div>
         <div className="kvrow"><span className="k">Rationale hash</span><span className="mono v" style={{ fontSize: "0.8125rem" }}>{fmt.shortHash(d.rationaleHash, 10, 6)}</span></div>
         {d.evidenceHash && <div className="kvrow"><span className="k">Evidence hash</span><span className="mono v" style={{ fontSize: "0.8125rem" }}>{fmt.shortHash(d.evidenceHash, 6, 4)}</span></div>}
-        <div className="kvrow"><span className="k">Decision bundle</span><a className="linklike mono" style={{ fontSize: "0.8125rem" }} href="#" onClick={(e) => e.preventDefault()}>{fmt.shortHash(d.decisionURI, 14, 6)} <Icon name="external-link" size={13} /></a></div>
+        <div className="kvrow"><span className="k">Decision bundle</span>{(() => {
+          const href = resolveDecisionUri(d.decisionURI);
+          const label = <>{fmt.shortHash(d.decisionURI, 14, 6)} <Icon name="external-link" size={13} /></>;
+          return href
+            ? <a className="linklike mono" style={{ fontSize: "0.8125rem" }} href={href} target="_blank" rel="noreferrer">{label}</a>
+            : <span className="mono v" style={{ fontSize: "0.8125rem" }}>{fmt.shortHash(d.decisionURI, 14, 6)}</span>;
+        })()}</div>
       </Section>
     </Modal>
   );

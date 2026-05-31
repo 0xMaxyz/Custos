@@ -7,11 +7,14 @@
 // tested without a DOM or a chain.
 
 // ── Guardrail constants surfaced in the UI ────────────────────────────────────
-// Mirror packages/shared (TVL_CAP, PER_TX_DEPOSIT_CAP, MAX_SLIPPAGE_BPS). Kept as
-// plain numbers here because the web app works in human USDC units, not 6-dec.
+// Sourced from packages/shared (the single source of truth shared with the on-chain
+// Guardrails) so UI caps never drift. The web app works in human USDC units, so we
+// convert the 6-decimal shared constant down by 1e6.
 
-/** Per-transaction deposit cap (USDC). Mirrors PER_TX_DEPOSIT_CAP_USDC. */
-export const PER_TX_DEPOSIT_CAP = 10_000;
+import { PER_TX_DEPOSIT_CAP_USDC } from "@sentinel/shared";
+
+/** Per-transaction deposit cap (human USDC). Derived from PER_TX_DEPOSIT_CAP_USDC. */
+export const PER_TX_DEPOSIT_CAP = PER_TX_DEPOSIT_CAP_USDC / 1_000_000;
 
 /** Max slippage surfaced for large (USDY-unwinding) withdrawals, in percent. */
 export const MAX_SLIPPAGE_PCT = 0.5;

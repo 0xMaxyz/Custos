@@ -1,0 +1,13 @@
+{
+  "chainId": 5003,
+  "network": "mantle-testnet",
+  "_note": "Populate after running: forge script script/Deploy.s.sol --rpc-url $MANTLE_TESTNET_RPC_URL --broadcast",
+  "guardrails": "",
+  "vault": "",
+  "benchmark": "",
+  "aaveAdapter": "",
+  "usdyAdapter": "",
+  "agentId": null,
+  "deployer": "",
+  "deployedAt": null
+}

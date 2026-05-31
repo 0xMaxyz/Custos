@@ -33,7 +33,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               | `[x] DONE` |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               | `[x] DONE` · [PR #11](https://github.com/0xMaxyz/miu/pull/11) |
 | PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card | `[x] DONE` (fixtures; live reads → PR-5a) · [PR #13](https://github.com/0xMaxyz/miu/pull/13) |
-| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             |
+| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             | `[~] IN PROGRESS` |
 | PR-6a | 6.1–6.5 | Public deploy, docs, video, submission                                       |
 | PR-7  | 7.1–7.4 | Buffer / contingency                                                         |
 
@@ -459,23 +459,35 @@ existing `use*Data` seams (consumers unchanged).
 
 **Phase goal:** deploy + verify on mainnet; prove the full loop with small real funds.
 
-### 5.1 — Deploy scripts · _PR-5a_
+### 5.1 — Deploy scripts · _PR-5a_ · `[x] DONE`
 
 - **What:** `forge script` deploy (vault, adapters, guardrails, benchmark, identity),
   parameterized; save addresses to `packages/shared` + `deployments.json`.
 - **Goal:** reproducible deploy.
 - **Test:** deploy to **Mantle testnet**; assert code at addresses; run a smoke
   rebalance.
+- **Built:** `contracts/script/Deploy.s.sol` — full deploy script (Guardrails →
+  YieldVault → AgentBenchmark → AaveV3Adapter → UsdyAdapter → roles); chainId-aware
+  (mainnet hard-codes verified addresses; testnet reads from env); `addStrategy` +
+  immediate `activateStrategy` on testnet (0 timelock), `addStrategy` only on mainnet
+  (awaits 48h timelock via `ActivateStrategies.s.sol`). `DeployMocks.s.sol` mints mock
+  USDC/USDY + `MockUsdyOracle` for Mantle Sepolia. `RegisterIdentity.s.sol` calls
+  canonical ERC-8004 `register(agentCardUri)`. `deployments/5000.json` +
+  `deployments/5003.json` templates; `packages/shared/src/deployments.ts` exports
+  `getDeployment(chainId)`. Web `useVaultData` and `useGuardianData` now read live
+  on-chain when `VITE_VAULT_ADDRESS` is set (wagmi `useReadContracts` + `useWatchContractEvent`);
+  fixture fallback unchanged. `web/src/lib/vaultAbi.ts` — minimal ABI. 64 web tests + 103
+  Solidity tests all pass.
 
-### 5.2 — Mainnet deploy + verify · _PR-5a_
+### 5.2 — Mainnet deploy + verify · _PR-5a_ · `[ ]` pending RPC + keys
 
 - **What:** deploy to **Mantle mainnet**; verify all contracts on mantlescan; set
   roles; conservative guardrail config.
 - **Goal:** verified contracts live; AI `rebalance` callable on-chain.
 - **Test:** mantlescan shows "verified"; `cast call` reads; a tiny rebalance tx
-  succeeds → Deployment-Award bars start ticking.
+  succeeds -> Deployment-Award bars start ticking.
 
-### 5.3 — Real-funds smoke test · _PR-5a_
+### 5.3 — Real-funds smoke test · _PR-5a_ · `[ ]` pending deploy
 
 - **What:** deposit small USDC; agent runs one cycle (USDY + Aave); trigger a
   controlled de-risk using the demo-trigger harness; withdraw.

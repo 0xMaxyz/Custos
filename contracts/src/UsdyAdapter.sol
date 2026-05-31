@@ -7,20 +7,31 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {IUsdyAdapter}       from "./interfaces/IUsdyAdapter.sol";
 import {IRWADynamicOracle}  from "./interfaces/IRWADynamicOracle.sol";
-import {SwapLib}            from "./SwapLib.sol";
+import {AggregatorSwapLib}  from "./AggregatorSwapLib.sol";
 
 /**
  * @title UsdyAdapter
- * @notice Allocates USDC into tokenized-Treasury yield (USDY) via Merchant Moe
- *         DEX swaps, and values holdings through the Ondo RWADynamicOracle.
+ * @notice Allocates USDC into tokenized-Treasury yield (USDY) via a single,
+ *         allow-listed DEX aggregator (e.g. Odos on Mantle), and values holdings
+ *         through the Ondo RWADynamicOracle.
+ *
+ * Why an aggregator instead of a direct single-pool router: USDY liquidity on
+ * Mantle is fragmented across thin pools (Agni USDY/USDT ~$0.97k, iZiSwap
+ * USDY/USDC ~$0.40k, Butter USDY/USDC ~$0.23k). No single DEX has a usable direct
+ * USDC/USDY route, so a single-pool swap reverts at any meaningful size. An
+ * aggregator splits the order across all venues. See AGENTS.md §2.1 for why this
+ * stays inside the custody boundary (pinned router + balance-delta minOut).
  *
  * Design:
  * - `totalAssets()` = USDY balance × oracle NAV (never a DEX mark for accounting).
  * - `maxWithdrawable()` = totalAssets(). Phase 2b will add a per-rebalance DEX
  *   liquidity cap.
- * - Slippage is enforced on-chain: minOut derived from oracle NAV ± maxSlippageBps.
- * - `swapData` (per IStrategyAdapter) overrides the default Merchant Moe path
- *   as abi.encode(uint256[] pairBinSteps, uint8[] versions). Empty = use defaults.
+ * - Slippage is enforced on-chain by a **balance-delta** check: minOut is derived
+ *   from oracle NAV ± maxSlippageBps and measured against the actual tokenOut this
+ *   adapter receives — the aggregator's reported output is never trusted.
+ * - `swapData` (per IStrategyAdapter) carries the aggregator router calldata from
+ *   the off-chain 1delta quote. It MUST be non-empty (no on-chain default route
+ *   exists for an aggregator) and MUST pay this adapter as the recipient.
  * - Only the vault (VAULT immutable) can call fund-moving functions.
  * - **Blocklist**: USDY enforces a transfer blocklist. The vault and this adapter
  *   must NOT be on the USDY blocklist at deploy time, or swaps will revert.
@@ -39,8 +50,9 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
 
     // ── Immutables ────────────────────────────────────────────────────────────
 
-    /// @notice Merchant Moe LB Router.
-    address public immutable ROUTER;
+    /// @notice Pinned, allow-listed DEX aggregator router (e.g. Odos on Mantle).
+    ///         The only address swap calldata may target.
+    address public immutable AGGREGATOR;
 
     /// @notice USDC token (the deposit/withdrawal asset, 6 decimals).
     address public immutable override underlying;
@@ -57,54 +69,38 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     /// @notice Maximum tolerated swap slippage (bps). Mirrors Guardrails default (50 = 0.5%).
     uint16 public immutable MAX_SLIPPAGE_BPS;
 
-    // ── Default path ──────────────────────────────────────────────────────────
-
-    // Merchant Moe LBPair bin step and version for the direct USDC/USDY pool.
-    // Defaults: bin step 1 (0.01% fee), version 2 (LBPair v2.1).
-    // Override per-call via swapData = abi.encode(pairBinSteps, versions).
-    uint256[] private _defaultBinSteps;
-    uint8[]   private _defaultVersions;
-
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /**
-     * @param router          Merchant Moe LB Router address.
+     * @param aggregator      Pinned, allow-listed DEX aggregator router (e.g. Odos).
      * @param usdc            USDC token address (6 dec).
      * @param usdy            USDY token address (18 dec).
      * @param oracle          Ondo RWADynamicOracle address.
      * @param vault           YieldVault address (sole permitted caller).
      * @param maxSlippageBps  Max swap slippage (bps; typically 50 = 0.5%).
-     * @param defaultBinStep  Default Merchant Moe LBPair bin step (e.g. 1).
-     * @param defaultVersion  Default router version (e.g. 2 = LBPair v2.1).
      */
     constructor(
-        address router,
+        address aggregator,
         address usdc,
         address usdy,
         address oracle,
         address vault,
-        uint16  maxSlippageBps,
-        uint256 defaultBinStep,
-        uint8   defaultVersion
+        uint16  maxSlippageBps
     ) {
-        if (router == address(0) || usdc == address(0) || usdy == address(0) ||
+        if (aggregator == address(0) || usdc == address(0) || usdy == address(0) ||
             oracle == address(0) || vault == address(0)) revert ZeroAddress();
 
-        ROUTER          = router;
+        AGGREGATOR      = aggregator;
         underlying      = usdc;
         USDY            = usdy;
         ORACLE          = IRWADynamicOracle(oracle);
         VAULT           = vault;
         MAX_SLIPPAGE_BPS = maxSlippageBps;
 
-        _defaultBinSteps = new uint256[](1);
-        _defaultVersions = new uint8[](1);
-        _defaultBinSteps[0] = defaultBinStep;
-        _defaultVersions[0] = defaultVersion;
-
-        // Pre-approve router for both swap directions (max allowance, gas-efficient).
-        IERC20(usdc).forceApprove(router, type(uint256).max);
-        IERC20(usdy).forceApprove(router, type(uint256).max);
+        // Pre-approve the pinned aggregator for both swap directions (max
+        // allowance, gas-efficient). Only this one router is ever approved.
+        IERC20(usdc).forceApprove(aggregator, type(uint256).max);
+        IERC20(usdy).forceApprove(aggregator, type(uint256).max);
     }
 
     // ── IUsdyAdapter ──────────────────────────────────────────────────────────
@@ -155,9 +151,11 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     }
 
     /**
-     * @notice Swap vault's USDC into USDY via Merchant Moe.
-     * @dev Vault must approve this adapter before calling.
-     *      minUSDY out = usdcAmount × (1e30 / oracleNav) × (1 − slippage).
+     * @notice Swap vault's USDC into USDY via the pinned aggregator.
+     * @dev Vault must approve this adapter before calling. `swapData` is the
+     *      aggregator router calldata from the off-chain 1delta quote, paying this
+     *      adapter as recipient. minUSDY out = usdcAmount × (1e30 / nav) × (1 − slippage),
+     *      enforced as a balance-delta check (the aggregator's output is never trusted).
      */
     function deposit(uint256 usdcAmount, bytes calldata swapData)
         external
@@ -177,18 +175,19 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
         uint256 expectedUsdy = (usdcAmount * 1e30) / nav;
         uint256 minUsdy = expectedUsdy * (10_000 - MAX_SLIPPAGE_BPS) / 10_000;
 
-        (uint256[] memory binSteps, uint8[] memory versions) = _decodePath(swapData);
-        SwapLib.exactIn(ROUTER, underlying, USDY, usdcAmount, minUsdy, address(this), binSteps, versions);
+        // Output lands on this adapter; balance-delta enforces minUsdy.
+        AggregatorSwapLib.swap(AGGREGATOR, USDY, minUsdy, swapData);
 
         return usdcAmount;
     }
 
     /**
-     * @notice Sell enough USDY to return `usdcAmount` USDC to `to`.
-     * @dev Sells usdcAmount × (1 + slippage) worth of USDY (at oracle NAV) to
-     *      ensure the requested USDC is covered despite DEX price impact.
-     *      minOut = max(minOutUsdc, usdcAmount) — caller always gets at least what
-     *      they asked for (guaranteed by the over-sell buffer).
+     * @notice Sell USDY to return at least `usdcAmount` USDC to `to`.
+     * @dev `swapData` (aggregator calldata) sells USDY and pays this adapter; the
+     *      realized USDC is then forwarded to `to`. The over-sell buffer is chosen
+     *      off-chain when building `swapData`; on-chain we enforce
+     *      minOut = max(minOutUsdc, usdcAmount) via balance delta, so the caller
+     *      always receives at least what it asked for.
      */
     function withdraw(uint256 usdcAmount, uint256 minOutUsdc, address to, bytes calldata swapData)
         external
@@ -200,25 +199,15 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
         if (usdcAmount == 0) revert ZeroAmount();
         _requireOracleFresh();
 
-        uint256 usdyToSell = _usdyToSell(usdcAmount);
         uint256 minOut = minOutUsdc > usdcAmount ? minOutUsdc : usdcAmount;
-
-        (uint256[] memory binSteps, uint8[] memory versions) = _decodePath(swapData);
-        withdrawn = SwapLib.exactIn(ROUTER, USDY, underlying, usdyToSell, minOut, to, binSteps, versions);
-    }
-
-    /// @dev Compute USDY amount (18-dec) to sell to obtain `usdcAmount` USDC, including slippage buffer.
-    function _usdyToSell(uint256 usdcAmount) internal view returns (uint256) {
-        uint256 nav = ORACLE.getPrice();
-        uint256 needed = (usdcAmount * 1e30) / nav;
-        uint256 withBuffer = needed * (10_000 + MAX_SLIPPAGE_BPS) / 10_000;
-        uint256 bal = IERC20(USDY).balanceOf(address(this));
-        return withBuffer > bal ? bal : withBuffer;
+        withdrawn = AggregatorSwapLib.swap(AGGREGATOR, underlying, minOut, swapData);
+        IERC20(underlying).safeTransfer(to, withdrawn);
     }
 
     /**
      * @notice Sell all USDY and send USDC proceeds to `to`.
      * @param minOutUsdc Minimum acceptable total USDC (slippage guard for the caller).
+     * @param swapData   Aggregator calldata selling the full USDY balance to this adapter.
      */
     function emergencyWithdrawAll(uint256 minOutUsdc, address to, bytes calldata swapData)
         external
@@ -230,8 +219,8 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
         uint256 usdyBal = IERC20(USDY).balanceOf(address(this));
         if (usdyBal == 0) return 0;
 
-        (uint256[] memory binSteps, uint8[] memory versions) = _decodePath(swapData);
-        withdrawn = SwapLib.exactIn(ROUTER, USDY, underlying, usdyBal, minOutUsdc, to, binSteps, versions);
+        withdrawn = AggregatorSwapLib.swap(AGGREGATOR, underlying, minOutUsdc, swapData);
+        IERC20(underlying).safeTransfer(to, withdrawn);
     }
 
     // ── Modifiers ─────────────────────────────────────────────────────────────
@@ -253,20 +242,6 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
             if (rangeEnd > 0 && block.timestamp > rangeEnd) revert OracleStale();
         } catch {
             // Range not exposed; getPrice() (used downstream) still guards a dead oracle.
-        }
-    }
-
-    /// @dev Decode swapData into path params, falling back to stored defaults.
-    function _decodePath(bytes calldata swapData)
-        internal
-        view
-        returns (uint256[] memory binSteps, uint8[] memory versions)
-    {
-        if (swapData.length > 0) {
-            (binSteps, versions) = abi.decode(swapData, (uint256[], uint8[]));
-        } else {
-            binSteps = _defaultBinSteps;
-            versions = _defaultVersions;
         }
     }
 }

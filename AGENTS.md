@@ -30,11 +30,22 @@ product. See `PLAN.md`.
 ## 2. Non-negotiable rules
 
 1. **Data vs. execution boundary.** The **1delta API** may be used for **reading
-   data** and **optional swap routing only**. It must **NEVER** be in the
-   custody/execution path. The vault must **never execute arbitrary third-party
-   calldata.** Execution happens only through our own audited adapters
-   (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`) that call protocols/DEXs
-   directly with on-chain `minOut`/guardrail checks.
+   data** and **swap routing/quoting only** (it aggregates Odos/Eisen/Nordstern).
+   It must **NEVER** be in the custody/execution path. The vault must **never
+   execute arbitrary third-party calldata.** Execution happens only through our own
+   audited adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`).
+   **Aggregator exception (USDY only):** because USDY liquidity on Mantle is
+   fragmented across thin pools (Agni USDY/USDT, iZiSwap & Butter USDY/USDC —
+   together ~$1.5k), no single-pool route is usable. `UsdyAdapter` may run swap
+   calldata against **one pinned, allow-listed aggregator router** (Odos on Mantle,
+   immutable at deploy) — but this is *not* "arbitrary calldata", because the
+   adapter (a) only ever targets that single pinned address, (b) enforces a
+   **balance-delta `minOut`** it derives itself from the Ondo oracle NAV (the
+   router's reported output is never trusted), and (c) requires output to land on
+   the adapter, so calldata paying anyone else nets a 0 delta and reverts
+   (fail-closed). Aave/AUSD adapters still call their protocols/DEXs directly with
+   on-chain `minOut`. The aggregator router address is verified on-chain (Phase-0
+   gate) and pinned; changing it requires a redeploy.
 2. **Guardrails are the final authority.** On-chain guardrails (see `SPEC.md` §1:
    max weight/bucket, min idle+Aave liquidity buffer, max slippage, token/venue
    whitelist, rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy
@@ -85,7 +96,7 @@ product. See `PLAN.md`.
 - **Backend/agent/API:** **Node.js + TypeScript + Fastify** + **viem** (no ethers).
 - **TS tests:** **Vitest**.
 - **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
-- **LLM:** **Anthropic API (Claude)** via `@anthropic-ai/sdk`, wrapped in a thin mockable `LLMClient` interface (`agent/src/llm/`). **Data:** **1delta API** + **Mantle RPC**.
+- **LLM:** **Anthropic API** (`@anthropic-ai/sdk`). Default model: `claude-haiku-4-5-20251001` (configurable via `ANTHROPIC_MODEL`). The thin mockable `LLMClient` interface in `agent/src/llm/` hides the provider. **Data:** **1delta API** + **Mantle RPC**.
 
 ---
 
@@ -113,8 +124,10 @@ product. See `PLAN.md`.
 
 ## 5. Git & workflow
 
-- **Branches:** develop on `claude/features`. Stay on the working branch; do not
-  switch branches unless asked.
+- **Branches:** Always use `claude/features` if it is available (reset to `origin/main`
+  to pick up merged work if needed). If `claude/features` has unmerged commits that
+  haven't landed in `main`, create a new branch (e.g. `claude/features-<slug>`) rather
+  than overwriting in-progress work. Never develop directly on `main`.
 - **Commits:** one logical change per commit, clear messages. Do not force-push or
   amend unless explicitly asked.
 - **Push:** `git push -u origin <branch>`; retry network failures with backoff.
@@ -126,6 +139,9 @@ product. See `PLAN.md`.
   Update the relevant MD files (mark task `[x] DONE`, record the PR number) so
   every subsequent agent session picks up current state without re-reading
   history.
+- **Cursor review comments:** When tagging Cursor for re-review on a PR comment,
+  always use `@cursor` (e.g. `@cursor All items from your review are addressed.`).
+  This ensures the automation picks up the request.
 
 ---
 

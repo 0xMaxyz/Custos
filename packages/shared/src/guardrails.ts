@@ -21,6 +21,15 @@ export const MAX_WEIGHT_BPS: Record<Bucket, number> = {
   [Bucket.AUSD]: 10_000, // 100% (absorbs all on de-risk)
 } as const;
 
+/**
+ * Absolute cap on USDY exposure (6-decimal USDC; 0 = disabled). Mantle USDY pools
+ * total ~$1.5k across Agni/iZiSwap/Butter, so a deterministic notional ceiling that
+ * tracks real aggregator depth — independent of TVL or the % weight cap — keeps the
+ * vault from sizing a swap larger than the market can fill. Mirrors
+ * Guardrails.Config.maxUsdyNotionalUsdc.
+ */
+export const MAX_USDY_NOTIONAL_USDC = 5_000 * 1_000_000; // $5,000
+
 /** Minimum idle buffer that must remain after any rebalance (bps of TVL). */
 export const MIN_IDLE_BPS = 200; // 2%
 

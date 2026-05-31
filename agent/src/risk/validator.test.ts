@@ -47,6 +47,26 @@ describe("validateProposal — individual guardrail checks", () => {
     expect(r.errors).toContain("BUCKET_EXCEEDS_CAP");
   });
 
+  it("rejects a USDY increase whose notional exceeds the absolute cap", () => {
+    // TVL $30k, increasing USDY 0 → 2000bps = $6k notional > $5k cap.
+    const fromZero = weights(8_000, 2_000, 0, 0);
+    const r = validateProposal(weights(8_000, 0, 2_000, 0), fromZero, BASE_SNAPSHOT, MAX_USDY, CTX);
+    expect(r.errors).toContain("USDY_NOTIONAL_EXCEEDS_CAP");
+  });
+
+  it("allows a USDY increase whose notional is within the absolute cap", () => {
+    // TVL $30k, increasing USDY 0 → 1000bps = $3k notional < $5k cap.
+    const fromZero = weights(9_000, 1_000, 0, 0);
+    const r = validateProposal(weights(8_800, 0, 1_000, 200), fromZero, BASE_SNAPSHOT, MAX_USDY, CTX);
+    expect(r.errors).not.toContain("USDY_NOTIONAL_EXCEEDS_CAP");
+  });
+
+  it("skips the notional cap when USDY is not increasing", () => {
+    // USDY held flat at 5000 (=$15k > cap) must NOT trip the notional gate.
+    const r = validateProposal(weights(200, 4_800, 5_000, 0), CURRENT, BASE_SNAPSHOT, MAX_USDY, CTX);
+    expect(r.errors).not.toContain("USDY_NOTIONAL_EXCEEDS_CAP");
+  });
+
   it("rejects USDY above the cycle guardrail ceiling", () => {
     const r = validateProposal(weights(200, 3_500, 6_300, 0), CURRENT, BASE_SNAPSHOT, 6_000, CTX);
     expect(r.errors).toContain("USDY_EXCEEDS_GUARDRAIL");

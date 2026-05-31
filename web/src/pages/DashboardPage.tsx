@@ -7,6 +7,7 @@ import { AllocationChart, AllocationLegend, Sparkline, PegGauge } from "../compo
 import * as fmt from "../lib/fmt";
 import { RISK, decisions } from "../lib/data";
 import { useVaultData } from "../lib/useVaultData";
+import { computeBaseline, formatDeltaPct } from "../lib/baseline";
 import type { PositionState, VaultState } from "../lib/data";
 import type { VaultData } from "../lib/useVaultData";
 import type { Route } from "../components/Shell";
@@ -47,6 +48,10 @@ function AgentStatusCard({ go }: { go: (r: Route) => void }) {
 }
 
 function BaselineCounter({ baseline: b }: { baseline: VaultData["baseline"] }) {
+  // Derive the headline delta from the benchmark series via the shared, tested
+  // helper (ROADMAP 4.7) so the widget, useIdentity().baseline, and the unit tests
+  // all read one source — not the raw, potentially-stale passiveDeltaBps field.
+  const summary = computeBaseline(b);
   return (
     <Card className="baseline">
       <div className="card-hl">
@@ -56,7 +61,7 @@ function BaselineCounter({ baseline: b }: { baseline: VaultData["baseline"] }) {
       <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 auto" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-            <span className="mono" style={{ fontSize: "2.25rem", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--success)", lineHeight: 1 }}>{fmt.pctSigned(b.passiveDeltaBps)}</span>
+            <span className="mono" style={{ fontSize: "2.25rem", fontWeight: 700, letterSpacing: "-0.02em", color: summary.sentinelAhead ? "var(--success)" : "var(--error)", lineHeight: 1 }}>{formatDeltaPct(summary.deltaBps)}</span>
             <span style={{ color: "var(--muted)", fontSize: "0.9375rem" }}>vs passive</span>
           </div>
           <div style={{ display: "flex", gap: 22, marginTop: 14, flexWrap: "wrap" }}>

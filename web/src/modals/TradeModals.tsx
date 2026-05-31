@@ -6,11 +6,21 @@ import { Spinner } from "../components/Components";
 import { Modal } from "./Modals";
 import * as fmt from "../lib/fmt";
 import { explorer, type VaultState, type PositionState } from "../lib/data";
+import {
+  previewDeposit,
+  depositStepIndex,
+  isDepositBusy,
+  nextDepositPhase,
+  previewWithdraw,
+  isWithdrawBusy,
+  PER_TX_DEPOSIT_CAP as PER_TX_CAP,
+  type DepositPhase,
+  type WithdrawPhase,
+  type WithdrawUnit,
+} from "../lib/txMachine";
 
 // Minimal wallet shape the trade modals need (address + spendable USDC balance).
 export interface TradeWallet { connected: boolean; address?: string | undefined; balance?: string | undefined; }
-
-const PER_TX_CAP = 10000;
 
 function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
@@ -52,25 +62,22 @@ function TxResult({ kind, title, lines, tx, onClose }: { kind: "confirmed" | "fa
 // ---------- Deposit ----------
 export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: TradeWallet; vault: VaultState; onClose: () => void; onToast: (t: ToastPayload) => void }) {
   const [amt, setAmt] = useState("");
-  const [phase, setPhase] = useState<"form" | "approving" | "approved" | "depositing" | "done" | "failed">("form");
+  const [phase, setPhase] = useState<DepositPhase>("form");
   const sharePrice = parseFloat(vault.sharePrice);
   const bal = parseFloat(wallet.balance ?? "0");
   const tvl = parseFloat(vault.tvlUsdc), cap = parseFloat(vault.tvlCapUsdc);
-  const remaining = cap - tvl;
-  const n = parseFloat(amt) || 0;
-  const sharesOut = n / sharePrice;
-  let err: string | null = null;
-  if (n > bal) err = "Exceeds wallet balance";
-  else if (n > PER_TX_CAP) err = `Over per-tx cap of ${fmt.usd(PER_TX_CAP, { cents: false })}`;
-  else if (n > remaining) err = `Only ${fmt.usd(remaining, { cents: false })} of vault capacity left`;
-  const valid = n > 0 && !err;
-  const step = phase === "form" || phase === "approving" ? 0 : 1;
+
+  const p = previewDeposit({ amount: amt, walletBalance: bal, tvl, tvlCap: cap, sharePrice });
+  const { amount: n, sharesOut, error: err, valid } = p;
+  const step = depositStepIndex(phase);
 
   const run = () => {
+    // Drive the approve→deposit machine. setTimeout stands in for the wallet
+    // round-trips until VITE_VAULT_ADDRESS is live (then swap for wagmi writes).
     setPhase("approving");
-    setTimeout(() => { setPhase("approved"); setTimeout(() => {
+    setTimeout(() => { setPhase((x) => nextDepositPhase(x)); setTimeout(() => {
       setPhase("depositing"); setTimeout(() => {
-        setPhase("done");
+        setPhase((x) => nextDepositPhase(x));
         onToast({ kind: "success", title: "Deposit confirmed", body: `${fmt.usd(n)} deposited · ${fmt.num(sharesOut)} shares`, tx: "0xabc9876543210fedcba9876543210fedcba9876543210fedcba98765432100abc" });
       }, 1200);
     }, 900); }, 1100);
@@ -78,7 +85,7 @@ export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: Trad
 
   if (phase === "done") return <TxResult kind="confirmed" title="Deposit confirmed" lines={[`You deposited ${fmt.usd(n)}`, `Received ${fmt.num(sharesOut)} shares`]} tx="0xabc9876543210fedcba9876543210fedcba9876543210fedcba98765432100abc" onClose={onClose} />;
 
-  const busy = phase === "approving" || phase === "depositing";
+  const busy = isDepositBusy(phase);
   return (
     <Modal title="Deposit USDC" icon="plus" onClose={busy ? () => {} : onClose}>
       <Stepper steps={["Approve", "Deposit"]} current={step} />
@@ -91,7 +98,7 @@ export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: Trad
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: "0.8125rem" }}>
           <span style={{ color: "var(--muted)" }}>Balance <span className="mono">{fmt.usd(bal)}</span></span>
           <button className="linklike" style={{ fontSize: "0.8125rem", background: "none", border: 0 }} disabled={busy}
-            onClick={() => setAmt(String(Math.min(bal, PER_TX_CAP, remaining)))}>Max</button>
+            onClick={() => setAmt(String(p.maxDepositable))}>Max</button>
         </div>
       </div>
       {err && n > 0 && <div className="disclosure" style={{ marginTop: 12, color: "var(--error)", background: "var(--error-soft)" }}><Icon name="alert-triangle" size={15} />{err}</div>}
@@ -114,18 +121,21 @@ export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: Trad
 
 // ---------- Withdraw ----------
 export function WithdrawModal({ position, vault, onClose, onToast }: { position: PositionState; vault: VaultState; onClose: () => void; onToast: (t: ToastPayload) => void }) {
-  const [unit, setUnit] = useState<"USDC" | "shares">("USDC");
+  const [unit, setUnit] = useState<WithdrawUnit>("USDC");
   const [amt, setAmt] = useState("");
-  const [phase, setPhase] = useState<"form" | "withdrawing" | "done">("form");
+  const [phase, setPhase] = useState<WithdrawPhase>("form");
   const sharePrice = parseFloat(vault.sharePrice);
-  const maxUsdc = parseFloat(position.valueUsdc), maxShares = parseFloat(position.shares);
   const instant = parseFloat(vault.instantWithdrawableUsdc);
-  const n = parseFloat(amt) || 0;
-  const usdcOut = unit === "USDC" ? n : n * sharePrice;
-  const sharesIn = unit === "shares" ? n : n / sharePrice;
-  const max = unit === "USDC" ? maxUsdc : maxShares;
-  const overInstant = usdcOut > instant;
-  const valid = n > 0 && n <= max + 0.001;
+
+  const p = previewWithdraw({
+    amount: amt,
+    unit,
+    positionUsdc: parseFloat(position.valueUsdc),
+    positionShares: parseFloat(position.shares),
+    instantUsdc: instant,
+    sharePrice,
+  });
+  const { usdcOut, sharesIn, max, exceedsInstant: overInstant, valid } = p;
 
   const run = () => {
     setPhase("withdrawing");
@@ -136,7 +146,7 @@ export function WithdrawModal({ position, vault, onClose, onToast }: { position:
   };
 
   if (phase === "done") return <TxResult kind="confirmed" title="Withdrawal confirmed" lines={[`You withdrew ${fmt.usd(usdcOut)}`, `Burned ${fmt.num(sharesIn)} shares`]} tx="0xdef1a2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcd" onClose={onClose} />;
-  const busy = phase === "withdrawing";
+  const busy = isWithdrawBusy(phase);
 
   return (
     <Modal title="Withdraw" icon="minus" onClose={busy ? () => {} : onClose}>
@@ -152,7 +162,7 @@ export function WithdrawModal({ position, vault, onClose, onToast }: { position:
           <span style={{ fontWeight: 700, color: "var(--muted)" }}>{unit}</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: "0.8125rem" }}>
-          <span style={{ color: "var(--muted)" }}>Position <span className="mono">{unit === "USDC" ? fmt.usd(maxUsdc) : fmt.num(maxShares)}</span></span>
+          <span style={{ color: "var(--muted)" }}>Position <span className="mono">{unit === "USDC" ? fmt.usd(max) : fmt.num(max)}</span></span>
           <button className="linklike" style={{ fontSize: "0.8125rem", background: "none", border: 0 }} disabled={busy} onClick={() => setAmt(String(max))}>Max</button>
         </div>
       </div>

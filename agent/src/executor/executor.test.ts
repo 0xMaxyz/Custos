@@ -369,4 +369,147 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     // Pinned URI should be a data: or ipfs:// URI, not a plain sentence.
     expect(reason).toMatch(/^(data:|ipfs:\/\/)/);
   });
+
+  it("rebalance: swapData[2] populated from getSwapQuote when USDY weight changes", async () => {
+    // Start with 5000bps USDY; LLM verdict tightens to 2000bps (withdraw path).
+    // The engine holds current USDY, but applyVerdict tightens to 2000 → allocation
+    // change triggers rebalance, and the withdraw calldata should land in swapData[2].
+    const snap = baseSnapshot(); // currentWeightsBps includes 5000bps USDY
+
+    const MOCK_CALLDATA = "0xdeadbeef" as const;
+    const ADAPTER_ADDR = "0xaabbccddaabbccddaabbccddaabbccddaabbccdd" as `0x${string}`;
+
+    const signalsMod = await import("../llm/signals.js");
+    const oneDeltaMod = await import("../data/oneDelta.js");
+    const evidenceMod = await import("../llm/evidence.js");
+
+    // LLM verdict tightens USDY ceiling to 2000bps (below current 5000bps).
+    const runSignalLayerSpy = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
+      riskLevel: "CAUTION",
+      usdyMaxWeightBps: 2_000,
+      deRisk: false,
+      rationale: "Regulatory concern; reduce USDY exposure.",
+      signals: [],
+      confidence: 0.85,
+    });
+    const buildEvidenceFetcherSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
+      async () => [],
+    );
+    // Mock 1delta getSwapQuote on the prototype so the executor's new instance picks it up.
+    const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
+      .mockResolvedValue({
+        router: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745" as `0x${string}`,
+        calldata: MOCK_CALLDATA,
+        amountOut: 4_600n * 10n ** 18n,
+      });
+
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+
+    const writeContract = vi.fn(async () => "0xabc123" as `0x${string}`);
+    const readContract = vi.fn(async (opts: { functionName: string }) => {
+      if (opts.functionName === "lastRebalanceAt") return 0n;
+      if (opts.functionName === "adapters") return ADAPTER_ADDR;
+      return 0n;
+    });
+    const publicClient = { readContract, waitForTransactionReceipt: vi.fn(async () => ({ logs: [] })) } as never;
+    const walletClient = {
+      writeContract,
+      chain: { id: 5000 },
+      account: { address: "0x1234" as `0x${string}` },
+    } as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      ANTHROPIC_API_KEY: "sk-test",
+    });
+
+    const executor = new Executor({
+      config,
+      clients: { publicClient, walletClient } as never,
+      snapshotter: makeSnapshotter(snap),
+    });
+
+    await executor.runCycle();
+
+    runSignalLayerSpy.mockRestore();
+    buildEvidenceFetcherSpy.mockRestore();
+    getSwapQuoteSpy.mockRestore();
+
+    expect(writeContract).toHaveBeenCalledOnce();
+    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string; args: unknown[] }])[0];
+    expect(call.functionName).toBe("rebalance");
+    const swapData = call.args[1] as string[];
+    // swapData[2] should carry the quote calldata.
+    expect(swapData[2]).toBe(MOCK_CALLDATA);
+    // Other slots remain empty.
+    expect(swapData[0]).toBe("0x");
+    expect(swapData[1]).toBe("0x");
+    expect(swapData[3]).toBe("0x");
+  });
+
+  it("rebalance: swapData[2] falls back to 0x when getSwapQuote fails (network error)", async () => {
+    // Same scenario but getSwapQuote throws — swapData[2] must be "0x" (fail-closed).
+    const snap = baseSnapshot(); // currentWeightsBps has 5000bps USDY
+
+    const signalsMod = await import("../llm/signals.js");
+    const oneDeltaMod = await import("../data/oneDelta.js");
+    const evidenceMod = await import("../llm/evidence.js");
+
+    const runSignalLayerSpy = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
+      riskLevel: "CAUTION",
+      usdyMaxWeightBps: 2_000,
+      deRisk: false,
+      rationale: "Regulatory concern; reduce USDY exposure.",
+      signals: [],
+      confidence: 0.85,
+    });
+    const buildEvidenceFetcherSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
+      async () => [],
+    );
+    const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
+      .mockRejectedValue(new Error("network error"));
+
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+
+    const writeContract = vi.fn(async () => "0xabc123" as `0x${string}`);
+    const readContract = vi.fn(async (opts: { functionName: string }) => {
+      if (opts.functionName === "lastRebalanceAt") return 0n;
+      if (opts.functionName === "adapters") return "0xaabbccddaabbccddaabbccddaabbccddaabbccdd";
+      return 0n;
+    });
+    const publicClient = { readContract, waitForTransactionReceipt: vi.fn(async () => ({ logs: [] })) } as never;
+    const walletClient = {
+      writeContract,
+      chain: { id: 5000 },
+      account: { address: "0x1234" as `0x${string}` },
+    } as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      ANTHROPIC_API_KEY: "sk-test",
+    });
+
+    const executor = new Executor({
+      config,
+      clients: { publicClient, walletClient } as never,
+      snapshotter: makeSnapshotter(snap),
+    });
+
+    await executor.runCycle();
+
+    runSignalLayerSpy.mockRestore();
+    buildEvidenceFetcherSpy.mockRestore();
+    getSwapQuoteSpy.mockRestore();
+
+    expect(writeContract).toHaveBeenCalledOnce();
+    const call = (writeContract.mock.calls[0] as unknown as [{ args: unknown[] }])[0];
+    const swapData = (call.args as unknown[][])[1] as string[];
+    expect(swapData[2]).toBe("0x");
+  });
 });

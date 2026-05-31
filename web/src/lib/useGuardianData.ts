@@ -131,9 +131,9 @@ export function useDecisions(): GuardianFeed {
   });
 
   if (!isDeployed) return { decisions: fixtureDecisions, isLive: false };
-  // liveDecisions === null means fetch still in flight — show fixtures while loading.
-  if (liveDecisions === null) return { decisions: fixtureDecisions, isLive: false };
-  return { decisions: liveDecisions, isLive: true };
+  // liveDecisions === null means getLogs still in flight. Return empty live feed
+  // (not demo fixtures) so a deployed vault never shows fictional de-risk history.
+  return { decisions: liveDecisions ?? [], isLive: true };
 }
 
 /** Look up a single decision by id (detail view). */

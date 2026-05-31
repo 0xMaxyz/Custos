@@ -310,11 +310,14 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(call.functionName).toBe("deRisk");
   });
 
-<<<<<<< HEAD
-  it("LLM-only deRisk (healthy peg): calls rebalance with USDY=0, not deRisk", async () => {
+  it("LLM-only deRisk (healthy peg): routes through rebalance with USDY=0, not deRisk", async () => {
+    // Healthy snapshot — assessment.forceDeRisk=false. The LLM returns deRisk:true
+    // (news/attestation hero path). The executor must NOT call _sendDeRisk (which
+    // would revert with DeRiskConditionNotMet for ALLOCATOR); instead it clamps
+    // usdyMaxWeightBps=0 and routes through rebalance() with USDY weight = 0.
     const signalsMod = await import("../llm/signals.js");
     const evidenceMod = await import("../llm/evidence.js");
-    const runSignalLayer = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
+    const runSignalLayerSpy = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
       riskLevel: "DERISK",
       usdyMaxWeightBps: 5_000,
       deRisk: true,
@@ -322,89 +325,24 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
       signals: [{ type: "REGULATORY", severity: "HIGH", summary: "SEC action", evidenceId: "r1" }],
       confidence: 0.95,
     });
-    const buildEvidenceFetcher = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
-      async () => [
-        {
-          id: "r1",
-          type: "REGULATORY" as EvidenceType,
-          source: "sec.gov",
-          url: "https://sec.gov",
-          publishedAt: "2026-06-01",
-          summary: "Action.",
-        },
-      ],
+    const buildEvidenceFetcherSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
+      async () => [{ id: "r1", type: "REGULATORY" as EvidenceType, source: "sec.gov", url: "https://sec.gov", publishedAt: "2026-06-01", summary: "Action." }],
     );
 
     const snap = baseSnapshot();
-    const { executor, writeContract } = await makeExecutor(snap, {
-      ANTHROPIC_API_KEY: "sk-test",
-    });
-=======
-  it("LLM-only deRisk (healthy peg): routes through rebalance with USDY=0, not deRisk", async () => {
-    // Healthy snapshot — assessment.forceDeRisk=false. The LLM returns deRisk:true
-    // (news/attestation hero path). The executor must NOT call _sendDeRisk (which
-    // would revert with DeRiskConditionNotMet for ALLOCATOR); instead it clamps
-    // usdyMaxWeightBps=0 and routes through rebalance() with USDY weight = 0.
-    //
-    // To exercise the LLM path, set anthropicApiKey in config and mock AnthropicClient
-    // to return the deRisk verdict via the tool_use schema.
-    const anthropicMod = await import("../llm/anthropic.js");
-    // clampVerdict (in runSignalLayer) requires deRisk=true to have a signal
-    // with an evidenceId that resolves in the evidence array (SPEC §3.3).
-    // Supply a matching pair so the clamp preserves deRisk=true.
-    const evidenceId = "ev-0";
-    const deRiskVerdict = {
-      riskLevel: "DERISK" as const,
-      usdyMaxWeightBps: 4_000,
-      deRisk: true,
-      rationale: "Regulatory shock detected",
-      signals: [{ type: "REGULATORY" as const, severity: "HIGH" as const, summary: "shock", evidenceId }],
-      confidence: 0.9,
-    };
-    const spy = vi.spyOn(anthropicMod.AnthropicClient.prototype, "complete").mockResolvedValueOnce(deRiskVerdict);
-
-    // Also mock buildEvidenceFetcher so the evidence list contains our evidenceId.
-    const evidenceMod = await import("../llm/evidence.js");
-    const evidenceSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValueOnce(
-      () => Promise.resolve([{ id: evidenceId, type: "NEWS" as EvidenceType, source: "test", url: "https://example.com", publishedAt: new Date().toISOString(), summary: "shock" }]),
-    );
-
-    // Current weights have USDY=5000; after LLM deRisk it must drop to 0.
-    const snap = baseSnapshot({ currentWeightsBps: weights(300, 4_700, 5_000, 0) });
-    const { Executor } = await import("./index.js");
-    const { loadConfig } = await import("../config.js");
-    const { publicClient, walletClient, writeContract } = makeMockClients();
-    const config = loadConfig({
-      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
-      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
-      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
-      ANTHROPIC_API_KEY: "sk-test-key",
-    });
-    const executor = new Executor({ config, clients: { publicClient, walletClient } as never, snapshotter: makeSnapshotter(snap) });
->>>>>>> 9e489c6 (test(executor): strengthen LLM-only deRisk routing test with mocked signal layer)
+    const { executor, writeContract } = await makeExecutor(snap, { ANTHROPIC_API_KEY: "sk-test" });
 
     const result = await executor.runCycle();
-    spy.mockRestore();
-    evidenceSpy.mockRestore();
+    runSignalLayerSpy.mockRestore();
+    buildEvidenceFetcherSpy.mockRestore();
 
     expect(result.submitted).toBe(true);
-<<<<<<< HEAD
     expect(result.kind).toBe("rebalance");
     expect(writeContract).toHaveBeenCalledOnce();
     const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string; args: unknown[] }])[0];
     expect(call.functionName).toBe("rebalance");
-    const weights = call.args[0] as readonly number[];
-    expect(weights[Bucket.USDY]).toBe(0);
-
-    runSignalLayer.mockRestore();
-    buildEvidenceFetcher.mockRestore();
-=======
-    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string; args: unknown[] }])[0];
-    expect(call.functionName).toBe("rebalance");
-    // First arg is the weights array: [IDLE, AAVE, USDY, AUSD] — USDY (index 2) must be 0.
-    const weightsArr = call.args[0] as number[];
-    expect(weightsArr[2]).toBe(0);
->>>>>>> 9e489c6 (test(executor): strengthen LLM-only deRisk routing test with mocked signal layer)
+    const weightsArr = call.args[0] as readonly number[];
+    expect(weightsArr[Bucket.USDY]).toBe(0);
   });
 
   it("oracle stale: calls deRisk via deterministic forceDeRisk", async () => {

@@ -4,6 +4,12 @@ Design spec for the frontend, intended as the brief for generating screens (Clau
 design). Stack is fixed: **React + Vite + Tailwind + daisyUI**, wallet via
 **RainbowKit + wagmi + viem**. Read alongside `PLAN.md`, `SPEC.md`, `ROADMAP.md`.
 
+> **Render real data, not invented numbers.** Every screen's field names, enums, and
+> example values are pinned in **§15 (taxonomy)**, **§16 (data dictionary)**, and
+> **§17 (example fixtures)** — drawn from the live contracts (`YieldVault`,
+> `Guardrails`, `AgentBenchmark`) and the agent schema (`SPEC.md` §3). Use them
+> verbatim so generated screens show the values the app actually emits.
+
 **Design intent:** clean, simple, professional. No fancy colors or fonts. Standard
 palette with a **purple** accent. **Light + dark** themes. Optimized for the Best
 UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Design
@@ -130,10 +136,23 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
   reasoning" link to `/activity`. This is the trust anchor.
 - **Your position:** deposited value, current value, shares, all-time yield, blended
   APY. Primary buttons **Deposit** / **Withdraw** (open modals).
+- **Baseline counter (hero — the Turing-Test answer):** a prominent, always-visible
+  comparison **"Sentinel vs a passive 100% USDY holder"** — running **bps delta**
+  (`passiveDeltaBps`) since inception / last de-risk, **drawdown avoided**
+  (`drawdownAvoidedUsdc`, USD) summed across de-risk events, and **realized yield**
+  (`realizedYieldBps`). Render as a paired stat ("Passive USDY +X bps · Sentinel
+  +Y bps · avoided −Z bps drawdown") with a small sparkline. This is the single most
+  important number on the page; legible disconnected (vault-wide) and personalized to
+  the user's position when connected. Source: `AgentBenchmark` outcomes (§16).
 - **Allocation card:** donut or stacked bar across IDLE / AAVE / USDY / AUSD with %
-  and USD; legend; "instantly withdrawable" figure (idle + Aave) called out.
-- **Vault stats:** TVL (vs cap), current blended APY, USDY peg status (NAV vs DEX),
-  oracle freshness.
+  and USD; legend; "instantly withdrawable" figure (idle + Aave) called out and
+  checked against the **15% instant-liquidity floor**.
+- **Vault stats:** TVL (vs `tvlCap` **$50k**), **blended APY** with an expandable
+  breakdown (**USDY implied APY** vs **Aave supply APY** — the yield spread the agent
+  weighs), **USDY peg** (oracle NAV vs DEX spot, deviation in bps against the
+  0.3 / 0.5 / 1.0% thresholds), and **oracle status** (range-based: "valid until
+  〈date〉" / "range ends in 2 days" — **not** a Chainlink "last-updated" staleness;
+  see §15.3).
 - **States:** not-connected (position card → connect CTA, vault stats still visible
   read-only), loading skeletons, empty (no deposit yet → "Make your first deposit").
 
@@ -143,11 +162,25 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
   - kind badge (Rebalance / **De-risk**), timestamp, risk level color.
   - one-line plain-language summary ("Rotated 30% USDY → AUSD: DEX price 1.1% below
     NAV").
-  - allocation **before → after** mini-bars.
-  - **evidence chips** (Attestation / News / Peg / Oracle) linking sources.
-  - tx link (mantlescan), rationale hash.
-- **Filters:** All / De-risk only / Rebalance. **Decision detail modal** on click
-  (full rationale text, all evidence with sources, before/after, outcome once known).
+  - allocation **before → after** mini-bars (all four buckets, `preWeightsBps` →
+    `postWeightsBps`).
+  - **evidence/signal chips** typed by signal (**Peg · Oracle · Liquidity ·
+    Attestation · News**, §15.1) with **severity** (Low/Med/High) coloring; each
+    links its source.
+  - **confidence** indicator (the agent's `confidence`, 0–1) and a small **"guardrails
+    enforced"** mark (the action stayed within on-chain limits).
+  - **outcome strip** once measured: realized bps, **passive-delta bps**, drawdown
+    avoided — or "measuring…" while `measuredAt == 0`.
+  - tx link (mantlescan), `rationaleHash`.
+- **Filters:** All / De-risk only / Rebalance (+ by risk level). **Decision detail
+  modal** on click: full **rationale** text, **risk verdict** (`riskLevel` +
+  `confidence`), the **deterministic flags** that fired (PEG_WARN /
+  ORACLE_NEAR_RANGE_END / LOW_LIQUIDITY, §15.2), **all signals** (type · severity ·
+  summary) each tied to its **evidence** (source · publishedAt · link), **before →
+  after** weights for all four buckets, the **guardrail ceiling** in force that cycle
+  (`maxUsdyWeightBpsAllowed`), and the **outcome** (`realizedYieldBps` ·
+  `passiveDeltaBps` · `drawdownAvoidedUsdc` · `measuredAt`). Show `rationaleHash` +
+  `decisionURI` (IPFS) for verifiability.
 - **States:** loading skeleton rows, empty ("No decisions yet — the agent is
   monitoring"), error (retry).
 
@@ -156,8 +189,19 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 - **Identity card:** ERC-8004 NFT (agent name, id, agentURI), owner, registry link;
   track record stats (decisions made, de-risk events handled, realized yield,
   drawdown avoided).
-- **"What I'm watching" panel:** live list of monitored signals (USDY peg, oracle
-  freshness, Aave utilization, AUSD reserves) with current values + thresholds.
+- **"What I'm watching" panel:** live signal list, each row **current value vs
+  threshold** + status dot (Normal/Caution/De-risk): **USDY peg** (DEX spot vs oracle
+  NAV, bps, vs 30 / 50 / 100), **oracle** (range end & age vs `oracleMaxAge` ~28h and
+  `oracleRangeEndBuffer` 24h), **Aave utilization** (bps) & **withdrawable** liquidity,
+  **instant-liquidity buffer** (IDLE + Aave vs the 15% floor), **AUSD proof-of-reserves**
+  (Should).
+- **Guardrails / "the limits" panel (trust surface):** the immutable on-chain bounds
+  the agent can never cross — **max USDY 60% · max Aave 90% · min idle 2% · min
+  instant-liquidity 15% · max slippage 0.5% · max rebalance move 50% · min rebalance
+  interval 1h · peg warn/block/de-risk 0.3 / 0.5 / 1.0% · TVL cap $50k · per-tx deposit
+  cap $10k · add-strategy timelock 48h**. Makes the "AI proposes, guardrails dispose —
+  the model is never the last line of defense" thesis concrete. Source: `packages/shared`
+  constants, identical to on-chain `Guardrails.config()` (§16).
 - **Ask the agent (Should):** chat panel — "Why am I in AUSD right now?", "What
   changed today?" — answered from decision history + current snapshot. Clearly
   labeled as explanations (read-only; the agent never takes orders from chat).
@@ -175,9 +219,12 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 ## 6. Dialogs / modals
 
 - **Connect wallet** — RainbowKit modal (themed).
-- **Deposit** — amount input (USDC, max button, balance), **preview** (shares out,
-  current share price, projected blended APY), 2-step **stepper** Approve → Deposit
-  (skip approve if allowance/permit), risk/disclosure note, confirm. Live tx state.
+- **Deposit** — amount input (USDC, max button, balance), **caps surfaced** (per-tx
+  max **$10,000**; vault **$50,000** cap shown as "used $X / $50,000" remaining),
+  **preview** (shares out, current share price, projected blended APY), 2-step
+  **stepper** Approve → Deposit (skip approve if allowance/permit), risk/disclosure
+  note, confirm. Live tx state. Disabled with an explicit reason when a cap is hit or
+  the vault is paused.
 - **Withdraw** — amount in USDC or shares (toggle), **preview** (USDC out, share
   price), **liquidity note** ("served from instant liquidity"; warn if large
   withdrawal may unwind USDY with slippage), confirm.
@@ -197,9 +244,11 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 Topbar, NavTabs, NetworkPill, ThemeToggle, WalletButton (RainbowKit), Banner
 (warning/paused), StatCard, MoneyValue (tabular + USD), TokenAmount, AddressChip
 (copy + explorer), AllocationChart (donut/stacked bar) + AllocationLegend, APYBadge,
-RiskLevelChip, AgentStatusCard, DecisionTimelineItem, EvidenceChip, IdentityCard,
-WatchlistPanel, ChatPanel, LineChart + ChartDataTable, Stepper, AmountInput,
-TxStatus, Toast, Skeletons, EmptyState, ErrorState.
+ApyBreakdown (USDY vs Aave), RiskLevelChip, AgentStatusCard, **BaselineCounter**,
+DecisionTimelineItem, EvidenceChip, **SignalBadge** (typed + severity), **FlagChip**,
+**ConfidenceMeter**, **OutcomeStrip**, IdentityCard, WatchlistPanel, **GuardrailsPanel**
+(the limits), **PegGauge**, **LiquidityBufferBar**, ChatPanel, LineChart +
+ChartDataTable, Stepper, AmountInput, TxStatus, Toast, Skeletons, EmptyState, ErrorState.
 
 ---
 
@@ -240,6 +289,14 @@ TxStatus, Toast, Skeletons, EmptyState, ErrorState.
 - **Conversational, bounded:** Ask-the-agent explains; it never executes from chat.
 - **Live "what I'm watching":** turns an invisible loop into something observable —
   the "radical transparency" theme made tangible.
+- **Beat-the-baseline, on-chain:** the Baseline counter (§5.1) shows Sentinel vs a
+  passive USDY holder in bps + drawdown avoided — the "can the AI actually beat
+  passive?" answer, sourced from the on-chain `AgentBenchmark`.
+- **Guardrails made visible:** the Limits panel (§5.3) shows the immutable on-chain
+  bounds the agent cannot cross, plus a per-decision "guardrails enforced" mark —
+  proof the model is never the last line of defense.
+- **Confidence, shown not hidden:** every decision surfaces the agent's `confidence`
+  (0–1) next to its risk level, so users can weight its certainty.
 
 ---
 
@@ -257,7 +314,7 @@ TxStatus, Toast, Skeletons, EmptyState, ErrorState.
 |---|---|
 | Visual Design 30% | restrained purple/neutral system, consistent tokens, two clean themes |
 | Interaction & Flow 30% | clear deposit/withdraw steppers, responsive shell, skeleton/empty/error states, smooth ≤200ms motion |
-| AI Interaction Design 25% | agent status card, plain-language rationale + evidence, watchlist, bounded chat (§10) |
+| AI Interaction Design 25% | agent status card, plain-language rationale + evidence, confidence, baseline counter, guardrails/limits panel, watchlist, bounded chat (§10) |
 | Accessibility 15% | keyboard/contrast/ARIA/chart-tables/reduced-motion (§9) |
 
 ---
@@ -287,4 +344,229 @@ TxStatus, Toast, Skeletons, EmptyState, ErrorState.
 6. **Risk radar + Ask-the-agent** (Should) — 4.8 / 5.4.
 
 > Build with mock data first (typed fixtures), then wire to chain/agent so screens
-> can be designed and reviewed before contracts land on testnet.
+> can be designed and reviewed before contracts land on testnet. The fixtures in §17
+> are the canonical mock set — design and review against those exact values.
+
+---
+
+## 15. Risk-signal, severity & flag taxonomy (enums the UI binds to)
+
+These are closed enum sets — design one swatch/badge per value, don't invent others.
+
+### 15.1 Signal & evidence types
+The agent's verdict carries `signals[]` and each links an `evidence[]` item. Type set:
+
+| `type` | Meaning | Default icon (lucide) |
+|--------|---------|-----------------------|
+| `PEG` | USDY DEX spot deviates from oracle NAV | `activity` |
+| `ORACLE` | `RWADynamicOracle` near range end / frozen / paused | `clock-alert` |
+| `LIQUIDITY` | Aave or DEX liquidity / buffer pressure | `droplet` |
+| `ATTESTATION` | Ondo/USDY reserve attestation finding | `file-check` |
+| `NEWS` | Regulatory / issuer / market headline (incl. issuer & regulatory) | `newspaper` |
+
+Each signal has a **severity** → color: `LOW` → info/neutral · `MEDIUM` → warning ·
+`HIGH` → error. Evidence item fields: `{ id, type, source, url, publishedAt, summary }`.
+
+### 15.2 Deterministic flags (from the risk engine, pre-LLM)
+Shown on the decision detail and "what I'm watching". Closed set:
+`NONE` · `PEG_WARN` (peg ≥ 0.3%) · `ORACLE_NEAR_RANGE_END` (within 24h of range end) ·
+`LOW_LIQUIDITY` (instant buffer < 15%). These are **deterministic**, not AI — label
+them as such (they are not the LLM's opinion).
+
+### 15.3 Risk level → stance, color, oracle wording
+| `riskLevel` (0/1/2) | Status color | Agent-status label | What it means |
+|---------------------|--------------|--------------------|---------------|
+| `NORMAL` | success (green) | **Active · Monitoring** | Within tolerance; earning |
+| `CAUTION` | warning (amber) | **Caution** | A signal is elevated; exposure may be tightened |
+| `DERISK` | error (red) | **De-risking** | Rotating USDY → AUSD/USDC; defense in progress |
+
+The LLM may only **tighten** (raise level / lower USDY) — never the reverse; reflect
+that one-directionality in copy. **Oracle wording:** USDY's oracle is *range-based*
+(it interpolates a daily rate), so never say "price feed stale / last updated 3h ago".
+Say **"oracle valid until 〈date〉"** or **"range ends in 2 days"**; only a frozen/paused
+oracle or one past its range end is "stale".
+
+---
+
+## 16. Data dictionary (UI element → field → unit → example → source)
+
+Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR** =
+`Guardrails.config()` / `packages/shared` constants · **BM** = `AgentBenchmark` ·
+**AGENT** = off-chain agent API / LLM verdict (`SPEC.md` §3) · **CHAIN** = wallet/RPC.
+
+**Position & vault stats (Dashboard §5.1)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| Your shares | `balanceOf(user)` | shares (18-dec) | `30,000.00` | VAULT |
+| Current value | `convertToAssets(shares)` | USDC (6-dec) | `$30,142.50` | VAULT |
+| Share price | `convertToAssets(1e18)` | USDC/share | `1.0047` | VAULT |
+| TVL / cap | `totalAssets()` / `tvlCap` | USDC | `$30,000 / $50,000` | VAULT / GR |
+| Blended APY | computed | % | `4.18%` | AGENT |
+| └ USDY implied APY | `usdyImpliedApyBps` | bps | `452` (4.52%) | AGENT |
+| └ Aave supply APY | `aaveUsdcSupplyApyBps` | bps | `380` (3.80%) | AGENT |
+| Allocation weights | current `weightsBps[4]` | bps `[IDLE,AAVE,USDY,AUSD]` | `[300,4700,5000,0]` | VAULT |
+| Instantly withdrawable | IDLE + `aaveWithdrawable` | USDC | `$15,000` | VAULT |
+| Paused / killed | `paused()` / `isKilled` | bool | `false / false` | VAULT |
+
+**Baseline counter (Dashboard §5.1 hero)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| Passive-delta | `passiveDeltaBps` | bps (signed) | `+180` | BM |
+| Drawdown avoided | `drawdownAvoidedUsdc` | USDC (6-dec) | `$610.00` | BM |
+| Realized yield | `realizedYieldBps` | bps (signed) | `+45` | BM |
+| Measured at | `measuredAt` | unix ts | `1749556800` | BM |
+
+**Agent status & decision (Dashboard §5.1 / Activity §5.2)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| Risk level | `riskLevel` | enum 0/1/2 | `NORMAL` | GR / AGENT |
+| Confidence | `confidence` | 0–1 | `0.86` | AGENT |
+| Decision id | `id` | uint | `14` | VAULT |
+| Kind | `kind` | 0 REBALANCE / 1 DERISK | `1` | VAULT |
+| Pre/post weights | `preWeightsBps` / `postWeightsBps` | bps[4] | `[300,4700,5000,0]→[500,4500,0,5000]` | VAULT |
+| To-bucket (de-risk) | `toBucket` | 0 IDLE / 3 AUSD | `3` | VAULT |
+| Rationale (text) | `rationale` | string | "Peg 122 bps below NAV…" | AGENT |
+| Rationale hash | `rationaleHash` | bytes32 | `0x9f2c…` | VAULT |
+| Decision bundle | `decisionURI` | ipfs:// | `ipfs://bafy…` | VAULT |
+| Evidence hash | `evidenceHash` | bytes32 | `0x4ad1…` | VAULT |
+
+**Watchlist & limits (Agent §5.3)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| USDY peg deviation | `usdyDexSpot` vs `usdyOracleNav` | bps | `20` | VAULT |
+| Oracle range end | `oracleRangeEnd` | unix ts | `2026-07-01` | VAULT |
+| Aave utilization | `aaveUtilizationBps` | bps | `7400` (74%) | AGENT |
+| Aave withdrawable | `aaveWithdrawable` | USDC | `$21,000` | VAULT |
+| Max USDY weight | `maxWeightBps[USDY]` | bps | `6000` (60%) | GR |
+| Min instant liquidity | `minInstantLiquidityBps` | bps | `1500` (15%) | GR |
+| Max slippage | `maxSlippageBps` | bps | `50` (0.5%) | GR |
+| Peg warn/block/derisk | `pegWarnBps`/`pegBlockBps`/`pegDeRiskBps` | bps | `30 / 50 / 100` | GR |
+| Per-tx deposit cap | `perTxDepositCap` | USDC | `$10,000` | GR |
+
+**Identity card (Agent §5.3)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| Agent id | ERC-8004 `agentId` | uint | `7` | CHAIN |
+| Agent name / URI | `tokenURI` JSON `{name, agentURI}` | string | `Sentinel Risk-Guardian` | CHAIN |
+| Owner | NFT owner | address | `0xA11c…E0a` | CHAIN |
+| Identity registry | ERC-8004 Identity | address | `0x8004A169…a432` | CHAIN |
+| Decisions handled | `decisionCount` | uint | `14` | BM |
+| De-risk events | count of `kind==1` | uint | `2` | VAULT |
+
+---
+
+## 17. Canonical example fixtures (design & review against these)
+
+Typed mock data for the screens. Numbers are internally consistent (USDC 6-dec,
+USDY 18-dec, chain 5000). Use verbatim.
+
+### 17.1 Chain & token facts
+```jsonc
+{
+  "chains": { "mainnet": 5000, "testnet": 5003 },
+  "explorer": "https://mantlescan.xyz",
+  "tokens": {
+    "USDC": { "decimals": 6,  "address": "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9" },
+    "USDY": { "decimals": 18, "address": "0x5bE26527e817998A7206475496fDE1E68957c5A6" },
+    "AUSD": { "decimals": 6,  "address": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a" }
+  },
+  "erc8004": {
+    "identity":   "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+    "reputation": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63"
+  }
+}
+```
+
+### 17.2 Vault stats + connected position (Dashboard)
+```jsonc
+{
+  "tvlUsdc": "30000.00", "tvlCapUsdc": "50000.00",
+  "blendedApyBps": 418, "usdyImpliedApyBps": 452, "aaveUsdcSupplyApyBps": 380,
+  "weightsBps": { "IDLE": 300, "AAVE": 4700, "USDY": 5000, "AUSD": 0 },
+  "instantWithdrawableUsdc": "15000.00",
+  "usdyOracleNavUsdc": "1.0832", "usdyDexSpotUsdc": "1.0810", "pegDeviationBps": 20,
+  "oracleRangeEnd": "2026-07-01T00:00:00Z",
+  "paused": false, "killed": false,
+  "position": {
+    "shares": "30000.00", "valueUsdc": "30142.50", "sharePrice": "1.0047",
+    "allTimeYieldUsdc": "142.50"
+  }
+}
+```
+
+### 17.3 Baseline counter (Dashboard hero)
+```jsonc
+{
+  "passiveDeltaBps": 180,            // Sentinel +1.80% vs a 100%-USDY holder
+  "drawdownAvoidedUsdc": "610.00",   // summed across de-risk events
+  "realizedYieldBps": 45,
+  "sinceDecisionId": 12, "measuredAt": "2026-06-10T12:00:00Z"
+}
+```
+
+### 17.4 Decision — NORMAL rebalance (Activity item + detail)
+```jsonc
+{
+  "id": 13, "kind": 0, "timestamp": "2026-06-10T12:00:00Z",
+  "riskLevel": "NORMAL", "confidence": 0.86,
+  "preWeightsBps":  { "IDLE": 300, "AAVE": 4700, "USDY": 5000, "AUSD": 0 },
+  "postWeightsBps": { "IDLE": 200, "AAVE": 4800, "USDY": 5000, "AUSD": 0 },
+  "flags": ["NONE"], "maxUsdyWeightBpsAllowed": 6000,
+  "rationale": "Peg deviation 20 bps within tolerance; USDY APY 4.52% exceeds Aave 3.80%; reserves attestation clean. Hold ~50% USDY.",
+  "signals": [
+    { "type": "PEG", "severity": "LOW", "summary": "USDY 20 bps below NAV on DEX.", "evidenceId": "e1" }
+  ],
+  "evidence": [
+    { "id": "e1", "type": "ATTESTATION", "source": "ondo.finance",
+      "url": "https://ondo.finance/usdy/attestations", "publishedAt": "2026-06-01",
+      "summary": "Monthly USDY reserve attestation: 99.4% short T-bills." }
+  ],
+  "rationaleHash": "0x9f2c…", "decisionURI": "ipfs://bafy…rationale",
+  "outcome": { "realizedYieldBps": 12, "passiveDeltaBps": 8, "drawdownAvoidedUsdc": "0.00", "measuredAt": "2026-06-10T13:00:00Z" },
+  "txHash": "0xabc…"
+}
+```
+
+### 17.5 Decision — DE-RISK (the hero moment)
+```jsonc
+{
+  "id": 14, "kind": 1, "timestamp": "2026-06-11T09:30:00Z",
+  "riskLevel": "DERISK", "confidence": 0.91, "toBucket": 3,
+  "preWeightsBps":  { "IDLE": 300, "AAVE": 4700, "USDY": 5000, "AUSD": 0 },
+  "postWeightsBps": { "IDLE": 500, "AAVE": 4500, "USDY": 0,    "AUSD": 5000 },
+  "flags": ["PEG_WARN"], "maxUsdyWeightBpsAllowed": 6000,
+  "rationale": "USDY traded 122 bps below its Treasury NAV on DEX and an issuer headline flagged a redemption pause review; rotated all USDY to AUSD to protect principal.",
+  "signals": [
+    { "type": "PEG",  "severity": "HIGH",   "summary": "USDY 122 bps below NAV — past the 1.0% de-risk threshold.", "evidenceId": "e1" },
+    { "type": "NEWS", "severity": "MEDIUM", "summary": "Issuer redemption-pause review reported.",                  "evidenceId": "e2" }
+  ],
+  "evidence": [
+    { "id": "e1", "type": "ORACLE", "source": "RWADynamicOracle", "url": "https://mantlescan.xyz/address/0xA96a…", "publishedAt": "2026-06-11", "summary": "Oracle NAV 1.0832 vs DEX spot 1.0700." },
+    { "id": "e2", "type": "NEWS",   "source": "reuters.com",      "url": "https://…", "publishedAt": "2026-06-11", "summary": "Report: issuer reviewing temporary redemption pause." }
+  ],
+  "rationaleHash": "0x4ad1…", "evidenceHash": "0x77be…", "decisionURI": "ipfs://bafy…derisk",
+  "outcome": { "realizedYieldBps": 45, "passiveDeltaBps": 180, "drawdownAvoidedUsdc": "610.00", "measuredAt": "2026-06-11T18:00:00Z" },
+  "txHash": "0xdef…"
+}
+```
+
+### 17.6 Watchlist snapshot (Agent §5.3)
+```jsonc
+[
+  { "label": "USDY peg",            "value": "20 bps below NAV", "threshold": "warn 30 / block 50 / derisk 100", "status": "NORMAL" },
+  { "label": "Oracle",              "value": "valid until 2026-07-01", "threshold": "range-end buffer 24h", "status": "NORMAL" },
+  { "label": "Aave utilization",    "value": "74%", "threshold": "—", "status": "NORMAL" },
+  { "label": "Instant-liquidity",   "value": "50% of TVL", "threshold": "min 15%", "status": "NORMAL" },
+  { "label": "AUSD reserves (PoR)", "value": "fully reserved", "threshold": "—", "status": "NORMAL" }
+]
+```
+
+### 17.7 Identity card (Agent §5.3)
+```jsonc
+{
+  "agentId": 7, "name": "Sentinel Risk-Guardian",
+  "agentURI": "ipfs://bafy…agentcard", "owner": "0xA11c…E0a",
+  "identityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+  "trackRecord": { "decisions": 14, "deRiskEvents": 2, "realizedVsPassivePct": 1.8, "drawdownAvoidedUsdc": "610.00" }
+}
+```

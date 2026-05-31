@@ -1,5 +1,5 @@
 import { getAddress, keccak256, toBytes, type WalletClient, type PublicClient } from "viem";
-import { Bucket, MAX_SLIPPAGE_BPS, TOKENS } from "@sentinel/shared";
+import { Bucket, MAX_SLIPPAGE_BPS, TOKENS, PROTOCOLS } from "@sentinel/shared";
 
 import type { AgentConfig } from "../config.js";
 import type { ChainClients } from "../chain/clients.js";
@@ -255,19 +255,23 @@ export class Executor {
 
     const oneDelta = new OneDeltaClient(this.config);
 
+    // Pinned Odos aggregator address — must match what UsdyAdapter.AGGREGATOR was
+    // deployed with. Reject any quote targeting a different router before signing.
+    const pinnedRouter = (PROTOCOLS.usdyAggregatorRouter as string).toLowerCase();
+
     try {
+      let quote;
       if (finalUsdy > currentUsdy) {
         // Deposit path: USDC → USDY. Amount = weight-delta × TVL.
         const deltaWeightBps = BigInt(finalUsdy - currentUsdy);
         const usdcIn = (deltaWeightBps * snapshot.totalAssetsUsdc) / 10_000n;
-        const quote = await oneDelta.getSwapQuote(
+        quote = await oneDelta.getSwapQuote(
           TOKENS.USDC.address,
           TOKENS.USDY.address,
           usdcIn,
           adapterAddress,
           MAX_SLIPPAGE_BPS,
         );
-        swapData[2] = quote.calldata;
       } else {
         // Withdraw path: USDY → USDC. Convert USDC value to USDY units via oracle NAV.
         const deltaWeightBps = BigInt(currentUsdy - finalUsdy);
@@ -275,17 +279,26 @@ export class Executor {
         // usdyOracleNavUsdc is 18-dec (price of 1 USDY in USDC × 1e18).
         // usdyIn = usdcValue (6-dec) * 1e18 / usdyOracleNavUsdc (18-dec) → 6-dec, then scale to 18.
         const usdyIn = (usdcValue * 10n ** 18n) / snapshot.usdyOracleNavUsdc;
-        const quote = await oneDelta.getSwapQuote(
+        quote = await oneDelta.getSwapQuote(
           TOKENS.USDY.address,
           TOKENS.USDC.address,
           usdyIn,
           adapterAddress,
           MAX_SLIPPAGE_BPS,
         );
-        swapData[2] = quote.calldata;
       }
+
+      // Fail-closed: reject quotes that target any router other than the pinned one.
+      // The adapter enforces this on-chain too, but we catch it here before signing.
+      if (quote.router.toLowerCase() !== pinnedRouter) {
+        throw new Error(
+          `Quote router mismatch: got ${quote.router}, expected ${pinnedRouter}`,
+        );
+      }
+
+      swapData[2] = quote.calldata;
     } catch {
-      // Quote failed (network error, no route, API down). Leave swapData[2] empty.
+      // Quote failed (network error, no route, wrong router, API down). Leave swapData[2] empty.
       // If the vault tries to execute a USDY swap with empty calldata it will revert
       // with EmptySwapData — a safe fail-closed outcome.
     }

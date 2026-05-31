@@ -96,7 +96,7 @@ product. See `PLAN.md`.
 - **Backend/agent/API:** **Node.js + TypeScript + Fastify** + **viem** (no ethers).
 - **TS tests:** **Vitest**.
 - **Deploy:** **Docker** (backend + frontend) behind **Caddy** (or nginx) routing.
-- **LLM:** **z.ai** (OpenAI-compatible + Anthropic-compatible API surfaces) as the AI API provider. Default model for tests: `glm-4-flash` (free tier). The thin mockable `LLMClient` interface in `agent/src/llm/` hides the provider. **Data:** **1delta API** + **Mantle RPC**.
+- **LLM:** **Anthropic API** (`@anthropic-ai/sdk`). Default model: `claude-haiku-4-5-20251001` (configurable via `ANTHROPIC_MODEL`). The thin mockable `LLMClient` interface in `agent/src/llm/` hides the provider. **Data:** **1delta API** + **Mantle RPC**.
 
 ---
 

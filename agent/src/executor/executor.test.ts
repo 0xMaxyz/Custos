@@ -512,4 +512,74 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     const swapData = (call.args as unknown[][])[1] as string[];
     expect(swapData[2]).toBe("0x");
   });
+
+  it("rebalance: swapData[2] stays 0x when quote.router != pinned Odos address (wrong-router rejection)", async () => {
+    // Quote returns a DIFFERENT router than the pinned Odos address.
+    // The executor must reject it and leave swapData[2] = "0x" (fail-closed at quote time).
+    const snap = baseSnapshot();
+
+    const signalsMod = await import("../llm/signals.js");
+    const oneDeltaMod = await import("../data/oneDelta.js");
+    const evidenceMod = await import("../llm/evidence.js");
+
+    const runSignalLayerSpy = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
+      riskLevel: "CAUTION",
+      usdyMaxWeightBps: 2_000,
+      deRisk: false,
+      rationale: "Reduce exposure.",
+      signals: [],
+      confidence: 0.85,
+    });
+    const buildEvidenceFetcherSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
+      async () => [],
+    );
+    // Quote returns a WRONG router address (not the pinned Odos one).
+    const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
+      .mockResolvedValue({
+        router: "0x1111111111111111111111111111111111111111" as `0x${string}`,
+        calldata: "0xcafebabe" as `0x${string}`,
+        amountOut: 4_600n * 10n ** 18n,
+      });
+
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+
+    const writeContract = vi.fn(async () => "0xabc123" as `0x${string}`);
+    const readContract = vi.fn(async (opts: { functionName: string }) => {
+      if (opts.functionName === "lastRebalanceAt") return 0n;
+      if (opts.functionName === "adapters") return "0xaabbccddaabbccddaabbccddaabbccddaabbccdd";
+      return 0n;
+    });
+    const publicClient = { readContract, waitForTransactionReceipt: vi.fn(async () => ({ logs: [] })) } as never;
+    const walletClient = {
+      writeContract,
+      chain: { id: 5000 },
+      account: { address: "0x1234" as `0x${string}` },
+    } as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      ANTHROPIC_API_KEY: "sk-test",
+    });
+
+    const executor = new Executor({
+      config,
+      clients: { publicClient, walletClient } as never,
+      snapshotter: makeSnapshotter(snap),
+    });
+
+    await executor.runCycle();
+
+    runSignalLayerSpy.mockRestore();
+    buildEvidenceFetcherSpy.mockRestore();
+    getSwapQuoteSpy.mockRestore();
+
+    expect(writeContract).toHaveBeenCalledOnce();
+    const call = (writeContract.mock.calls[0] as unknown as [{ args: unknown[] }])[0];
+    const swapData = (call.args as unknown[][])[1] as string[];
+    // Wrong router → rejected → swapData[2] must be empty, never "0xcafebabe".
+    expect(swapData[2]).toBe("0x");
+  });
 });

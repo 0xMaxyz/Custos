@@ -345,13 +345,22 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
 - **Goal:** the agent has an on-chain identity NFT + reputation surface.
 - **Test:** fork/testnet test: register → `tokenURI` resolves to the agent card;
   reputation entry writable & access-gated.
-- **Built:** `interfaces/IERC8004.sol` (IIdentityRegistry + IReputationRegistry per
-  SPEC §2.5). `SentinelIdentityRegistry` (ERC721URIStorage; `register` mints the next
-  sequential id to the caller, `setAgentURI` gated to the token owner, `tokenURI`
-  resolves the card). `SentinelReputationRegistry` (append-only feedback log, writes
-  gated to `REPORTER`, agent ids validated against the linked IdentityRegistry).
-  `Phase4a.t.sol` — 9 tests (mint/sequential ids, owner-only URI update, tokenURI on
-  unknown id, REPORTER-only + known-agent-only feedback, append-only ordering).
+- **Built — canonical (production) path:** `interfaces/IERC8004Canonical.sol` mirrors
+  the REAL deployed Mantle singletons (identity `register/setAgentURI/tokenURI/
+  ownerOf/getAgentWallet`; reputation `giveFeedback/readFeedback/getLastIndex/
+  getSummary/getIdentityRegistry`). `ForkPhase4a.t.sol` proves it on a Mantle fork:
+  `register → tokenURI` round-trips, non-owner cannot `setAgentURI`, `giveFeedback →
+  readFeedback/getSummary` round-trips, reputation links to the canonical identity.
+  (Fork suite is skipped in CI like all `Fork*` tests; needs an allowlisted Mantle RPC.)
+- **Built — fallback path:** `interfaces/IERC8004.sol` (simplified subset).
+  `SentinelIdentityRegistry` (ERC721URIStorage; `register` mints the next sequential id
+  to the caller, owner-only `setAgentURI`, `tokenURI` resolves the card) — note the
+  canonical identity is ABI-compatible for this subset. `SentinelReputationRegistry`
+  (role-gated `appendFeedback`, agent ids validated, zero-addr guard) is used only when
+  the canonical singleton is absent. `Phase4a.t.sol` — 10 offline tests.
+- **Decision:** SPEC §2.5 updated — production calls the canonical 0x8004 singletons;
+  `Sentinel*` are the fallback. Canonical reputation uses `giveFeedback` (richer,
+  client-keyed), not the simplified `appendFeedback`.
 
 ### 4.2 — Agent card + metadata · _PR-4a_ · `[x] DONE` · [PR #12](https://github.com/0xMaxyz/miu/pull/12)
 

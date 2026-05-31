@@ -7,23 +7,24 @@ pragma solidity 0.8.28;
  *         verifiable identity (an ERC-721 token whose `tokenURI` resolves to the
  *         agent card) plus an append-only reputation surface.
  *
- * On Mantle the canonical 0x8004… singletons are deployed (confirmed by the
- * Phase-0.3 presence gate; see packages/shared addresses). Sentinel ships the
- * minimal equivalents in this repo (`SentinelIdentityRegistry`,
- * `SentinelReputationRegistry`) which implement *this* interface — the SPEC §2.5
- * subset Sentinel's own deploy/agent code targets.
+ * On Mantle the canonical 0x8004… singletons ARE deployed (confirmed by the
+ * Phase-0.3 presence gate; see packages/shared addresses), so per SPEC §2.5 the
+ * production path calls them — see `IERC8004Canonical.sol` for their real ABIs and
+ * `ForkPhase4a.t.sol` for the on-chain register/feedback proof. The `Sentinel*`
+ * registries in this repo implement *this* simplified interface and are the
+ * FALLBACK, used only when the singletons are absent (e.g. a bare testnet).
  *
- * ⚠ DUAL-PATH / ABI CAVEAT: this interface is **not** byte-compatible with the
- * canonical erc-8004-contracts ABI on Mantle. In particular the canonical
- * ReputationRegistry exposes `giveFeedback` / `readFeedback`, **not**
- * `appendFeedback`, and the canonical IdentityRegistry's `register` signature /
- * receiver requirements differ (an EOA `register(string)` call has been observed to
- * revert `ERC721InvalidReceiver`). Therefore:
- *   - Use this interface ONLY against the Sentinel* registries in this repo.
- *   - Integrating the canonical 0x8004 singletons requires their real ABI (a
- *     separate, generated interface) and is tracked for the deploy wiring (PR-5a).
- * SPEC.md §2.5 defines the Sentinel-facing shape; it does not claim canonical
- * ABI parity.
+ * ⚠ ABI CAVEAT (why this is a separate, simpler interface):
+ *   - Identity: the canonical IdentityRegistry's `register(string)` / `setAgentURI`
+ *     / `tokenURI` ARE compatible with this subset. (An EOA `register` via
+ *     read-only `cast call` reverts `ERC721InvalidReceiver` only because eth_call
+ *     has `msg.sender == address(0)` and `_safeMint` rejects the zero receiver — a
+ *     real transaction works, as the fork test shows.)
+ *   - Reputation: the canonical ReputationRegistry is a richer, permissionless,
+ *     client-keyed ledger — `giveFeedback(...)` / `readFeedback` / `getSummary`,
+ *     NOT this single `appendFeedback`. `SentinelReputationRegistry` is therefore a
+ *     simplified, role-gated stand-in for fallback deployments only; production
+ *     reputation writes go through `ICanonicalReputationRegistry.giveFeedback`.
  */
 
 /**

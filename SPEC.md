@@ -247,21 +247,45 @@ interface IAgentBenchmark {
 ```
 **Passive-baseline design:** `navAtDecision` stores the oracle NAV at each decision. The off-chain agent computes `passiveDeltaBps` — how many bps Sentinel outperformed a 100%-USDY passive holder — and writes it via `updateOutcome`. On-chain storage keeps the full audit trail; computation stays off-chain per "AI only where it beats an algorithm" (AGENTS.md §2.3).
 
-### 2.5 ERC-8004 integration (subset we use)
+### 2.5 ERC-8004 integration
+
+The canonical 0x8004 singletons **are deployed on Mantle** (Phase-0.3 presence gate
+confirms `extcodesize > 0`), so the **production path calls them**. Their real ABIs
+are declared in `contracts/src/interfaces/IERC8004Canonical.sol` and proven on a
+fork in `ForkPhase4a.t.sol`. The `Sentinel*` registries (implementing the simplified
+`IERC8004.sol` below) are the **fallback** for chains where the singletons are absent.
+
+**Identity (canonical & fallback are compatible for the subset we use):**
 ```solidity
-// If 0x8004 singletons exist on Mantle we call them; else we deploy minimal equivalents.
 interface IIdentityRegistry /* ERC-721 + URIStorage */ {
     function register(string calldata agentURI) external returns (uint256 agentId);
     function setAgentURI(uint256 agentId, string calldata agentURI) external;
     function tokenURI(uint256 agentId) external view returns (string memory);
 }
-
-interface IReputationRegistry {
-    /// Append a structured, immutable feedback/outcome signal for an agent.
-    function appendFeedback(uint256 agentId, bytes32 tag, int256 score, string calldata uri) external;
-}
 ```
-- **Agent card** (`agentURI` → IPFS JSON): `{ name, description, endpoints, wallet, supportedTrust, vault, benchmark }`.
+> An EOA `register` via read-only `cast call` reverts `ERC721InvalidReceiver` only
+> because `eth_call` has `msg.sender == address(0)`; a real transaction works.
+
+**Reputation:** the **canonical** registry is a permissionless, client-keyed ledger,
+*not* a single append. Production outcome writes use:
+```solidity
+// canonical (ICanonicalReputationRegistry) — what we call in production
+function giveFeedback(
+    uint256 agentId, int128 value, uint8 valueDecimals,
+    string tag1, string tag2, string endpoint, string feedbackURI, bytes32 feedbackHash
+) external;
+function readFeedback(uint256 agentId, address client, uint64 index)
+    external view returns (int128 value, uint8 valueDecimals, string tag1, string tag2, bool isRevoked);
+function getSummary(uint256 agentId, address[] clients, string tag1, string tag2)
+    external view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals);
+```
+The simplified fallback `IReputationRegistry { appendFeedback(agentId, tag, score, uri) }`
+(role-gated, `SentinelReputationRegistry`) is used only when the canonical singleton
+is absent. Sentinel publishes each decision outcome (e.g. passive-baseline delta) as
+`giveFeedback` with `tag1 = decision kind`, `tag2 = metric`, `value/valueDecimals` the
+signed score, and `feedbackURI/feedbackHash` binding the IPFS evidence.
+
+- **Agent card** (`agentURI` → IPFS JSON): `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault, benchmark }` (Sentinel-specific shape; canonical explorer interop via `services[]`/`registrations[]` is mapped at deploy time — PR-5a).
 
 ---
 

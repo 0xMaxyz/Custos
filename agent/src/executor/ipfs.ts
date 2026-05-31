@@ -34,18 +34,33 @@ export async function pinRationale(
   config: AgentConfig,
   fetchImpl: typeof fetch = fetch,
 ): Promise<PinResult> {
-  const json = JSON.stringify(bundle, null, 2);
+  return pinJson(bundle, config, "rationale.json", fetchImpl);
+}
+
+/**
+ * Pin an arbitrary JSON object to IPFS, returning the resolvable URI and the
+ * keccak256 of its canonical (2-space) serialization. Shared by the rationale
+ * bundle and the ERC-8004 agent card. Falls back to a `data:` URI when no IPFS
+ * backend is configured so the caller always has a non-empty URI + stable hash.
+ */
+export async function pinJson(
+  value: unknown,
+  config: AgentConfig,
+  filename: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PinResult> {
+  const json = JSON.stringify(value, null, 2);
   const rationaleHash = keccak256(toBytes(json)) as `0x${string}`;
 
   if (!config.ipfsApiUrl) {
-    // Fallback: encode as data URI so decisionURI is always non-empty.
+    // Fallback: encode as data URI so the URI is always non-empty.
     const encoded = Buffer.from(json).toString("base64");
     return { uri: `data:application/json;base64,${encoded}`, rationaleHash };
   }
 
   // POST to IPFS HTTP API (Kubo-compatible: /api/v0/add).
   const form = new FormData();
-  form.append("file", new Blob([json], { type: "application/json" }), "rationale.json");
+  form.append("file", new Blob([json], { type: "application/json" }), filename);
 
   const res = await fetchImpl(`${config.ipfsApiUrl}/api/v0/add?pin=true`, {
     method: "POST",

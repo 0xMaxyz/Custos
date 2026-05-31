@@ -30,8 +30,8 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7) |
 | PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  | `[x] DONE` · [PR #9](https://github.com/0xMaxyz/miu/pull/9) |
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    | `[x] DONE` · [PR #10](https://github.com/0xMaxyz/miu/pull/10) |
-| PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               |
-| PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               |
+| PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               | `[x] DONE` |
+| PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               | `[x] DONE` · [PR #11](https://github.com/0xMaxyz/miu/pull/11) |
 | PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card |
 | PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             |
 | PR-6a | 6.1–6.5 | Public deploy, docs, video, submission                                       |
@@ -337,7 +337,7 @@ signal; passive-baseline delta recorded on-chain.
 **Phase goal:** register the agent identity; ship a React app (dashboard,
 risk-guardian feed, identity card, deposit/withdraw) on testnet.
 
-### 4.1 — ERC-8004 identity · _PR-4a_
+### 4.1 — ERC-8004 identity · _PR-4a_ · `[x] DONE` · [PR #12](https://github.com/0xMaxyz/miu/pull/12)
 
 - **What:** register agent in 0x8004 Identity/Reputation registries if on Mantle;
   else deploy minimal Identity + Reputation registries and register; reputation hook
@@ -345,13 +345,34 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
 - **Goal:** the agent has an on-chain identity NFT + reputation surface.
 - **Test:** fork/testnet test: register → `tokenURI` resolves to the agent card;
   reputation entry writable & access-gated.
+- **Built — canonical (production) path:** `interfaces/IERC8004Canonical.sol` mirrors
+  the REAL deployed Mantle singletons (identity `register/setAgentURI/tokenURI/
+  ownerOf/getAgentWallet`; reputation `giveFeedback/readFeedback/getLastIndex/
+  getSummary/getIdentityRegistry`). `ForkPhase4a.t.sol` proves it on a Mantle fork:
+  `register → tokenURI` round-trips, non-owner cannot `setAgentURI`, `giveFeedback →
+  readFeedback/getSummary` round-trips, reputation links to the canonical identity.
+  (Fork suite is skipped in CI like all `Fork*` tests; needs an allowlisted Mantle RPC.)
+- **Built — fallback path:** `interfaces/IERC8004.sol` (simplified subset).
+  `SentinelIdentityRegistry` (ERC721URIStorage; `register` mints the next sequential id
+  to the caller, owner-only `setAgentURI`, `tokenURI` resolves the card) — note the
+  canonical identity is ABI-compatible for this subset. `SentinelReputationRegistry`
+  (role-gated `appendFeedback`, agent ids validated, zero-addr guard) is used only when
+  the canonical singleton is absent. `Phase4a.t.sol` — 10 offline tests.
+- **Decision:** SPEC §2.5 updated — production calls the canonical 0x8004 singletons;
+  `Sentinel*` are the fallback. Canonical reputation uses `giveFeedback` (richer,
+  client-keyed), not the simplified `appendFeedback`.
 
-### 4.2 — Agent card + metadata · _PR-4a_
+### 4.2 — Agent card + metadata · _PR-4a_ · `[x] DONE` · [PR #12](https://github.com/0xMaxyz/miu/pull/12)
 
 - **What:** agent registration JSON (name, description, endpoints, wallet) pinned to
   IPFS; linked from identity.
 - **Goal:** a resolvable, schema-valid agent card.
 - **Test:** Vitest: fetched `tokenURI` JSON validates against the expected schema.
+- **Built:** `agent/src/identity/agentCard.ts` — zod `agentCardSchema`
+  `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault,
+  benchmark }`, `buildAgentCard()` (checksums addresses, validates before returning,
+  fails loudly on missing vault/benchmark), `pinAgentCard()` reusing the shared
+  `pinJson` IPFS helper (data: URI fallback). 10 Vitest cases.
 
 ### 4.3 — Web scaffold + chain config · _PR-4b_ · `[x] DONE` (PR #11)
 

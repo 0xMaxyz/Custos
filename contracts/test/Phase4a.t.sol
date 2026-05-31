@@ -138,4 +138,12 @@ contract Phase4aTest is Test {
     function test_ReputationLinksToIdentityRegistry() public view {
         assertEq(address(reputation.IDENTITY()), address(identity));
     }
+
+    function test_ReputationConstructorRejectsZeroAddresses() public {
+        vm.expectRevert(SentinelReputationRegistry.ZeroAddress.selector);
+        new SentinelReputationRegistry(address(0), admin);
+
+        vm.expectRevert(SentinelReputationRegistry.ZeroAddress.selector);
+        new SentinelReputationRegistry(address(identity), address(0));
+    }
 }

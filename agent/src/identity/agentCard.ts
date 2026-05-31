@@ -11,6 +11,14 @@ import { pinJson, type PinResult } from "../executor/ipfs.js";
  *
  * SPEC.md §2.5 fixes the shape: { name, description, endpoints, wallet,
  * supportedTrust, vault, benchmark }.
+ *
+ * NOTE (canonical interop): this is the **Sentinel-specific** card shape that our
+ * own UI + registries consume. It is intentionally NOT the canonical erc-8004
+ * best-practices registration file (which keys on `type` / `services[]` /
+ * `registrations[]` and is what 8004scan-style explorers index). If/when Sentinel
+ * registers its `tokenURI` against the canonical 0x8004 IdentityRegistry, emit (or
+ * additionally pin) the canonical shape by mapping `endpoints` → `services[]`.
+ * Tracked with the deploy wiring (PR-5a).
  */
 
 const addressSchema = z

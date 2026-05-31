@@ -337,7 +337,7 @@ signal; passive-baseline delta recorded on-chain.
 **Phase goal:** register the agent identity; ship a React app (dashboard,
 risk-guardian feed, identity card, deposit/withdraw) on testnet.
 
-### 4.1 — ERC-8004 identity · _PR-4a_ · `[x] DONE`
+### 4.1 — ERC-8004 identity · _PR-4a_ · `[x] DONE` · [PR #12](https://github.com/0xMaxyz/miu/pull/12)
 
 - **What:** register agent in 0x8004 Identity/Reputation registries if on Mantle;
   else deploy minimal Identity + Reputation registries and register; reputation hook
@@ -353,7 +353,7 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
   `Phase4a.t.sol` — 9 tests (mint/sequential ids, owner-only URI update, tokenURI on
   unknown id, REPORTER-only + known-agent-only feedback, append-only ordering).
 
-### 4.2 — Agent card + metadata · _PR-4a_ · `[x] DONE`
+### 4.2 — Agent card + metadata · _PR-4a_ · `[x] DONE` · [PR #12](https://github.com/0xMaxyz/miu/pull/12)
 
 - **What:** agent registration JSON (name, description, endpoints, wallet) pinned to
   IPFS; linked from identity.

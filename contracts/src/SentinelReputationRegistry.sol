@@ -30,6 +30,7 @@ contract SentinelReputationRegistry is IReputationRegistry, AccessControl {
     // ── Errors ────────────────────────────────────────────────────────────────
 
     error UnknownAgent(uint256 agentId);
+    error ZeroAddress();
 
     // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ contract SentinelReputationRegistry is IReputationRegistry, AccessControl {
      * @param admin     Granted DEFAULT_ADMIN_ROLE + ADMIN (can grant REPORTER).
      */
     constructor(address identity, address admin) {
+        if (identity == address(0) || admin == address(0)) revert ZeroAddress();
         IDENTITY = IIdentityRegistry(identity);
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(Roles.ADMIN, admin);

@@ -7,11 +7,23 @@ pragma solidity 0.8.28;
  *         verifiable identity (an ERC-721 token whose `tokenURI` resolves to the
  *         agent card) plus an append-only reputation surface.
  *
- * On Mantle the canonical 0x8004… singletons may already be deployed (see
- * packages/shared addresses + the Phase-0.3 presence gate). When they are, Sentinel
- * registers against them; when they are not, it deploys the minimal equivalents in
- * this repo (`SentinelIdentityRegistry`, `SentinelReputationRegistry`), which
- * implement these same interfaces. SPEC.md §2.5 is the source of truth.
+ * On Mantle the canonical 0x8004… singletons are deployed (confirmed by the
+ * Phase-0.3 presence gate; see packages/shared addresses). Sentinel ships the
+ * minimal equivalents in this repo (`SentinelIdentityRegistry`,
+ * `SentinelReputationRegistry`) which implement *this* interface — the SPEC §2.5
+ * subset Sentinel's own deploy/agent code targets.
+ *
+ * ⚠ DUAL-PATH / ABI CAVEAT: this interface is **not** byte-compatible with the
+ * canonical erc-8004-contracts ABI on Mantle. In particular the canonical
+ * ReputationRegistry exposes `giveFeedback` / `readFeedback`, **not**
+ * `appendFeedback`, and the canonical IdentityRegistry's `register` signature /
+ * receiver requirements differ (an EOA `register(string)` call has been observed to
+ * revert `ERC721InvalidReceiver`). Therefore:
+ *   - Use this interface ONLY against the Sentinel* registries in this repo.
+ *   - Integrating the canonical 0x8004 singletons requires their real ABI (a
+ *     separate, generated interface) and is tracked for the deploy wiring (PR-5a).
+ * SPEC.md §2.5 defines the Sentinel-facing shape; it does not claim canonical
+ * ABI parity.
  */
 
 /**

@@ -29,7 +29,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline**   | `[x] DONE` |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7) |
 | PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  | `[x] DONE` · [PR #9](https://github.com/0xMaxyz/miu/pull/9) |
-| PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    |
+| PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    | `[x] DONE` · [PR #10](https://github.com/0xMaxyz/miu/pull/10) |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               |
 | PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card |
@@ -293,7 +293,7 @@ LLM rationale (news/attestation hero path) → guardrail validator → signer �
 - **Test:** Vitest: proposals violating each guardrail are rejected/repaired;
   property tests vs the on-chain bounds.
 
-### 3.7 — Executor / signer · _PR-3c_
+### 3.7 — Executor / signer · _PR-3c_ · `[x] DONE`
 
 - **What:** build + sign `rebalance`/`deRisk` with ALLOCATOR key; optional 1delta
   swap route passed as adapter param (`minOut` enforced on-chain); IPFS-pin
@@ -302,7 +302,7 @@ LLM rationale (news/attestation hero path) → guardrail validator → signer �
 - **Test:** integration vs anvil fork: one agent run emits an on-chain `Decision`;
   weights change within guardrails.
 
-### 3.8 — Scheduler + event triggers · _PR-3c_
+### 3.8 — Scheduler + event triggers · _PR-3c_ · `[x] DONE`
 
 - **What:** periodic loop + event triggers (poll depeg/oracle/utilization → immediate
   `deRisk` on breach); integrate demo-trigger harness for fork-injectable conditions.

@@ -34,6 +34,7 @@ const configSchema = z.object({
   allocatorPrivateKey: privateKey.optional(),
 
   // ── IPFS pinning (optional until execution path) ──
+  ipfsApiUrl: z.string().url().optional(),
   ipfsPinningJwt: z.string().min(1).optional(),
   ipfsGatewayUrl: z.string().url().default("https://gateway.pinata.cloud"),
 
@@ -72,6 +73,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),
+    ipfsApiUrl: pick("IPFS_API_URL"),
     ipfsPinningJwt: pick("IPFS_PINNING_JWT"),
     ipfsGatewayUrl: pick("IPFS_GATEWAY_URL"),
     vaultAddress: pick("VAULT_ADDRESS"),

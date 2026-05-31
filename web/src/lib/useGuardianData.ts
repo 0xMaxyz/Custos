@@ -1,9 +1,12 @@
 // Risk-guardian + identity data seams (ROADMAP 4.6 / 4.8 / 5.1).
 //
 // When VITE_VAULT_ADDRESS is set, backfills historical DecisionRecorded events
-// via getLogs from block 0 then watches for new ones via useWatchContractEvent.
+// via getLogs (from vault deployment block) then watches for new ones.
 // Reads the agent identity from the ERC-8004 canonical registry when VITE_AGENT_ID
 // is set. Fixture fallback when undeployed; consumers are unchanged.
+//
+// Deployed but no events yet → isLive:true, decisions:[] (empty live feed,
+// not the demo fixture data).
 
 import { useReadContract, useWatchContractEvent, usePublicClient } from "wagmi";
 import { useRef, useState, useEffect }                              from "react";
@@ -14,6 +17,10 @@ import { VAULT_ABI }      from "./vaultAbi";
 
 const VAULT_ADDRESS = (import.meta.env.VITE_VAULT_ADDRESS ?? "") as `0x${string}`;
 const isDeployed = VAULT_ADDRESS.length > 2;
+
+// Deployment block hint: scope getLogs to avoid full-chain scan on mainnet.
+// Set VITE_VAULT_DEPLOY_BLOCK after deploy (defaults to 0 = from genesis).
+const DEPLOY_BLOCK = BigInt(import.meta.env.VITE_VAULT_DEPLOY_BLOCK ?? "0");
 
 // ── Canonical ERC-8004 identity registry ABI (read-only subset) ──────────────
 const IDENTITY_ABI = [
@@ -26,33 +33,51 @@ const IDENTITY_ABI = [
   },
 ] as const;
 
+// Minimal Decision shape built from on-chain data. Fields that require
+// off-chain resolution (signals, evidence, outcome, txHash) start as empty
+// defaults and can be enriched later when the decisionURI bundle is fetched.
+function buildLiveDecision(args: {
+  id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
+}): Decision {
+  return {
+    id:              Number(args.id),
+    kind:            args.kind as 0 | 1,
+    timestamp:       new Date().toISOString(),
+    riskLevel:       "NORMAL",
+    confidence:      0,
+    preWeightsBps:   { IDLE: 0, AAVE: 0, USDY: 0, AUSD: 0 },
+    postWeightsBps:  { IDLE: 0, AAVE: 0, USDY: 0, AUSD: 0 },
+    flags:           [],
+    maxUsdyWeightBpsAllowed: 6000,
+    summary:         `Decision #${Number(args.id)} — bundle resolving…`,
+    rationale:       "",
+    signals:         [],
+    evidence:        [],
+    rationaleHash:   args.rationaleHash as string,
+    decisionURI:     args.decisionURI,
+    outcome:         { realizedYieldBps: 0, passiveDeltaBps: 0, drawdownAvoidedUsdc: "0", measuredAt: "" },
+    txHash:          "",
+  };
+}
+
 export interface GuardianFeed {
   decisions: Decision[];
   /** true once the feed comes from chain; false while served from fixtures. */
   isLive: boolean;
 }
 
-function mergeDecision(base: Decision, log: {
-  id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
-}): Decision {
-  return {
-    ...base,
-    id: Number(log.id),
-    kind: log.kind as 0 | 1,
-    rationaleHash: log.rationaleHash as string,
-    decisionURI: log.decisionURI,
-    timestamp: new Date().toISOString(),
-  };
-}
-
 export function useDecisions(): GuardianFeed {
-  const [liveDecisions, setLiveDecisions] = useState<Decision[]>([]);
+  // null = loading (deployed, fetch in progress); [] = loaded but empty
+  const [liveDecisions, setLiveDecisions] = useState<Decision[] | null>(isDeployed ? null : []);
   const seenIds = useRef(new Set<number>());
   const client = usePublicClient();
 
   // Backfill historical DecisionRecorded events on mount.
   useEffect(() => {
-    if (!isDeployed || !client) return;
+    if (!isDeployed || !client) {
+      setLiveDecisions([]);
+      return;
+    }
     client.getLogs({
       address: VAULT_ADDRESS,
       event: {
@@ -65,21 +90,21 @@ export function useDecisions(): GuardianFeed {
           { name: "decisionURI",   type: "string",  indexed: false },
         ],
       },
-      fromBlock: 0n,
+      fromBlock: DEPLOY_BLOCK,
     }).then((logs) => {
-      if (logs.length === 0) return;
-      setLiveDecisions(() => {
-        const next: Decision[] = [];
-        for (const log of [...logs].reverse()) {
-          const args = log.args as { id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string };
-          const nId = Number(args.id);
-          if (seenIds.current.has(nId)) continue;
-          seenIds.current.add(nId);
-          next.push(mergeDecision(fixtureDecisions[0]!, args));
-        }
-        return next;
-      });
-    }).catch(() => { /* getLogs unavailable — watch-only fallback */ });
+      const next: Decision[] = [];
+      for (const log of [...logs].reverse()) {
+        const args = log.args as { id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string };
+        const nId = Number(args.id);
+        if (seenIds.current.has(nId)) continue;
+        seenIds.current.add(nId);
+        next.push(buildLiveDecision(args));
+      }
+      setLiveDecisions(next);
+    }).catch(() => {
+      // getLogs unavailable — fall back to empty live feed, watch-only.
+      setLiveDecisions([]);
+    });
   }, [client]);
 
   // Watch for new events after mount.
@@ -90,7 +115,7 @@ export function useDecisions(): GuardianFeed {
     enabled: isDeployed,
     onLogs(logs) {
       setLiveDecisions((prev) => {
-        const next = [...prev];
+        const next = [...(prev ?? [])];
         for (const log of logs) {
           const { id, kind, rationaleHash, decisionURI } = log.args as {
             id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
@@ -98,7 +123,7 @@ export function useDecisions(): GuardianFeed {
           const nId = Number(id);
           if (seenIds.current.has(nId)) continue;
           seenIds.current.add(nId);
-          next.unshift(mergeDecision(fixtureDecisions[0]!, { id, kind, rationaleHash, decisionURI }));
+          next.unshift(buildLiveDecision({ id, kind, rationaleHash, decisionURI }));
         }
         return next;
       });
@@ -106,10 +131,9 @@ export function useDecisions(): GuardianFeed {
   });
 
   if (!isDeployed) return { decisions: fixtureDecisions, isLive: false };
-  return {
-    decisions: liveDecisions.length > 0 ? liveDecisions : fixtureDecisions,
-    isLive: liveDecisions.length > 0,
-  };
+  // liveDecisions === null means fetch still in flight — show fixtures while loading.
+  if (liveDecisions === null) return { decisions: fixtureDecisions, isLive: false };
+  return { decisions: liveDecisions, isLive: true };
 }
 
 /** Look up a single decision by id (detail view). */
@@ -142,6 +166,7 @@ export function useIdentity(): IdentityData {
     return { identity, baseline: computeBaseline(baseline), isLive: false };
   }
 
+  // Baseline stays on fixtures until AgentBenchmark reads land (PR-5b/addendum).
   return {
     identity: { ...identity, agentURI: tokenUri as string },
     baseline: computeBaseline(baseline),

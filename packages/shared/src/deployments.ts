@@ -1,9 +1,17 @@
 /**
  * Sentinel deployed contract addresses.
  *
- * Populated by `forge script script/Deploy.s.sol` output.
- * The web app reads VITE_VAULT_ADDRESS (env) to enable live reads; these
- * constants provide the full address set for the agent + tests.
+ * Canonical source of truth after each broadcast:
+ *   1. Forge prints a JSON summary — copy into deployments/<chainId>.json.
+ *   2. Paste vault/guardrails/benchmark addresses into MAINNET_DEPLOYMENT /
+ *      TESTNET_DEPLOYMENT below (or run the post-deploy populate script).
+ *   3. Set the matching VITE_* / agent env vars.
+ *
+ * Runtime authority:
+ *   - **Web app**: reads VITE_VAULT_ADDRESS + VITE_AGENT_ID (env at build time).
+ *   - **Agent**: reads VAULT_ADDRESS + BENCHMARK_ADDRESS (process.env).
+ *   - **This file**: typed constants consumed by tests and the agent SDK; they
+ *     mirror the JSON files and must be kept in sync after each deploy.
  *
  * Until a deploy happens the values are empty strings — callers must guard
  * against address(0) / empty.

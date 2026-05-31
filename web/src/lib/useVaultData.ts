@@ -44,7 +44,9 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   const sharePxRaw = sharePxEntry.result as bigint; // assets per 1e6 shares
 
   const tvlUsdc    = formatUnits(tvlRaw, 6);
-  const sharePrice = (Number(sharePxRaw) / 1_000_000).toFixed(6);
+  // sharePxRaw = assets per 1e6 shares (i.e. price * 1e6). Use formatUnits to
+  // keep bigint precision throughout rather than Number() lossy conversion.
+  const sharePrice = formatUnits(sharePxRaw, 6);
 
   let positionShares = 0n;
   const balEntry = data[2];

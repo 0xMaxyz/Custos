@@ -9,7 +9,8 @@ import { TtlCache } from "./cache.js";
  * `MarketSnapshot` the deterministic risk engine consumes.
  *
  * Sources are injected via {@link SnapshotSources} so the orchestration is fully
- * unit-testable with stubs; one fork integration test exercises the real wiring.
+ * unit-testable with stubs. The real wiring is exercised by the RPC-gated
+ * integration test in `pipeline.fork.test.ts` (skipped when MANTLE_RPC_URL is unset).
  */
 
 export interface SnapshotSources {
@@ -21,6 +22,8 @@ export interface SnapshotSources {
   readonly aaveMarket: () => Promise<{ supplyApyBps: number; utilizationBps: number }>;
   /** USDY/USDC DEX spot (18-dec), 0n if unavailable. */
   readonly usdyDexSpotUsdc: () => Promise<bigint>;
+  /** AUSD proof-of-reserves backing ratio (bps); 0 if unavailable. */
+  readonly ausdBackingRatioBps: () => Promise<number>;
   /** Vault state: TVL, Aave-withdrawable, and current weights. */
   readonly vaultState: () => Promise<{
     totalAssetsUsdc: bigint;
@@ -41,6 +44,7 @@ const KEY = {
   usdyApy: "usdyApy",
   aave: "aaveMarket",
   dexSpot: "usdyDexSpot",
+  ausdPor: "ausdPor",
   vault: "vaultState",
 } as const;
 
@@ -57,13 +61,15 @@ export class Snapshotter {
 
   /** Assemble a full {@link MarketSnapshot}, fetching missing parts through the cache. */
   async snapshot(): Promise<MarketSnapshot> {
-    const [oracle, usdyImpliedApyBps, aave, dexSpot, vault] = await Promise.all([
-      this.cache.getOrSet(KEY.oracle, this.sources.oracle),
-      this.cache.getOrSet(KEY.usdyApy, this.sources.usdyImpliedApyBps),
-      this.cache.getOrSet(KEY.aave, this.sources.aaveMarket),
-      this.cache.getOrSet(KEY.dexSpot, this.sources.usdyDexSpotUsdc),
-      this.cache.getOrSet(KEY.vault, this.sources.vaultState),
-    ]);
+    const [oracle, usdyImpliedApyBps, aave, dexSpot, ausdBackingRatioBps, vault] =
+      await Promise.all([
+        this.cache.getOrSet(KEY.oracle, this.sources.oracle),
+        this.cache.getOrSet(KEY.usdyApy, this.sources.usdyImpliedApyBps),
+        this.cache.getOrSet(KEY.aave, this.sources.aaveMarket),
+        this.cache.getOrSet(KEY.dexSpot, this.sources.usdyDexSpotUsdc),
+        this.cache.getOrSet(KEY.ausdPor, this.sources.ausdBackingRatioBps),
+        this.cache.getOrSet(KEY.vault, this.sources.vaultState),
+      ]);
 
     return {
       asOf: new Date(this.now()).toISOString(),
@@ -77,6 +83,7 @@ export class Snapshotter {
       aaveWithdrawableUsdc: vault.aaveWithdrawableUsdc,
       totalAssetsUsdc: vault.totalAssetsUsdc,
       currentWeightsBps: vault.currentWeightsBps,
+      ausdBackingRatioBps,
     };
   }
 

@@ -31,6 +31,11 @@ const dexSpotSchema = z.object({
   spotUsdc18: z.string().regex(/^\d+$/),
 });
 
+const ausdPorSchema = z.object({
+  /** AUSD backing ratio in bps (10000 = fully backed). */
+  backingRatioBps: z.number().int().nonnegative(),
+});
+
 export interface OneDeltaClientOptions {
   readonly fetchImpl?: FetchLike;
   /** Per-request timeout in ms. */
@@ -65,6 +70,17 @@ export class OneDeltaClient {
     const parsed = dexSpotSchema.safeParse(raw);
     if (!parsed.success) return 0n;
     return BigInt(parsed.data.spotUsdc18);
+  }
+
+  /**
+   * AUSD proof-of-reserves backing ratio (bps), sourced from the Chaos Labs PoR
+   * feed via 1delta's data API. Returns 0 when unavailable so callers treat it as
+   * "unknown" rather than a breach (the on-chain custody path is the real guard).
+   */
+  async getAusdBackingRatioBps(): Promise<number> {
+    const raw = await this.getJson("/v1/mantle/ausd/por");
+    const parsed = ausdPorSchema.safeParse(raw);
+    return parsed.success ? parsed.data.backingRatioBps : 0;
   }
 
   private async getJson(path: string): Promise<unknown> {

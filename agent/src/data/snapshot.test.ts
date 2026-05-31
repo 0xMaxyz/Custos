@@ -14,6 +14,7 @@ function makeSources(overrides: Partial<SnapshotSources> = {}): SnapshotSources 
     usdyImpliedApyBps: async () => 452,
     aaveMarket: async () => ({ supplyApyBps: 380, utilizationBps: 7_400 }),
     usdyDexSpotUsdc: async () => 1_079_000_000_000_000_000n,
+    ausdBackingRatioBps: async () => 10_000,
     vaultState: async () => ({
       totalAssetsUsdc: 30_000_000_000n,
       aaveWithdrawableUsdc: 21_000_000_000n,
@@ -38,6 +39,7 @@ describe("Snapshotter", () => {
     expect(snap.usdyImpliedApyBps).toBe(452);
     expect(snap.totalAssetsUsdc).toBe(30_000_000_000n);
     expect(snap.currentWeightsBps[Bucket.USDY]).toBe(5_000);
+    expect(snap.ausdBackingRatioBps).toBe(10_000);
     expect(snap.asOf).toBe(new Date(1_700_000_000_000).toISOString());
   });
 

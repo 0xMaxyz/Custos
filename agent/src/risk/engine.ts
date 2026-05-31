@@ -24,6 +24,13 @@ import type { MarketSnapshot, RiskAssessment, RiskFlag, WeightsBps } from "../ty
 
 const BPS = 10_000;
 
+/**
+ * AUSD is under-backed if its PoR ratio drops below this floor (bps). A value of
+ * 0 means PoR is unavailable this cycle and is treated as "unknown" (no flag).
+ * Conservative: anything below 99.5% backing while we hold AUSD raises caution.
+ */
+const AUSD_POR_MIN_BPS = 9_950;
+
 // ── Pure metric functions ─────────────────────────────────────────────────────
 
 /**
@@ -167,6 +174,17 @@ export function assess(snapshot: MarketSnapshot, options: AssessOptions = {}): R
     if (riskLevel === "NORMAL") riskLevel = "CAUTION";
   }
 
+  // AUSD proof-of-reserves: if we hold AUSD and its backing is known-and-thin,
+  // surface a caution. ratio=0 means "unknown" (PoR unavailable) → no flag.
+  if (
+    snapshot.currentWeightsBps[Bucket.AUSD] > 0 &&
+    snapshot.ausdBackingRatioBps > 0 &&
+    snapshot.ausdBackingRatioBps < AUSD_POR_MIN_BPS
+  ) {
+    flags.push("AUSD_POR_WARN");
+    if (riskLevel === "NORMAL") riskLevel = "CAUTION";
+  }
+
   if (flags.length === 0) flags.push("NONE");
 
   // Propose candidate weights.
@@ -181,8 +199,12 @@ export function assess(snapshot: MarketSnapshot, options: AssessOptions = {}): R
     candidate = withUsdyWeight(snapshot.currentWeightsBps, Math.min(desiredUsdy, usdyCeiling));
   }
 
-  // Enforce the minimum idle buffer on the candidate.
+  // Enforce the minimum idle buffer, then the instant-liquidity floor, on the
+  // candidate — so the deterministic engine is a true guardrail floor (the same
+  // bounds the on-chain Guardrails.validateRebalance enforces) before the LLM /
+  // TS validator ever sees it.
   candidate = enforceMinIdle(candidate);
+  candidate = enforceInstantLiquidity(candidate, snapshot);
 
   return {
     riskLevel,
@@ -199,6 +221,30 @@ function enforceMinIdle(w: WeightsBps): WeightsBps {
   const next: WeightsBps = { ...w };
   let needed = MIN_IDLE_BPS - next[Bucket.IDLE];
   for (const b of [Bucket.AAVE, Bucket.USDY, Bucket.AUSD] as const) {
+    if (needed <= 0) break;
+    const take = Math.min(next[b], needed);
+    next[b] -= take;
+    next[Bucket.IDLE] += take;
+    needed -= take;
+  }
+  return normalizeToIdle(next);
+}
+
+/**
+ * Instant liquidity = IDLE + min(AAVE weight, Aave-withdrawable fraction of TVL).
+ * If the candidate falls below MIN_INSTANT_LIQUIDITY_BPS, shift weight out of the
+ * illiquid buckets (USDY → AUSD) into IDLE until the floor is met. Mirrors the
+ * on-chain check so the candidate never proposes a move that would revert.
+ */
+function enforceInstantLiquidity(w: WeightsBps, snapshot: MarketSnapshot): WeightsBps {
+  const aaveCap = aaveLiquidityBps(snapshot); // Aave-withdrawable as bps of TVL
+  const instant = (x: WeightsBps): number => x[Bucket.IDLE] + Math.min(x[Bucket.AAVE], aaveCap);
+  if (instant(w) >= MIN_INSTANT_LIQUIDITY_BPS) return w;
+
+  const next: WeightsBps = { ...w };
+  let needed = MIN_INSTANT_LIQUIDITY_BPS - instant(next);
+  // Pull from the illiquid buckets into IDLE (which counts fully toward instant).
+  for (const b of [Bucket.USDY, Bucket.AUSD] as const) {
     if (needed <= 0) break;
     const take = Math.min(next[b], needed);
     next[b] -= take;

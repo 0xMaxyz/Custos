@@ -33,7 +33,8 @@ export type RiskFlag =
   | "PEG_DE_RISK"
   | "ORACLE_STALE"
   | "ORACLE_NEAR_RANGE_END"
-  | "LOW_LIQUIDITY";
+  | "LOW_LIQUIDITY"
+  | "AUSD_POR_WARN";
 
 /** Severity buckets for a risk signal (SPEC §3.2). */
 export type Severity = "LOW" | "MEDIUM" | "HIGH";
@@ -84,6 +85,11 @@ export interface MarketSnapshot {
   readonly totalAssetsUsdc: bigint;
   /** Current on-chain allocation weights. */
   readonly currentWeightsBps: WeightsBps;
+  /**
+   * AUSD proof-of-reserves backing ratio in bps (10000 = fully backed by reserves).
+   * 0 means PoR is unavailable this cycle (treated as "unknown", not a breach).
+   */
+  readonly ausdBackingRatioBps: number;
 }
 
 // ── Risk engine output ────────────────────────────────────────────────────────

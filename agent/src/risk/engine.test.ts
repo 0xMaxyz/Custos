@@ -31,6 +31,7 @@ function baseSnapshot(overrides: Partial<MarketSnapshot> = {}): MarketSnapshot {
     aaveWithdrawableUsdc: 21_000_000_000n, // $21k (6-dec)
     totalAssetsUsdc: 30_000_000_000n, // $30k
     currentWeightsBps: weights(300, 4_700, 5_000, 0),
+    ausdBackingRatioBps: 10_000, // fully backed
     ...overrides,
   };
 }
@@ -155,5 +156,61 @@ describe("assess — table-driven", () => {
     const snap = baseSnapshot({ currentWeightsBps: weights(200, 1_800, 8_000, 0) });
     const r = assess(snap, { nowSec: NOW });
     expect(r.candidateWeightsBps[Bucket.USDY]).toBeLessThanOrEqual(6_000);
+  });
+
+  it("buffer requirement: tightens an illiquid candidate to meet the instant-liquidity floor", () => {
+    // All in USDY/AUSD, no Aave liquidity → candidate must shift toward IDLE so
+    // IDLE + min(AAVE, aaveWithdrawable) >= 1500 bps.
+    const snap = baseSnapshot({
+      currentWeightsBps: weights(200, 0, 5_000, 4_800),
+      aaveWithdrawableUsdc: 0n,
+      // keep peg healthy so the only driver is the liquidity floor
+      usdyImpliedApyBps: 452,
+      aaveUsdcSupplyApyBps: 380,
+    });
+    const r = assess(snap, { nowSec: NOW });
+    const aaveCap = 0; // no withdrawable
+    const instant =
+      r.candidateWeightsBps[Bucket.IDLE] + Math.min(r.candidateWeightsBps[Bucket.AAVE], aaveCap);
+    expect(instant).toBeGreaterThanOrEqual(1_500);
+    expect(sum(r.candidateWeightsBps)).toBe(10_000);
+  });
+
+  it("buffer requirement: counts Aave-withdrawable toward the floor (no over-tightening)", () => {
+    // Plenty of Aave liquidity already satisfies the floor → USDY can stay.
+    const snap = baseSnapshot({
+      currentWeightsBps: weights(300, 4_700, 5_000, 0),
+      aaveWithdrawableUsdc: 21_000_000_000n, // 70% of TVL withdrawable
+    });
+    const r = assess(snap, { nowSec: NOW });
+    expect(r.candidateWeightsBps[Bucket.USDY]).toBe(5_000);
+  });
+
+  it("AUSD_POR_WARN: thin backing while holding AUSD raises caution", () => {
+    const snap = baseSnapshot({
+      currentWeightsBps: weights(300, 2_700, 4_000, 3_000),
+      ausdBackingRatioBps: 9_800, // below the 9950 floor
+    });
+    const r = assess(snap, { nowSec: NOW });
+    expect(r.flags).toContain("AUSD_POR_WARN");
+    expect(r.riskLevel).toBe("CAUTION");
+  });
+
+  it("AUSD PoR unknown (0) does not raise a flag", () => {
+    const snap = baseSnapshot({
+      currentWeightsBps: weights(300, 2_700, 4_000, 3_000),
+      ausdBackingRatioBps: 0, // unavailable
+    });
+    const r = assess(snap, { nowSec: NOW });
+    expect(r.flags).not.toContain("AUSD_POR_WARN");
+  });
+
+  it("AUSD PoR thin but no AUSD held does not raise a flag", () => {
+    const snap = baseSnapshot({
+      currentWeightsBps: weights(300, 4_700, 5_000, 0),
+      ausdBackingRatioBps: 9_000,
+    });
+    const r = assess(snap, { nowSec: NOW });
+    expect(r.flags).not.toContain("AUSD_POR_WARN");
   });
 });

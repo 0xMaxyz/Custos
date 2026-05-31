@@ -27,7 +27,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-1b | 1.5–1.6 | Aave adapter + rebalance/withdraw                                            |
 | PR-2a | 2.1–2.3 | DEX lib + USDY valuation + UsdyAdapter                                       |
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline**   | `[x] DONE` |
-| PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` |
+| PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7) |
 | PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  |
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               |
@@ -239,14 +239,14 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 **Phase goal:** the Fastify service: ingest data → deterministic risk engine →
 LLM rationale (news/attestation hero path) → guardrail validator → signer → scheduler, driving the contracts on a fork.
 
-### 3.1 — Config & types · _PR-3a_ · `[x] DONE`
+### 3.1 — Config & types · _PR-3a_ · `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7)
 
 - **What:** shared types (`Allocation`, `RiskSignal`, `Decision`); env/config loader;
   viem clients (read + ALLOCATOR signer); pull addresses from `packages/shared`.
 - **Goal:** typed, validated foundation.
 - **Test:** Vitest: config loader rejects missing/invalid env; type/unit tests.
 
-### 3.2 — Data ingestion (read) · _PR-3a_ · `[x] DONE`
+### 3.2 — Data ingestion (read) · _PR-3a_ · `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7)
 
 - **What:** 1delta client (Aave pools/IRM/yields, Mantle) + RPC readers (USDY NAV +
   DEX spot, Aave reserve data, AUSD PoR); caching layer.
@@ -254,7 +254,7 @@ LLM rationale (news/attestation hero path) → guardrail validator → signer �
 - **Test:** Vitest with mocked HTTP/RPC for shape + cache TTL; one integration test
   against a local fork.
 
-### 3.3 — Deterministic risk engine · _PR-3a_ · `[x] DONE`
+### 3.3 — Deterministic risk engine · _PR-3a_ · `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7)
 
 - **What:** pure functions: yield spread (USDY-implied APY vs Aave supply APY), peg
   deviation bps, oracle staleness, buffer requirement, constrained target-weight

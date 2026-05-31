@@ -52,6 +52,7 @@ export function buildPipeline(config: AgentConfig): Pipeline {
     },
     aaveMarket: () => oneDelta.getAaveUsdcMarket(),
     usdyDexSpotUsdc: () => oneDelta.getUsdyDexSpotUsdc(),
+    ausdBackingRatioBps: () => oneDelta.getAusdBackingRatioBps(),
     vaultState: () => readVaultState(clients.publicClient, vaultAddr),
   };
 

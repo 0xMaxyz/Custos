@@ -59,6 +59,20 @@ describe("OneDeltaClient", () => {
     expect(await client.getUsdyDexSpotUsdc()).toBe(0n);
   });
 
+  it("parses a valid AUSD PoR backing ratio", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ backingRatioBps: 10_000 }),
+    ) as unknown as FetchLike;
+    const client = new OneDeltaClient(config, { fetchImpl });
+    expect(await client.getAusdBackingRatioBps()).toBe(10_000);
+  });
+
+  it("returns 0 (unknown) when the AUSD PoR shape is invalid", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ nope: 1 })) as unknown as FetchLike;
+    const client = new OneDeltaClient(config, { fetchImpl });
+    expect(await client.getAusdBackingRatioBps()).toBe(0);
+  });
+
   it("omits the auth header when no api key is set", async () => {
     const noKey = loadConfig({ MANTLE_RPC_URL: "https://rpc.mantle.xyz" });
     const fetchImpl = vi.fn<FetchLike>(async () =>

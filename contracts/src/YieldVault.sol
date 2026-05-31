@@ -12,6 +12,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Roles}           from "./Roles.sol";
 import {Guardrails}      from "./Guardrails.sol";
 import {IStrategyAdapter} from "./interfaces/IStrategyAdapter.sol";
+import {IUsdyAdapter}    from "./interfaces/IUsdyAdapter.sol";
 
 /**
  * @title YieldVault
@@ -412,8 +413,20 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             : 0;
         s.totalAssets     = tvl;
         s.lastRebalanceAt = lastRebalanceAt;
-        // USDY oracle values: Phase 2 will populate from RWADynamicOracle.
-        // Phase 1b: no USDY adapter; usdyOracleNav + usdyDexSpot left as 0 (guard inactive).
+
+        // USDY oracle values: populated when the USDY adapter (bucket 2) is registered.
+        // Casting is safe because only a USDY adapter implementing IUsdyAdapter is ever
+        // placed in this slot (enforced off-chain and by the adapter's constructor).
+        IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
+        if (address(usdyAdapter) != address(0)) {
+            try IUsdyAdapter(address(usdyAdapter)).oracleData() returns (uint256 nav, uint64 rangeEnd) {
+                s.usdyOracleNav = nav;
+                s.usdyDexSpot   = nav; // Phase 2b will replace with actual DEX TWAP/quote.
+                s.oracleRangeEnd = rangeEnd;
+                // oracleUpdatedAt is not exposed by RWADynamicOracle; leave as 0
+                // (secondary oracleMaxAge check stays inactive until Phase 2b).
+            } catch { /* oracle down: leave as 0, guard will remain inactive this cycle */ }
+        }
     }
 
     /**

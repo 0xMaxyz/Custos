@@ -206,20 +206,42 @@ interface IGuardrails {
 ```solidity
 interface IAgentBenchmark {
     struct Outcome {
-        int256  realizedYieldBps;     // since prior decision
-        uint256 drawdownAvoidedUsdc;  // est. on de-risk events
-        uint64  measuredAt;
+        int256  realizedYieldBps;     // agent yield vs prior decision (bps)
+        uint256 drawdownAvoidedUsdc;  // estimated loss avoided on de-risk events (6-dec USDC)
+        int256  passiveDeltaBps;      // Sentinel outperformance vs 100%-USDY passive holder (bps)
+        uint64  measuredAt;           // unix timestamp of outcome measurement
     }
 
-    function recordDecision(uint256 decisionId, bytes32 rationaleHash, string calldata decisionURI) external; // VAULT
-    function updateOutcome(uint256 decisionId, Outcome calldata o) external;  // ALLOCATOR/keeper
+    // Called by YieldVault only. Snaps usdyNavAtDecision as the passive-baseline reference.
+    function recordDecision(
+        uint256 decisionId,
+        bytes32 rationaleHash,
+        string  calldata decisionURI,
+        uint256 usdyNavAtDecision
+    ) external;
+
+    // Written by ALLOCATOR/keeper post-facto. Immutable once measuredAt != 0.
+    function updateOutcome(uint256 decisionId, Outcome calldata o) external;
 
     function decisionCount() external view returns (uint256);
     function outcomeOf(uint256 decisionId) external view returns (Outcome memory);
+    function navAtDecision(uint256 decisionId) external view returns (uint256);
 
-    event OutcomeUpdated(uint256 indexed decisionId, int256 realizedYieldBps, uint256 drawdownAvoidedUsdc);
+    event DecisionRecorded(
+        uint256 indexed decisionId,
+        bytes32 rationaleHash,
+        string  decisionURI,
+        uint256 usdyNavAtDecision
+    );
+    event OutcomeUpdated(
+        uint256 indexed decisionId,
+        int256  realizedYieldBps,
+        uint256 drawdownAvoidedUsdc,
+        int256  passiveDeltaBps
+    );
 }
 ```
+**Passive-baseline design:** `navAtDecision` stores the oracle NAV at each decision. The off-chain agent computes `passiveDeltaBps` — how many bps Sentinel outperformed a 100%-USDY passive holder — and writes it via `updateOutcome`. On-chain storage keeps the full audit trail; computation stays off-chain per "AI only where it beats an algorithm" (AGENTS.md §2.3).
 
 ### 2.5 ERC-8004 integration (subset we use)
 ```solidity

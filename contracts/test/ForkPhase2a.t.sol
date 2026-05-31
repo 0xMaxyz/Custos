@@ -63,6 +63,9 @@ contract ForkPhase2aTest is Test {
 
     uint256 constant DEPOSIT = 1_000e6; // $1k USDC
 
+    /// @dev Live oracle NAV read in setUp — passed as usdyDexSpotUsdc to rebalance().
+    uint256 internal liveNav;
+
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     function setUp() public {
@@ -97,6 +100,9 @@ contract ForkPhase2aTest is Test {
         vault.activateStrategy(2);
 
         deal(USDC, user, DEPOSIT);
+
+        // Snapshot live oracle NAV for use as usdyDexSpotUsdc in rebalance calls.
+        liveNav = IRWADynamicOracle(USDY_ORACLE).getPrice();
     }
 
     // ── Task 2.2 — Oracle valuation ───────────────────────────────────────────
@@ -141,7 +147,7 @@ contract ForkPhase2aTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-deposit", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://fork-phase2a-deposit", bytes32(0), liveNav);
 
         uint256 usdyBal = IERC20(USDY).balanceOf(address(adapter));
         assertGt(usdyBal, 0, "adapter should hold USDY after rebalance");
@@ -166,7 +172,7 @@ contract ForkPhase2aTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-wd-1", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://fork-phase2a-wd-1", bytes32(0), liveNav);
 
         // Warp 30 days to simulate USDY NAV growth.
         vm.warp(block.timestamp + 30 days);
@@ -199,7 +205,7 @@ contract ForkPhase2aTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-mw", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://fork-phase2a-mw", bytes32(0), liveNav);
 
         uint256 mw = adapter.maxWithdrawable();
         uint256 ta = adapter.totalAssets();
@@ -222,7 +228,7 @@ contract ForkPhase2aTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-roundtrip-in", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://fork-phase2a-roundtrip-in", bytes32(0), liveNav);
 
         uint256 usdyHeld = IERC20(USDY).balanceOf(address(adapter));
         assertGt(usdyHeld, 0, "no USDY after first swap");
@@ -231,7 +237,7 @@ contract ForkPhase2aTest is Test {
         uint16[4] memory back; back[0] = 10_000;
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(back, sd, "ipfs://fork-phase2a-roundtrip-out", bytes32(0));
+        vault.rebalance(back, sd, "ipfs://fork-phase2a-roundtrip-out", bytes32(0), 0);
 
         assertEq(IERC20(USDY).balanceOf(address(adapter)), 0, "USDY not fully unwound");
 

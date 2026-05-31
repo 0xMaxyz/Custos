@@ -27,8 +27,9 @@ import {IAaveV3Pool, ReserveData} from "../src/interfaces/IAaveV3Pool.sol";
 contract ForkPhase1bTest is Test {
     // ── Mantle mainnet addresses ──────────────────────────────────────────────
 
-    address internal constant USDC = 0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9;
-    address internal constant AAVE_ADDRESSES_PROVIDER = 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb;
+    // Verified against the Phase 0.3 on-chain gate (Fork.t.sol::testAddressesHaveCode).
+    address internal constant USDC = 0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9; // 1delta curated list
+    address internal constant AAVE_ADDRESSES_PROVIDER = 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb; // aave.com/docs Mantle
 
     // ── Actors ────────────────────────────────────────────────────────────────
 

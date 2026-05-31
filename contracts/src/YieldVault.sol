@@ -41,6 +41,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     error GuardrailsRejected(bytes4 reason);
     error DeRiskConditionNotMet();
     error InvalidToBucket();
+    error NotAllocatorOrGuardian();
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -326,7 +327,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     {
         bool isAllocator = hasRole(Roles.ALLOCATOR, msg.sender);
         bool isGuardian  = hasRole(Roles.GUARDIAN,  msg.sender);
-        require(isAllocator || isGuardian, "YieldVault: not ALLOCATOR or GUARDIAN");
+        if (!isAllocator && !isGuardian) revert NotAllocatorOrGuardian();
         _requireNotKilled();
 
         if (toBucket != BUCKET_IDLE && toBucket != BUCKET_AUSD) revert InvalidToBucket();
@@ -378,6 +379,8 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             if (available == 0) continue;
 
             uint256 toWithdraw = available < remaining ? available : remaining;
+            // minOut=0 is safe for the 1:1 Aave leg. Phase 2 (USDY/DEX adapters)
+            // must derive a floor from guardrails.config().maxSlippageBps here.
             adapter.withdraw(toWithdraw, 0, address(this), "");
             remaining = remaining > toWithdraw ? remaining - toWithdraw : 0;
         }
@@ -433,6 +436,8 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             uint256 delta = ((uint256(preWeights[i]) - targetWeights[i]) * tvl) / 10_000;
             if (delta == 0) continue;
             bytes memory sd = swapData.length > i ? swapData[i] : bytes("");
+            // minOut=0 safe for 1:1 Aave; Phase 2 DEX adapters must enforce a
+            // maxSlippageBps-derived floor here.
             adapter.withdraw(delta, 0, address(this), sd);
         }
 

@@ -143,14 +143,14 @@ guardrails, and deposit/withdraw.
 - **Goal:** pluggable adapters behind a stable interface.
 - **Test:** Forge: a mock adapter; vault allocates/deallocates to it; invariants hold.
 
-### 1.5 — `AaveV3Adapter` · _PR-1b_ · `[x] DONE`
+### 1.5 — `AaveV3Adapter` · _PR-1b_ · `[x] DONE` · [PR #4](https://github.com/0xMaxyz/miu/pull/4)
 - **What:** supply/withdraw USDC on Aave v3 Mantle; `totalAssets` = aUSDC balance;
   `maxWithdrawable` = available pool liquidity.
 - **Goal:** vault can route idle USDC to Aave and pull it back.
 - **Test:** fork test: deposit → allocate to Aave → `warp` → aUSDC grew →
   full withdraw returns ≥ principal.
 
-### 1.6 — `rebalance()` + withdraw queue · _PR-1b_ · `[x] DONE`
+### 1.6 — `rebalance()` + withdraw queue · _PR-1b_ · `[x] DONE` · [PR #4](https://github.com/0xMaxyz/miu/pull/4)
 - **What:** `rebalance(targetWeights, decisionURI, rationaleHash)` (ALLOCATOR),
   enforces guardrails + buffer; withdrawals pull idle→Aave in queue order respecting
   available liquidity; emit `Decision`.

@@ -28,6 +28,7 @@ contract AaveV3Adapter is IStrategyAdapter, ReentrancyGuard {
     error OnlyVault();
     error BelowMinOut();
     error ZeroAmount();
+    error ZeroAddress();
 
     // ── Immutables ────────────────────────────────────────────────────────────
 
@@ -52,6 +53,9 @@ contract AaveV3Adapter is IStrategyAdapter, ReentrancyGuard {
      * @param vault  YieldVault address (the only caller allowed).
      */
     constructor(address pool, address usdc, address aUsdc, address vault) {
+        if (pool == address(0) || usdc == address(0) || aUsdc == address(0) || vault == address(0)) {
+            revert ZeroAddress();
+        }
         POOL       = IAaveV3Pool(pool);
         underlying = usdc;
         A_USDC     = aUsdc;

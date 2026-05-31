@@ -62,7 +62,9 @@ jobs:
 
       - name: Unit tests (offline — no fork)
         working-directory: contracts
-        run: forge test --no-match-contract ForkTest -vv
+        # Exclude every fork-only suite (ForkTest, ForkPhase1bTest, …) — their
+        # setUp() needs a live Mantle fork. Pattern matches any contract named *Fork*.
+        run: forge test --no-match-contract 'Fork' -vv
 
   # ── Fork tests (live Mantle RPC — only on pushes to main/feature branches) ───
   fork-tests:
@@ -84,7 +86,8 @@ jobs:
         working-directory: contracts
         env:
           MANTLE_RPC_URL: ${{ secrets.MANTLE_RPC_URL }}
+        # Run every fork suite (ForkTest gate + ForkPhase1bTest Aave adapter + …).
         run: |
           forge test --fork-url "$MANTLE_RPC_URL" \
-            --match-contract ForkTest \
+            --match-contract 'Fork' \
             -vv

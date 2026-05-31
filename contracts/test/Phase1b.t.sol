@@ -124,7 +124,7 @@ contract Phase1bTest is Test {
         target[1] = aaveBps;
         bytes[] memory sd = new bytes[](4);
         vm.prank(allocator);
-        return vault.rebalance(target, sd, "ipfs://test", keccak256("rationale"));
+        return vault.rebalance(target, sd, "ipfs://test", keccak256("rationale"), 0);
     }
 
     // ── Task 1.5 — AaveV3Adapter access control ───────────────────────────────
@@ -170,7 +170,7 @@ contract Phase1bTest is Test {
 
         vm.warp(block.timestamp + 2 hours); // past min interval
         vm.prank(allocator);
-        uint256 did = vault.rebalance(target, sd, "ipfs://r1", bytes32(0));
+        uint256 did = vault.rebalance(target, sd, "ipfs://r1", bytes32(0), 0);
 
         assertGt(did, 0);
         assertGt(aaveAdapter.totalAssets(), 0);
@@ -188,7 +188,7 @@ contract Phase1bTest is Test {
         emit YieldVault.DecisionRecorded(1, 0, bytes32(0), "ipfs://r1");
 
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://r1", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://r1", bytes32(0), 0);
     }
 
     function test_RebalanceGuardrailsRejectWeightSumNot10000() public {
@@ -201,7 +201,7 @@ contract Phase1bTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(YieldVault.GuardrailsRejected.selector, Guardrails.WeightsSumNot10000.selector)
         );
-        vault.rebalance(target, sd, "ipfs://bad", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://bad", bytes32(0), 0);
     }
 
     function test_RebalanceGuardrailsRejectTooSoon() public {
@@ -213,7 +213,7 @@ contract Phase1bTest is Test {
         // First rebalance at block.timestamp (interval 0 since lastRebalanceAt == 0).
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://r1", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://r1", bytes32(0), 0);
 
         // Second rebalance immediately — should be rejected.
         vm.prank(allocator);
@@ -223,7 +223,7 @@ contract Phase1bTest is Test {
                 Guardrails.RebalanceIntervalNotElapsed.selector
             )
         );
-        vault.rebalance(target, sd, "ipfs://r2", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://r2", bytes32(0), 0);
     }
 
     function test_OnlyAllocatorCanRebalance() public {
@@ -234,7 +234,7 @@ contract Phase1bTest is Test {
         vm.warp(block.timestamp + 2 hours);
         vm.expectRevert();
         vm.prank(attacker);
-        vault.rebalance(target, sd, "ipfs://bad", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://bad", bytes32(0), 0);
     }
 
     function test_PausedVaultBlocksRebalance() public {
@@ -248,7 +248,7 @@ contract Phase1bTest is Test {
         vm.warp(block.timestamp + 2 hours);
         vm.expectRevert();
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://bad", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://bad", bytes32(0), 0);
     }
 
     // ── Task 1.6 — withdraw queue ─────────────────────────────────────────────
@@ -271,7 +271,7 @@ contract Phase1bTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://r1", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://r1", bytes32(0), 0);
 
         // Verify: ~5k idle, ~5k in adapter.
         uint256 idle = usdc.balanceOf(address(vault));

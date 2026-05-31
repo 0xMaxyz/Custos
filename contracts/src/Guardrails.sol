@@ -24,6 +24,7 @@ contract Guardrails is AccessControl {
     error InstantLiquidityTooLow();
     error RebalanceIntervalNotElapsed();
     error RebalanceMoveTooLarge();
+    error UsdyAllocationBlocked();
     error InvalidBucket();
     error TimelockNotElapsed();
     error InvalidConfig();
@@ -184,6 +185,16 @@ contract Guardrails is AccessControl {
             return (false, RebalanceMoveTooLarge.selector);
         }
 
+        // 7. USDY depeg / oracle guard: block any increase in USDY weight when
+        //    the oracle or DEX spot signals a breach. Only applies when both
+        //    oracle NAV and DEX spot are non-zero (otherwise guard is inactive).
+        if (s.usdyOracleNav > 0 && s.usdyDexSpot > 0) {
+            (bool blockNewUsdy,,) = _evaluateUsdyRisk(s, c);
+            if (blockNewUsdy && postWeightsBps[_USDY] > preWeightsBps[_USDY]) {
+                return (false, UsdyAllocationBlocked.selector);
+            }
+        }
+
         return (true, bytes4(0));
     }
 
@@ -198,8 +209,16 @@ contract Guardrails is AccessControl {
         view
         returns (bool blockNewUsdy, bool forceDeRisk, uint8 riskLevel)
     {
-        Config memory c = _config;
+        return _evaluateUsdyRisk(s, _config);
+    }
 
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    function _evaluateUsdyRisk(MarketState memory s, Config memory c)
+        internal
+        view
+        returns (bool blockNewUsdy, bool forceDeRisk, uint8 riskLevel)
+    {
         // Oracle staleness: past range end = invalid NAV.
         bool oracleStale = s.oracleRangeEnd > 0 && block.timestamp > s.oracleRangeEnd;
         // Secondary staleness guard.
@@ -227,7 +246,7 @@ contract Guardrails is AccessControl {
                 return (true, true, 2); // DERISK
             }
             if (deviationBps >= c.pegBlockBps) {
-                return (true, false, oracleNearEnd ? 1 : 1); // CAUTION, block new
+                return (true, false, 1); // CAUTION, block new
             }
             if (deviationBps >= c.pegWarnBps || oracleNearEnd) {
                 return (false, false, 1); // CAUTION, don't block
@@ -240,8 +259,6 @@ contract Guardrails is AccessControl {
 
         return (false, false, 0); // NORMAL
     }
-
-    // ── Internal helpers ──────────────────────────────────────────────────────
 
     function _sum(uint16[4] calldata w) private pure returns (uint256 s) {
         s = uint256(w[0]) + w[1] + w[2] + w[3];

@@ -346,7 +346,7 @@ contract Phase2aTest is Test {
         uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://phase2a-test", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://phase2a-test", bytes32(0), 0);
 
         // USDY adapter should now hold USDY.
         assertGt(usdy.balanceOf(address(adapter)), 0);
@@ -368,7 +368,7 @@ contract Phase2aTest is Test {
         uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), 0);
 
         uint256 usdyBefore = usdy.balanceOf(address(adapter));
         assertGt(usdyBefore, 0);

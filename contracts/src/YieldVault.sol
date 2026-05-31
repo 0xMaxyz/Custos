@@ -9,10 +9,11 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable}      from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {Roles}           from "./Roles.sol";
-import {Guardrails}      from "./Guardrails.sol";
+import {Roles}            from "./Roles.sol";
+import {Guardrails}       from "./Guardrails.sol";
 import {IStrategyAdapter} from "./interfaces/IStrategyAdapter.sol";
-import {IUsdyAdapter}    from "./interfaces/IUsdyAdapter.sol";
+import {IUsdyAdapter}     from "./interfaces/IUsdyAdapter.sol";
+import {IAgentBenchmark}  from "./interfaces/IAgentBenchmark.sol";
 
 /**
  * @title YieldVault
@@ -52,6 +53,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     event StrategyActivated(uint8 indexed bucket, address adapter);
     event StrategyRemoved(uint8 indexed bucket);
     event GuardrailsUpdated(address indexed newGuardrails);
+    event BenchmarkUpdated(address indexed newBenchmark);
     event DecisionRecorded(uint256 indexed id, uint8 kind, bytes32 rationaleHash, string decisionURI);
     event Rebalanced(uint256 indexed id, uint16[4] postWeightsBps);
     event DeRisked(uint256 indexed id, uint8 toBucket, bytes32 evidenceHash);
@@ -74,6 +76,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     // ── State ─────────────────────────────────────────────────────────────────
 
     Guardrails public guardrails;
+
+    /// Optional benchmark ledger (may be address(0) before Phase 2b is configured).
+    IAgentBenchmark public benchmark;
 
     /// Strategy adapter for each bucket (address(0) = no adapter = idle-in-vault).
     IStrategyAdapter[NUM_BUCKETS] public adapters;
@@ -254,6 +259,12 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         emit GuardrailsUpdated(_guardrails);
     }
 
+    /// @notice Set (or clear) the AgentBenchmark ledger. Only ADMIN.
+    function setBenchmark(address _benchmark) external onlyRole(Roles.ADMIN) {
+        benchmark = IAgentBenchmark(_benchmark);
+        emit BenchmarkUpdated(_benchmark);
+    }
+
     // ── Allocator actions ─────────────────────────────────────────────────────
 
     /**
@@ -267,13 +278,16 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
      * @param swapData          Per-bucket routing hint passed to adapters.
      * @param decisionURI       IPFS URI for the rationale + evidence bundle.
      * @param rationaleHash     keccak256 of the rationale text (on-chain anchor).
+     * @param usdyDexSpotUsdc   Current USDY/USDC DEX spot price (18-dec, agent-supplied).
+     *                          Pass 0 to disable the DEX-spot deviation guard.
      * @return decisionId       Monotonic id for this decision.
      */
     function rebalance(
         uint16[4] calldata targetWeightsBps,
         bytes[]   calldata swapData,
         string    calldata decisionURI,
-        bytes32            rationaleHash
+        bytes32            rationaleHash,
+        uint256            usdyDexSpotUsdc
     )
         external
         onlyRole(Roles.ALLOCATOR)
@@ -285,24 +299,32 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
         uint256 tvl = totalAssets();
         uint16[4] memory preWeights = _currentWeightsBps(tvl);
+        Guardrails.MarketState memory s = _buildMarketState(tvl, usdyDexSpotUsdc);
 
-        // Build market state for guardrail validation.
-        Guardrails.MarketState memory s = _buildMarketState(tvl);
+        _checkAndExecuteRebalance(preWeights, targetWeightsBps, tvl, swapData, s);
 
-        // Guardrails: validate proposed move.
-        (bool ok, bytes4 reason) = guardrails.validateRebalance(preWeights, targetWeightsBps, s);
-        if (!ok) revert GuardrailsRejected(reason);
-
-        // Execute the allocation delta.
-        _executeRebalance(preWeights, targetWeightsBps, tvl, swapData);
-
-        // Record decision on-chain.
         decisionId = ++decisionCount;
         lastRebalanceAt = uint64(block.timestamp);
-        uint16[4] memory postWeights = _currentWeightsBps(totalAssets());
 
         emit DecisionRecorded(decisionId, 0, rationaleHash, decisionURI);
-        emit Rebalanced(decisionId, postWeights);
+        emit Rebalanced(decisionId, _currentWeightsBps(totalAssets()));
+
+        IAgentBenchmark bm = benchmark;
+        if (address(bm) != address(0)) {
+            bm.recordDecision(decisionId, rationaleHash, decisionURI, s.usdyOracleNav);
+        }
+    }
+
+    function _checkAndExecuteRebalance(
+        uint16[4] memory   preWeights,
+        uint16[4] calldata targetWeights,
+        uint256            tvl,
+        bytes[]   calldata swapData,
+        Guardrails.MarketState memory s
+    ) internal {
+        (bool ok, bytes4 reason) = guardrails.validateRebalance(preWeights, targetWeights, s);
+        if (!ok) revert GuardrailsRejected(reason);
+        _executeRebalance(preWeights, targetWeights, tvl, swapData);
     }
 
     /**
@@ -337,7 +359,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         // Allocator de-risk requires the oracle/depeg guard to have fired.
         if (isAllocator && !isGuardian) {
             uint256 tvl = totalAssets();
-            Guardrails.MarketState memory s = _buildMarketState(tvl);
+            Guardrails.MarketState memory s = _buildMarketState(tvl, 0);
             (, bool forceDeRisk,) = guardrails.evaluateUsdyRisk(s);
             if (!forceDeRisk) revert DeRiskConditionNotMet();
         }
@@ -354,6 +376,14 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         decisionId = ++decisionCount;
         emit DecisionRecorded(decisionId, 1, evidenceHash, reason);
         emit DeRisked(decisionId, toBucket, evidenceHash);
+
+        // Anchor de-risk decision in the benchmark ledger if configured.
+        IAgentBenchmark bm = benchmark;
+        if (address(bm) != address(0)) {
+            uint256 tvl = totalAssets();
+            Guardrails.MarketState memory s = _buildMarketState(tvl, 0);
+            bm.recordDecision(decisionId, evidenceHash, reason, s.usdyOracleNav);
+        }
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
@@ -409,7 +439,12 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     }
 
     /// @notice Build a Guardrails.MarketState snapshot from current on-chain state.
-    function _buildMarketState(uint256 tvl) internal view returns (Guardrails.MarketState memory s) {
+    /// @param usdyDexSpotUsdc Agent-supplied DEX spot price for USDY (18-dec). 0 = inactive.
+    function _buildMarketState(uint256 tvl, uint256 usdyDexSpotUsdc)
+        internal
+        view
+        returns (Guardrails.MarketState memory s)
+    {
         IStrategyAdapter aaveAdapter = adapters[BUCKET_AAVE];
         s.aaveWithdrawable = address(aaveAdapter) != address(0)
             ? aaveAdapter.maxWithdrawable()
@@ -418,18 +453,15 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         s.lastRebalanceAt = lastRebalanceAt;
 
         // USDY oracle values: populated when the USDY adapter (bucket 2) is registered.
-        // Casting is safe because only a USDY adapter implementing IUsdyAdapter is ever
-        // placed in this slot (enforced off-chain and by the adapter's constructor).
         IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
         if (address(usdyAdapter) != address(0)) {
             try IUsdyAdapter(address(usdyAdapter)).oracleData() returns (uint256 nav, uint64 rangeEnd) {
-                s.usdyOracleNav = nav;
-                s.usdyDexSpot   = nav; // Phase 2b will replace with actual DEX TWAP/quote.
+                s.usdyOracleNav  = nav;
                 s.oracleRangeEnd = rangeEnd;
-                // oracleUpdatedAt is not exposed by RWADynamicOracle; leave as 0
-                // (secondary oracleMaxAge check stays inactive until Phase 2b).
-            } catch { /* oracle down: leave as 0, guard will remain inactive this cycle */ }
+            } catch { /* oracle down: leave as 0, guard stays inactive this cycle */ }
         }
+        // Use agent-supplied DEX spot; guard only fires when both nav and spot are non-zero.
+        s.usdyDexSpot = usdyDexSpotUsdc;
     }
 
     /**

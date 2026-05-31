@@ -70,8 +70,11 @@ jobs:
   fork-tests:
     name: Solidity — fork tests (Mantle mainnet)
     runs-on: ubuntu-latest
-    # Skip if the secret is absent (forks, first-time contributors).
-    if: ${{ vars.MANTLE_RPC_URL != '' || secrets.MANTLE_RPC_URL != '' }}
+    # Skip if not configured (forks, first-time contributors). The `secrets`
+    # context is NOT available in a job-level `if:`, so gate on the `vars` flag —
+    # set the MANTLE_RPC_URL repository *variable* alongside the secret to enable
+    # this job; the secret still supplies the actual URL in the step env below.
+    if: ${{ vars.MANTLE_RPC_URL != '' }}
     steps:
       - uses: actions/checkout@v4
         with:

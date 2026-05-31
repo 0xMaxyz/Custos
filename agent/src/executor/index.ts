@@ -1,5 +1,5 @@
 import { getAddress, keccak256, toBytes, type WalletClient, type PublicClient } from "viem";
-import { Bucket } from "@sentinel/shared";
+import { Bucket, MAX_SLIPPAGE_BPS, TOKENS, PROTOCOLS } from "@sentinel/shared";
 
 import type { AgentConfig } from "../config.js";
 import type { ChainClients } from "../chain/clients.js";
@@ -10,9 +10,11 @@ import { runSignalLayer } from "../llm/signals.js";
 import { AnthropicClient } from "../llm/anthropic.js";
 import { buildEvidenceFetcher } from "../llm/evidence.js";
 import { pinRationale, type RationaleBundle } from "./ipfs.js";
+import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
 import type { WeightsBps, RiskSignal } from "../types.js";
 import type { EvidenceItem } from "../llm/types.js";
+import type { MarketSnapshot } from "../types.js";
 
 export interface ExecutorOptions {
   readonly config: AgentConfig;
@@ -145,7 +147,7 @@ export class Executor {
   }
 
   private async _sendRebalance(
-    snapshot: ReturnType<Snapshotter["snapshot"]> extends Promise<infer T> ? T : never,
+    snapshot: MarketSnapshot,
     assessment: ReturnType<typeof assess>,
     verdict: Awaited<ReturnType<typeof runSignalLayer>>,
     evidence: EvidenceItem[],
@@ -162,13 +164,13 @@ export class Executor {
 
     const { uri, rationaleHash } = await pinRationale(bundle, this.config);
     const weightsArray = toWeightsArray(weights);
-    const emptySwap = ["0x", "0x", "0x", "0x"] as const;
+    const swapData = await this._buildSwapData(snapshot, weights);
 
     const hash = await this.wallet.writeContract({
       address: this.vault,
       abi: yieldVaultWriteAbi,
       functionName: "rebalance",
-      args: [weightsArray, emptySwap, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
+      args: [weightsArray, swapData, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
       chain: this.wallet.chain,
       account: this.wallet.account!,
     });
@@ -180,7 +182,7 @@ export class Executor {
   }
 
   private async _sendDeRisk(
-    snapshot: ReturnType<Snapshotter["snapshot"]> extends Promise<infer T> ? T : never,
+    snapshot: MarketSnapshot,
     assessment: ReturnType<typeof assess>,
     verdict: Awaited<ReturnType<typeof runSignalLayer>>,
     evidence: EvidenceItem[],
@@ -197,13 +199,21 @@ export class Executor {
 
     // Pin the evidence bundle and use the URI as the on-chain reason/decisionURI field.
     const { uri, rationaleHash } = await pinRationale(bundle, this.config);
-    const emptySwap = ["0x", "0x", "0x", "0x"] as const;
+
+    // For a full de-risk we sell all USDY. Build swapData with USDY→USDC calldata.
+    const zeroWeights: WeightsBps = {
+      [Bucket.IDLE]: 0,
+      [Bucket.AAVE]: snapshot.currentWeightsBps[Bucket.AAVE],
+      [Bucket.USDY]: 0,
+      [Bucket.AUSD]: snapshot.currentWeightsBps[Bucket.AUSD],
+    };
+    const swapData = await this._buildSwapData(snapshot, zeroWeights);
 
     const hash = await this.wallet.writeContract({
       address: this.vault,
       abi: yieldVaultWriteAbi,
       functionName: "deRisk",
-      args: [0, emptySwap, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
+      args: [0, swapData, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
       chain: this.wallet.chain,
       account: this.wallet.account!,
     });
@@ -212,6 +222,88 @@ export class Executor {
     const decisionId = extractDecisionId(receipt);
 
     return { submitted: true, kind: "derisk", decisionId, txHash: hash, reason: "De-risk executed" };
+  }
+
+  /**
+   * Build swapData for the vault's rebalance/deRisk call. Only swapData[2] (USDY
+   * adapter) is ever populated — IDLE and Aave need no swap calldata, AUSD has its
+   * own adapter that handles its own routing. If the USDY weight is unchanged, or
+   * the quote fails, we fall back to empty bytes for that slot (which the adapter
+   * will revert on if it actually tries to execute a swap).
+   */
+  private async _buildSwapData(
+    snapshot: MarketSnapshot,
+    finalWeights: WeightsBps,
+  ): Promise<readonly [`0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`]> {
+    const emptySlot = "0x" as const;
+    const swapData: [`0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`] = [
+      emptySlot, emptySlot, emptySlot, emptySlot,
+    ];
+
+    const currentUsdy = snapshot.currentWeightsBps[Bucket.USDY];
+    const finalUsdy = finalWeights[Bucket.USDY];
+
+    if (currentUsdy === finalUsdy) return swapData;
+
+    // Read the USDY adapter address from the vault (adapters[2] = USDY bucket).
+    const adapterAddress = await this.public.readContract({
+      address: this.vault,
+      abi: yieldVaultAbi,
+      functionName: "adapters",
+      args: [2n],
+    }) as `0x${string}`;
+
+    const oneDelta = new OneDeltaClient(this.config);
+
+    // Pinned Odos aggregator address — must match what UsdyAdapter.AGGREGATOR was
+    // deployed with. Reject any quote targeting a different router before signing.
+    const pinnedRouter = (PROTOCOLS.usdyAggregatorRouter as string).toLowerCase();
+
+    try {
+      let quote;
+      if (finalUsdy > currentUsdy) {
+        // Deposit path: USDC → USDY. Amount = weight-delta × TVL.
+        const deltaWeightBps = BigInt(finalUsdy - currentUsdy);
+        const usdcIn = (deltaWeightBps * snapshot.totalAssetsUsdc) / 10_000n;
+        quote = await oneDelta.getSwapQuote(
+          TOKENS.USDC.address,
+          TOKENS.USDY.address,
+          usdcIn,
+          adapterAddress,
+          MAX_SLIPPAGE_BPS,
+        );
+      } else {
+        // Withdraw path: USDY → USDC. Convert USDC value to USDY units via oracle NAV.
+        const deltaWeightBps = BigInt(currentUsdy - finalUsdy);
+        const usdcValue = (deltaWeightBps * snapshot.totalAssetsUsdc) / 10_000n;
+        // usdyOracleNavUsdc is 18-dec (price of 1 USDY in USDC × 1e18).
+        // usdyIn = usdcValue (6-dec) * 1e18 / usdyOracleNavUsdc (18-dec) → 6-dec, then scale to 18.
+        const usdyIn = (usdcValue * 10n ** 18n) / snapshot.usdyOracleNavUsdc;
+        quote = await oneDelta.getSwapQuote(
+          TOKENS.USDY.address,
+          TOKENS.USDC.address,
+          usdyIn,
+          adapterAddress,
+          MAX_SLIPPAGE_BPS,
+        );
+      }
+
+      // Fail-closed: reject quotes that target any router other than the pinned one.
+      // The adapter enforces this on-chain too, but we catch it here before signing.
+      if (quote.router.toLowerCase() !== pinnedRouter) {
+        throw new Error(
+          `Quote router mismatch: got ${quote.router}, expected ${pinnedRouter}`,
+        );
+      }
+
+      swapData[2] = quote.calldata;
+    } catch {
+      // Quote failed (network error, no route, wrong router, API down). Leave swapData[2] empty.
+      // If the vault tries to execute a USDY swap with empty calldata it will revert
+      // with EmptySwapData — a safe fail-closed outcome.
+    }
+
+    return swapData;
   }
 }
 

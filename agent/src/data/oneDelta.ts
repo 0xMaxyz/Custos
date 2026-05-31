@@ -36,6 +36,28 @@ const ausdPorSchema = z.object({
   backingRatioBps: z.number().int().nonnegative(),
 });
 
+/**
+ * Swap-routing quote. 1delta aggregates multiple DEX aggregators (Odos, Eisen,
+ * Nordstern, …) into a single best route, returning the calldata to execute it.
+ * The vault's `UsdyAdapter` runs this calldata against the **pinned** aggregator
+ * router only, and re-derives `minOut` from the on-chain oracle — the values here
+ * are advisory (sizing + the address allow-list check), never trusted for custody.
+ */
+const swapQuoteSchema = z.object({
+  /** Aggregator router the calldata targets. Must equal the adapter's pinned AGGREGATOR. */
+  router: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+  /** ABI-encoded swap calldata to run against `router`. */
+  calldata: z.string().regex(/^0x[0-9a-fA-F]*$/),
+  /** Expected output amount (token-out decimals), as a decimal string. */
+  amountOut: z.string().regex(/^\d+$/),
+});
+
+export interface SwapQuote {
+  readonly router: `0x${string}`;
+  readonly calldata: `0x${string}`;
+  readonly amountOut: bigint;
+}
+
 export interface OneDeltaClientOptions {
   readonly fetchImpl?: FetchLike;
   /** Per-request timeout in ms. */
@@ -81,6 +103,32 @@ export class OneDeltaClient {
     const raw = await this.getJson("/v1/mantle/ausd/por");
     const parsed = ausdPorSchema.safeParse(raw);
     return parsed.success ? parsed.data.backingRatioBps : 0;
+  }
+
+  /**
+   * Best-route swap calldata for `tokenIn → tokenOut` of `amountIn`, recipient
+   * `to`. Used to build `swapData` for UsdyAdapter deposit/withdraw. Returns the
+   * pinned-router calldata; the adapter enforces the real minOut on-chain.
+   * @param to Recipient the aggregator must pay — MUST be the adapter address so
+   *           the adapter's balance-delta check sees the output.
+   */
+  async getSwapQuote(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: bigint,
+    to: string,
+    slippageBps: number,
+  ): Promise<SwapQuote> {
+    const qs =
+      `?tokenIn=${tokenIn}&tokenOut=${tokenOut}` +
+      `&amountIn=${amountIn.toString()}&to=${to}&slippageBps=${slippageBps}`;
+    const raw = await this.getJson(`/v1/mantle/swap/quote${qs}`);
+    const parsed = swapQuoteSchema.parse(raw);
+    return {
+      router: parsed.router as `0x${string}`,
+      calldata: parsed.calldata as `0x${string}`,
+      amountOut: BigInt(parsed.amountOut),
+    };
   }
 
   private async getJson(path: string): Promise<unknown> {

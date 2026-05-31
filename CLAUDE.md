@@ -16,10 +16,16 @@ under an **ERC-8004** identity. Track: **AI × RWA (Application path)**. The
 verifiable autonomous defense — not the swap-to-USDY — is the product.
 
 ## Top non-negotiables (full list in `AGENTS.md` §2)
-1. **1delta = data + optional swap routing ONLY.** Never in the custody/execution
+1. **1delta = data + swap routing/quoting ONLY.** Never in the custody/execution
    path. The vault never executes arbitrary third-party calldata. Execution =
-   our own adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`) calling
-   protocols/DEXs directly with on-chain `minOut`/guardrails.
+   our own adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`). Aave/AUSD call
+   protocols/DEXs directly. **USDY exception:** `UsdyAdapter` runs swap calldata
+   against ONE pinned, allow-listed aggregator router (Odos on Mantle) — safe
+   because the router is immutable, the adapter enforces an oracle-derived
+   **balance-delta `minOut`** (router output never trusted), and output must land
+   on the adapter (else 0 delta → revert). Needed because Mantle USDY liquidity is
+   split across thin pools (~$1.5k total) with no usable single-pool route. See
+   `AGENTS.md` §2.1.
 2. **Guardrails are final.** LLM proposes → deterministic validator checks →
    immutable on-chain guardrails (incl. depeg/oracle guard) backstop. The model is
    never the last line of defense. The LLM may only **tighten** risk, never loosen

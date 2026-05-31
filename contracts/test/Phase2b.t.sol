@@ -11,7 +11,7 @@ import {Roles}           from "../src/Roles.sol";
 
 import {ERC20Mock}            from "./Phase2a.t.sol";
 import {MockRWADynamicOracle} from "./mocks/MockRWADynamicOracle.sol";
-import {MockMerchantMoeRouter} from "./mocks/MockMerchantMoeRouter.sol";
+import {MockAggregatorRouter} from "./mocks/MockAggregatorRouter.sol";
 import {UsdyAdapter}          from "../src/UsdyAdapter.sol";
 
 /**
@@ -33,7 +33,7 @@ contract Phase2bTest is Test {
     ERC20Mock             usdc;
     ERC20Mock             usdy;
     MockRWADynamicOracle  oracle;
-    MockMerchantMoeRouter router;
+    MockAggregatorRouter  router;
     UsdyAdapter           usdyAdapter;
     Guardrails            gr;
     YieldVault            vault;
@@ -50,7 +50,7 @@ contract Phase2bTest is Test {
         usdc   = new ERC20Mock("USD Coin", "USDC", 6);
         usdy   = new ERC20Mock("Ondo USDY", "USDY", 18);
         oracle = new MockRWADynamicOracle(NAV, block.timestamp + 365 days);
-        router = new MockMerchantMoeRouter();
+        router = new MockAggregatorRouter();
         // 1:1 NAV: USDC (6-dec) → USDY (18-dec) requires ×1e12; reverse requires ÷1e12.
         router.setRate(address(usdc), address(usdy), 1e12, 1);
         router.setRate(address(usdy), address(usdc), 1, 1e12);
@@ -84,9 +84,7 @@ contract Phase2bTest is Test {
             address(usdy),
             address(oracle),
             address(vault),
-            200, // 2%
-            1,   // default bin step
-            2    // LB version
+            200 // 2% maxSlippageBps
         );
 
         bm = new AgentBenchmark(address(vault), admin);
@@ -114,6 +112,18 @@ contract Phase2bTest is Test {
         usdc.mint(address(router), DEPOSIT);
     }
 
+    // ── Aggregator swap calldata helpers ──────────────────────────────────────
+    function _buyUsdy(uint256 usdcIn) internal view returns (bytes memory) {
+        return abi.encodeCall(
+            MockAggregatorRouter.swap, (address(usdc), address(usdy), usdcIn, address(usdyAdapter))
+        );
+    }
+    function _sellUsdy(uint256 usdyIn) internal view returns (bytes memory) {
+        return abi.encodeCall(
+            MockAggregatorRouter.swap, (address(usdy), address(usdc), usdyIn, address(usdyAdapter))
+        );
+    }
+
     // ── 2.4: DEX-spot depeg guard ─────────────────────────────────────────────
 
     function test_RebalanceBlockedWhenDexSpotDepeg() public {
@@ -135,6 +145,7 @@ contract Phase2bTest is Test {
         // NAV spot matches oracle exactly → should pass
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6); // 60% of $100k TVL
 
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://normal", bytes32(0), NAV);
@@ -166,14 +177,17 @@ contract Phase2bTest is Test {
         // First move 30% to USDY with good spot
         uint16[4] memory toUsdy = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
         vm.prank(allocator);
         vault.rebalance(toUsdy, sd, "ipfs://alloc", bytes32(0), NAV);
 
         // Now DEX depegs slightly (warn level, not block level)
         uint256 warnSpot = (NAV * 9_975) / 10_000; // 0.25% below — above warn (30bps), below block (50bps)
         uint16[4] memory reduce = [uint16(7_000), 0, 3_000, 0]; // REDUCE USDY: allowed
+        bytes[] memory rsd = new bytes[](3);
+        rsd[2] = _sellUsdy(30_000e18); // sell 30% of TVL worth of USDY
         vm.prank(allocator);
-        vault.rebalance(reduce, sd, "ipfs://reduce", bytes32(0), warnSpot);
+        vault.rebalance(reduce, rsd, "ipfs://reduce", bytes32(0), warnSpot);
     }
 
     // ── 2.6: AgentBenchmark ledger ────────────────────────────────────────────
@@ -181,6 +195,7 @@ contract Phase2bTest is Test {
     function test_BenchmarkRecordsDecisionOnRebalance() public {
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
 
         vm.prank(allocator);
         uint256 did = vault.rebalance(target, sd, "ipfs://bm1", keccak256("rationale"), NAV);
@@ -192,16 +207,19 @@ contract Phase2bTest is Test {
     function test_BenchmarkRecordsMultipleDecisions() public {
         uint16[4] memory t1 = [uint16(4_000), 0, 6_000, 0];
         uint16[4] memory t2 = [uint16(10_000), 0, 0, 0];
-        bytes[] memory sd = new bytes[](3);
+        bytes[] memory sd1 = new bytes[](3);
+        sd1[2] = _buyUsdy(60_000e6);
 
         vm.prank(allocator);
-        uint256 d1 = vault.rebalance(t1, sd, "ipfs://d1", bytes32(0), NAV);
+        uint256 d1 = vault.rebalance(t1, sd1, "ipfs://d1", bytes32(0), NAV);
 
         // Warp past interval
         vm.warp(block.timestamp + 2 hours);
 
+        bytes[] memory sd2 = new bytes[](3);
+        sd2[2] = _sellUsdy(60_000e18); // unwind full USDY back to idle
         vm.prank(allocator);
-        uint256 d2 = vault.rebalance(t2, sd, "ipfs://d2", bytes32(0), NAV);
+        uint256 d2 = vault.rebalance(t2, sd2, "ipfs://d2", bytes32(0), NAV);
 
         assertEq(bm.decisionCount(), 2);
         assertEq(d2, d1 + 1);
@@ -210,6 +228,7 @@ contract Phase2bTest is Test {
     function test_BenchmarkUpdateOutcome() public {
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
 
         vm.prank(allocator);
         uint256 did = vault.rebalance(target, sd, "ipfs://bm2", bytes32(0), NAV);
@@ -234,6 +253,7 @@ contract Phase2bTest is Test {
     function test_BenchmarkUpdateOutcomeOnlyAllocator() public {
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
 
         vm.prank(allocator);
         uint256 did = vault.rebalance(target, sd, "ipfs://bm3", bytes32(0), NAV);
@@ -266,6 +286,7 @@ contract Phase2bTest is Test {
         // First alloc USDY
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://pre", bytes32(0), NAV);
 
@@ -277,6 +298,7 @@ contract Phase2bTest is Test {
         uint256 bmCountBefore = bm.decisionCount();
 
         bytes[] memory dsd = new bytes[](3);
+        dsd[2] = _sellUsdy(60_000e18); // unwind full USDY balance on de-risk
         // Pass a depegged DEX spot so forceDeRisk fires for the allocator.
         uint256 depeggedSpot = NAV * 97 / 100; // 3% below → past pegDeRiskBps=100
         vm.prank(allocator);
@@ -299,6 +321,7 @@ contract Phase2bTest is Test {
         // Rebalance should not revert even with no benchmark
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://no-bm", bytes32(0), NAV);
     }
@@ -306,6 +329,7 @@ contract Phase2bTest is Test {
     function test_BenchmarkOutcomeAlreadySetReverts() public {
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
         vm.prank(allocator);
         uint256 did = vault.rebalance(target, sd, "ipfs://bm-dup", bytes32(0), NAV);
 

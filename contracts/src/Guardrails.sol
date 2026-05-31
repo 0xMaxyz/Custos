@@ -26,6 +26,7 @@ contract Guardrails is AccessControl {
     error RebalanceMoveTooLarge();
     error UsdyAllocationBlocked();
     error UsdySpotRequired();
+    error UsdyNotionalCapExceeded();
     error InvalidBucket();
     error TimelockNotElapsed();
     error InvalidConfig();
@@ -41,6 +42,7 @@ contract Guardrails is AccessControl {
         uint16[4] maxWeightBps;        // per bucket; index = Bucket id
         uint16    minIdleBps;          // min IDLE fraction of TVL (bps)
         uint16    minInstantLiquidityBps; // min (IDLE + Aave-withdrawable) fraction (bps)
+        uint256   maxUsdyNotionalUsdc; // absolute USDY exposure cap, 6-dec USDC (0 = disabled)
         // Execution safety
         uint16    maxSlippageBps;
         uint16    maxRebalanceMoveBps;
@@ -95,6 +97,10 @@ contract Guardrails is AccessControl {
             maxWeightBps:           maxW,
             minIdleBps:             200,     // 2%
             minInstantLiquidityBps: 1_500,   // 15%
+            // Absolute USDY cap: Mantle USDY pools total ~$1.5k. Cap exposure at
+            // $5k so the deterministic ceiling tracks real aggregator depth
+            // regardless of TVL — well below the 60% weight cap at a $50k TVL.
+            maxUsdyNotionalUsdc:    5_000 * 1e6,
             maxSlippageBps:         50,      // 0.5%
             maxRebalanceMoveBps:    5_000,   // 50%
             minRebalanceInterval:   3_600,   // 1h
@@ -191,6 +197,14 @@ contract Guardrails is AccessControl {
         //    so the guard can evaluate peg health — fail closed.
         //    When oracle NAV is available and spot is non-zero, evaluate deviation.
         if (postWeightsBps[_USDY] > preWeightsBps[_USDY]) {
+            // Absolute USDY notional cap (0 = disabled). Tracks real aggregator
+            // pool depth on Mantle, independent of TVL or the % weight cap.
+            if (c.maxUsdyNotionalUsdc > 0) {
+                uint256 postUsdyNotional = (uint256(postWeightsBps[_USDY]) * s.totalAssets) / _BPS;
+                if (postUsdyNotional > c.maxUsdyNotionalUsdc) {
+                    return (false, UsdyNotionalCapExceeded.selector);
+                }
+            }
             if (s.usdyOracleNav > 0 && s.usdyDexSpot == 0) {
                 return (false, UsdySpotRequired.selector);
             }

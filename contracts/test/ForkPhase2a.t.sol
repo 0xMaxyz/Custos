@@ -7,11 +7,20 @@ pragma solidity 0.8.28;
  * Run with a live Mantle fork:
  *   forge test --fork-url $MANTLE_RPC_URL --match-contract ForkPhase2aTest -vv
  *
- * Verifies:
- *   2.1  SwapLib — USDC→USDY exactIn swap respects minOut on Merchant Moe.
- *   2.2  RWADynamicOracle — getPrice() returns plausible NAV; range is fresh.
- *   2.3  UsdyAdapter — deposit (USDC→USDY) + totalAssets oracle value;
- *         withdraw (USDY→USDC) returns ≥ minOut; full rebalance round-trip.
+ * Verifies the pieces that depend on **live on-chain state but not on a live swap**:
+ *   2.2  RWADynamicOracle — getPrice() returns plausible NAV; range probe is safe.
+ *   2.3  UsdyAdapter — constructs against the pinned aggregator + live oracle,
+ *         values an empty position at 0, and is not on the USDY blocklist.
+ *
+ * NOTE — why there is no live USDC→USDY swap here:
+ *   USDY execution now routes through a single pinned DEX **aggregator** (Odos on
+ *   Mantle): the adapter runs aggregator calldata and enforces a balance-delta
+ *   minOut. Reproducing that on a fork requires the aggregator's signed route
+ *   calldata for the exact fork block, which can't be fetched deterministically in
+ *   Foundry. The swap execution path (deposit/withdraw/emergency, minOut enforcement,
+ *   pinned-recipient safety) is fully covered by the offline mock suite in
+ *   Phase2a.t.sol; the off-chain route fetch is covered by the agent's 1delta
+ *   client tests. This fork suite covers only the live oracle + blocklist gates.
  */
 
 import {Test, console2} from "forge-std/Test.sol";
@@ -33,20 +42,15 @@ contract ForkPhase2aTest is Test {
     // USDY: Ondo Finance — verified via 1delta curated list + Fork.t.sol
     address internal constant USDY = 0x5bE26527e817998A7206475496fDE1E68957c5A6;
 
-    // Merchant Moe LB Router v2: docs.merchantmoe.com / contract-addresses
-    address internal constant MM_LB_ROUTER = 0xeaEE7EE68874218c3558b40063c42B82D3E7232a;
+    // Odos V2 router on Mantle — the single pinned aggregator the adapter executes
+    // against. MUST be re-verified on-chain (Phase 0.3 gate) before any deployment;
+    // only used for construction here (no live swap is performed in this suite).
+    address internal constant ODOS_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
 
     // USDY oracle: Ondo Redemption Price Oracle on Mantle. USDY.oracle() reverts,
     // so we use the documented constant (Ondo docs / Phase 0.3 gate). Exposes
     // getPrice(); currentRange() is not implemented (adapter handles via try/catch).
     address internal constant USDY_ORACLE = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
-
-    // ── Test params ───────────────────────────────────────────────────────────
-
-    // Merchant Moe USDC/USDY LBPair: bin step 1, version 2 (LBPair v2.1).
-    // Confirmed in Phase 0.4 gate (Fork.t.sol::testLiquidityGateUsdy).
-    uint256 constant DEFAULT_BIN_STEP = 1;
-    uint8   constant DEFAULT_VERSION  = 2;
 
     // ── Actors ────────────────────────────────────────────────────────────────
 
@@ -61,11 +65,6 @@ contract ForkPhase2aTest is Test {
     YieldVault    internal vault;
     UsdyAdapter   internal adapter;
 
-    uint256 constant DEPOSIT = 1_000e6; // $1k USDC
-
-    /// @dev Live oracle NAV read in setUp — passed as usdyDexSpotUsdc to rebalance().
-    uint256 internal liveNav;
-
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     function setUp() public {
@@ -79,14 +78,12 @@ contract ForkPhase2aTest is Test {
         vault = new YieldVault(USDC, admin, address(gr));
 
         adapter = new UsdyAdapter(
-            MM_LB_ROUTER,
+            ODOS_ROUTER,
             USDC,
             USDY,
             USDY_ORACLE,
             address(vault),
-            50,               // maxSlippageBps
-            DEFAULT_BIN_STEP,
-            DEFAULT_VERSION
+            50 // maxSlippageBps
         );
 
         vm.startPrank(admin);
@@ -98,11 +95,6 @@ contract ForkPhase2aTest is Test {
         vm.warp(block.timestamp + 2 days + 1);
         vm.prank(admin);
         vault.activateStrategy(2);
-
-        deal(USDC, user, DEPOSIT);
-
-        // Snapshot live oracle NAV for use as usdyDexSpotUsdc in rebalance calls.
-        liveNav = IRWADynamicOracle(USDY_ORACLE).getPrice();
     }
 
     // ── Task 2.2 — Oracle valuation ───────────────────────────────────────────
@@ -132,119 +124,12 @@ contract ForkPhase2aTest is Test {
         console2.log("[2.2] adapter.oracleData() rangeEnd (0 if range unsupported):", rangeEnd);
     }
 
-    // ── Task 2.3 — Deposit (USDC → USDY via Merchant Moe) ────────────────────
+    // ── Task 2.3 — Empty-position valuation ───────────────────────────────────
 
-    function testForkDepositSwapsUsdcToUsdy() public {
-        vm.startPrank(user);
-        IERC20(USDC).approve(address(vault), DEPOSIT);
-        vault.deposit(DEPOSIT, user);
-        vm.stopPrank();
-
-        assertEq(vault.totalAssets(), DEPOSIT);
-
-        // Rebalance: 50% idle, 50% USDY.
-        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
-        bytes[] memory sd = new bytes[](4);
-        vm.warp(block.timestamp + 2 hours);
-        vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-deposit", bytes32(0), liveNav);
-
-        uint256 usdyBal = IERC20(USDY).balanceOf(address(adapter));
-        assertGt(usdyBal, 0, "adapter should hold USDY after rebalance");
-        console2.log("[2.3] USDY in adapter after deposit rebalance:", usdyBal);
-
-        // totalAssets via oracle should be close to DEPOSIT/2 (half was swapped).
-        uint256 adapterValue = adapter.totalAssets();
-        assertApproxEqAbs(adapterValue, DEPOSIT / 2, DEPOSIT / 50); // ±2%
-        console2.log("[2.3] adapter.totalAssets():", adapterValue);
-    }
-
-    // ── Task 2.3 — Withdraw (USDY → USDC) ────────────────────────────────────
-
-    function testForkDepositAndFullWithdraw() public {
-        vm.startPrank(user);
-        IERC20(USDC).approve(address(vault), DEPOSIT);
-        vault.deposit(DEPOSIT, user);
-        vm.stopPrank();
-
-        // Rebalance into USDY.
-        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
-        bytes[] memory sd = new bytes[](4);
-        vm.warp(block.timestamp + 2 hours);
-        vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-wd-1", bytes32(0), liveNav);
-
-        // Warp 30 days to simulate USDY NAV growth.
-        vm.warp(block.timestamp + 30 days);
-
-        uint256 adapterAfterWarp = adapter.totalAssets();
-        console2.log("[2.3] adapter.totalAssets() after 30d warp:", adapterAfterWarp);
-
-        // Full redeem.
-        uint256 shares = vault.balanceOf(user);
-        uint256 balBefore = IERC20(USDC).balanceOf(user);
-        vm.startPrank(user);
-        vault.redeem(shares, user, user);
-        vm.stopPrank();
-
-        uint256 received = IERC20(USDC).balanceOf(user) - balBefore;
-        console2.log("[2.3] USDC received on full redeem:", received);
-        // Allow 1% slippage from DEPOSIT.
-        assertGe(received, DEPOSIT * 99 / 100, "received less than 99% of principal");
-    }
-
-    // ── Task 2.3 — maxWithdrawable ────────────────────────────────────────────
-
-    function testForkMaxWithdrawableLeToTotalAssets() public {
-        vm.startPrank(user);
-        IERC20(USDC).approve(address(vault), DEPOSIT);
-        vault.deposit(DEPOSIT, user);
-        vm.stopPrank();
-
-        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
-        bytes[] memory sd = new bytes[](4);
-        vm.warp(block.timestamp + 2 hours);
-        vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-mw", bytes32(0), liveNav);
-
-        uint256 mw = adapter.maxWithdrawable();
-        uint256 ta = adapter.totalAssets();
-        assertEq(mw, ta, "maxWithdrawable should equal totalAssets in Phase 2a");
-        console2.log("[2.3] maxWithdrawable:", mw, "totalAssets:", ta);
-    }
-
-    // ── Task 2.1 — SwapLib round-trip (USDC → USDY → USDC) ────────────────────
-
-    /// @notice Proves SwapLib.exactIn works both directions on Merchant Moe and
-    ///         that a full round-trip stays within ~2x the per-swap slippage cap.
-    function testForkSwapLibRoundTrip() public {
-        // Deposit + allocate fully into USDY (within the 60% cap → use 50%).
-        vm.startPrank(user);
-        IERC20(USDC).approve(address(vault), DEPOSIT);
-        vault.deposit(DEPOSIT, user);
-        vm.stopPrank();
-
-        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
-        bytes[] memory sd = new bytes[](4);
-        vm.warp(block.timestamp + 2 hours);
-        vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-phase2a-roundtrip-in", bytes32(0), liveNav);
-
-        uint256 usdyHeld = IERC20(USDY).balanceOf(address(adapter));
-        assertGt(usdyHeld, 0, "no USDY after first swap");
-
-        // Rebalance back to 100% idle — sells USDY → USDC (second swap leg).
-        uint16[4] memory back; back[0] = 10_000;
-        vm.warp(block.timestamp + 2 hours);
-        vm.prank(allocator);
-        vault.rebalance(back, sd, "ipfs://fork-phase2a-roundtrip-out", bytes32(0), 0);
-
-        assertEq(IERC20(USDY).balanceOf(address(adapter)), 0, "USDY not fully unwound");
-
-        // Round-trip cost should be roughly within 2 × maxSlippageBps (0.5%) = 1%.
-        uint256 tvl = vault.totalAssets();
-        console2.log("[2.1] TVL after USDC->USDY->USDC round trip:", tvl);
-        assertGe(tvl, DEPOSIT * 98 / 100, "round-trip lost more than ~2% to slippage");
+    function testForkEmptyPositionValuation() public view {
+        // No USDY held → totalAssets and maxWithdrawable are both 0 and equal.
+        assertEq(adapter.totalAssets(), 0, "empty adapter should value at 0");
+        assertEq(adapter.maxWithdrawable(), adapter.totalAssets(), "mw should equal totalAssets");
     }
 
     // ── Task 2.3 — Blocklist check (Phase 0.5 gate, adapter-specific) ─────────
@@ -254,7 +139,6 @@ contract ForkPhase2aTest is Test {
     ///         to revert silently. This gate must pass before activating the adapter
     ///         in any deployment (mainnet or testnet).
     function testForkUsdyAdapterNotBlocklisted() public view {
-        // Try the standard Ondo blocklist interface. USDY may expose isBlocked(address).
         _assertNotBlocked(address(vault),   "vault");
         _assertNotBlocked(address(adapter), "adapter");
     }
@@ -268,7 +152,6 @@ contract ForkPhase2aTest is Test {
             assertFalse(blocked, string.concat("USDY blocklist: ", label, " is blocked"));
             console2.log(string.concat("[0.5] USDY.isBlocked(", label, "):"), blocked);
         } else {
-            // Interface not exposed or call failed — transfer-based check is the fallback.
             console2.log(string.concat("[0.5] USDY.isBlocked not accessible for ", label, " (transfer test covers this)"));
         }
     }

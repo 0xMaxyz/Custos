@@ -410,21 +410,21 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         if (idle >= needed) return;
 
         uint256 remaining = needed - idle;
-        // Drain adapters in bucket order: AAVE first (instant liquidity), then others.
-        for (uint8 i = 1; i < NUM_BUCKETS && remaining > 0; i++) {
-            IStrategyAdapter adapter = adapters[i];
-            if (address(adapter) == address(0)) continue;
-
-            uint256 available = adapter.maxWithdrawable();
-            if (available == 0) continue;
-
-            uint256 toWithdraw = available < remaining ? available : remaining;
-            // minOut=0 is safe: Aave is 1:1 and UsdyAdapter.withdraw internally sets
-            // minOut = max(minOutUsdc, usdcAmount) so it always returns ≥ toWithdraw USDC.
-            // TODO(2b): for any future adapter that does NOT self-enforce minOut, derive
-            // a vault-side floor here: toWithdraw * (10_000 - guardrails.config().maxSlippageBps) / 10_000.
-            adapter.withdraw(toWithdraw, 0, address(this), "");
-            remaining = remaining > toWithdraw ? remaining - toWithdraw : 0;
+        // Synchronous redemptions are served only from INSTANT liquidity: idle USDC
+        // + the Aave adapter. USDY/AUSD are sourced via a DEX aggregator and can only
+        // be unwound with off-chain swap calldata (no empty-route default exists), so
+        // they are never drained on the user-redemption path — that is precisely what
+        // the `minInstantLiquidityBps` (15% = IDLE + Aave) guardrail guarantees. A
+        // redemption exceeding instant liquidity reverts; the agent must rebalance
+        // (supplying aggregator calldata) before it can be served.
+        IStrategyAdapter aave = adapters[BUCKET_AAVE];
+        if (address(aave) != address(0)) {
+            uint256 available = aave.maxWithdrawable();
+            if (available > 0) {
+                uint256 toWithdraw = available < remaining ? available : remaining;
+                // minOut=0 is safe: Aave is 1:1 USDC and self-enforces its floor.
+                aave.withdraw(toWithdraw, 0, address(this), "");
+            }
         }
 
         if (IERC20(asset()).balanceOf(address(this)) < needed) revert InsufficientLiquidity();

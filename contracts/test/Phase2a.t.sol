@@ -7,7 +7,7 @@ pragma solidity 0.8.28;
  * Run:  forge test --no-match-contract 'Fork' --match-contract Phase2aTest -vv
  *
  * Covers:
- *  2.1  SwapLib — exactIn path (exercised via UsdyAdapter deposit/withdraw)
+ *  2.1  AggregatorSwapLib — pinned-router exec + balance-delta minOut (via UsdyAdapter)
  *  2.2  USDY oracle valuation — totalAssets(), oracleData(), staleness guard
  *  2.3  UsdyAdapter — access control, deposit, withdraw, emergencyWithdrawAll
  *       YieldVault._buildMarketState — reads USDY oracle via IUsdyAdapter
@@ -28,11 +28,12 @@ import {IERC20}         from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Roles}        from "../src/Roles.sol";
 import {Guardrails}   from "../src/Guardrails.sol";
 import {YieldVault}   from "../src/YieldVault.sol";
-import {UsdyAdapter}  from "../src/UsdyAdapter.sol";
-import {IUsdyAdapter} from "../src/interfaces/IUsdyAdapter.sol";
+import {UsdyAdapter}      from "../src/UsdyAdapter.sol";
+import {IUsdyAdapter}     from "../src/interfaces/IUsdyAdapter.sol";
+import {AggregatorSwapLib} from "../src/AggregatorSwapLib.sol";
 
 import {MockRWADynamicOracle}  from "./mocks/MockRWADynamicOracle.sol";
-import {MockMerchantMoeRouter} from "./mocks/MockMerchantMoeRouter.sol";
+import {MockAggregatorRouter}  from "./mocks/MockAggregatorRouter.sol";
 import {MockStrategyAdapter}   from "./mocks/MockStrategyAdapter.sol";
 
 // ── Minimal ERC-20 with mint (used for USDC and USDY in tests) ────────────────
@@ -84,7 +85,7 @@ contract Phase2aTest is Test {
     ERC20Mock              internal usdc;
     ERC20Mock              internal usdy;
     MockRWADynamicOracle   internal oracle;
-    MockMerchantMoeRouter  internal router;
+    MockAggregatorRouter   internal router;
     Guardrails             internal gr;
     YieldVault             internal vault;
     UsdyAdapter            internal adapter;
@@ -104,7 +105,7 @@ contract Phase2aTest is Test {
         usdc   = new ERC20Mock("USD Coin", "USDC", 6);
         usdy   = new ERC20Mock("USDY",     "USDY", 18);
         oracle = new MockRWADynamicOracle(NAV, ORACLE_END);
-        router = new MockMerchantMoeRouter();
+        router = new MockAggregatorRouter();
 
         // Exchange rates: NAV=1e18 → 1 USDC ↔ 1 USDY (adjusted for decimals)
         // USDC(6dec) → USDY(18dec): multiply by 1e12
@@ -121,9 +122,7 @@ contract Phase2aTest is Test {
             address(usdy),
             address(oracle),
             address(vault),
-            50,   // maxSlippageBps (0.5%)
-            1,    // defaultBinStep
-            2     // defaultVersion
+            50    // maxSlippageBps (0.5%)
         );
 
         vm.startPrank(admin);
@@ -139,6 +138,20 @@ contract Phase2aTest is Test {
         // Pre-fund router so it can pay out on swaps.
         usdc.mint(address(router), 100_000e6);
         usdy.mint(address(router), 100_000e18);
+    }
+
+    // ── Aggregator swap calldata helpers (mirrors what the off-chain agent builds) ─
+    /// USDC→USDY aggregator calldata paying the adapter.
+    function _buyUsdy(uint256 usdcIn) internal view returns (bytes memory) {
+        return abi.encodeCall(
+            MockAggregatorRouter.swap, (address(usdc), address(usdy), usdcIn, address(adapter))
+        );
+    }
+    /// USDY→USDC aggregator calldata paying the adapter.
+    function _sellUsdy(uint256 usdyIn) internal view returns (bytes memory) {
+        return abi.encodeCall(
+            MockAggregatorRouter.swap, (address(usdy), address(usdc), usdyIn, address(adapter))
+        );
     }
 
     // ── Task 2.2 — USDY oracle valuation ─────────────────────────────────────
@@ -229,27 +242,49 @@ contract Phase2aTest is Test {
         usdc.approve(address(adapter), DEPOSIT);
 
         vm.prank(address(vault));
-        adapter.deposit(DEPOSIT, "");
+        adapter.deposit(DEPOSIT, _buyUsdy(DEPOSIT));
 
-        // Vault's USDC is gone; adapter now holds USDY (via router).
+        // Vault's USDC is gone; adapter now holds USDY (via aggregator).
         assertEq(usdc.balanceOf(address(vault)), 0);
-        // Router sends USDY to adapter: 1000e6 * 1e12 / 1 = 1000e18
+        // Aggregator sends USDY to adapter: 1000e6 * 1e12 / 1 = 1000e18
         assertEq(usdy.balanceOf(address(adapter)), USDY_EQUIV);
         // totalAssets = 1000e18 * 1e18 / 1e30 = 1000e6
         assertEq(adapter.totalAssets(), DEPOSIT);
     }
 
-    function test_DepositEnforcesMinUsdyOutViaRouter() public {
+    function test_DepositEnforcesMinUsdyOutViaBalanceDelta() public {
         usdc.mint(address(vault), DEPOSIT);
         vm.prank(address(vault));
         usdc.approve(address(adapter), DEPOSIT);
 
-        // Make router return zero — minUsdy check in router fails.
-        router.setShouldReturnZero(true);
-        // minOut = USDY_EQUIV * 9950/10000 = 995e18 > 0, so router revert fires.
+        // Aggregator underpays (returns half) — adapter's balance-delta minOut fails.
+        router.setShouldUnderpay(true);
+        // minUsdy = USDY_EQUIV * 9950/10000 = 995e18; received 500e18 → revert.
         vm.prank(address(vault));
-        vm.expectRevert("MockRouter: amountOut < amountOutMin");
+        vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput (selector-only match unavailable for errors with args)
+        adapter.deposit(DEPOSIT, _buyUsdy(DEPOSIT));
+    }
+
+    function test_DepositRevertsEmptySwapData() public {
+        usdc.mint(address(vault), DEPOSIT);
+        vm.prank(address(vault));
+        usdc.approve(address(adapter), DEPOSIT);
+        // No aggregator route supplied → fail-closed (no on-chain default exists).
+        vm.prank(address(vault));
+        vm.expectRevert(AggregatorSwapLib.EmptySwapData.selector);
         adapter.deposit(DEPOSIT, "");
+    }
+
+    function test_DepositRevertsWhenOutputPaidElsewhere() public {
+        usdc.mint(address(vault), DEPOSIT);
+        vm.prank(address(vault));
+        usdc.approve(address(adapter), DEPOSIT);
+        // Calldata pays `rando`, not the adapter → measured delta is 0 → revert.
+        bytes memory evil =
+            abi.encodeCall(MockAggregatorRouter.swap, (address(usdc), address(usdy), DEPOSIT, rando));
+        vm.prank(address(vault));
+        vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput (selector-only match unavailable for errors with args)
+        adapter.deposit(DEPOSIT, evil);
     }
 
     // ── Task 2.3 — withdraw ───────────────────────────────────────────────────
@@ -261,31 +296,32 @@ contract Phase2aTest is Test {
 
         uint256 vaultBefore = usdc.balanceOf(address(vault));
         vm.prank(address(vault));
-        adapter.withdraw(DEPOSIT, 0, address(vault), "");
+        // Sell the full USDY balance → 1000e18 * 1 / 1e12 = 1000e6 USDC.
+        adapter.withdraw(DEPOSIT, 0, address(vault), _sellUsdy(USDY_EQUIV));
 
         uint256 received = usdc.balanceOf(address(vault)) - vaultBefore;
-        // Router returns at least DEPOSIT (with slippage buffer, sells slightly more USDY).
+        // Realized USDC must be ≥ DEPOSIT (minOut floor enforced by balance delta).
         assertGe(received, DEPOSIT);
         console2.log("[2.3] USDC received on withdraw:", received);
     }
 
     function test_WithdrawEnforcesMinOut() public {
         usdy.mint(address(adapter), USDY_EQUIV);
-        router.setShouldReturnZero(true);
+        router.setShouldUnderpay(true);
 
         vm.prank(address(vault));
-        // minOut = DEPOSIT (usdcAmount), router returns 0 → revert
-        vm.expectRevert("MockRouter: amountOut < amountOutMin");
-        adapter.withdraw(DEPOSIT, 0, address(vault), "");
+        // minOut = DEPOSIT; aggregator underpays (500e6 < 1000e6) → revert.
+        vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput (selector-only match unavailable for errors with args)
+        adapter.withdraw(DEPOSIT, 0, address(vault), _sellUsdy(USDY_EQUIV));
     }
 
     function test_WithdrawRespectsExplicitMinOut() public {
         usdy.mint(address(adapter), USDY_EQUIV);
-        // Request more than we can get — should revert.
-        uint256 strictMinOut = DEPOSIT * 2; // unreachable
+        // Request more than the route can deliver — should revert.
+        uint256 strictMinOut = DEPOSIT * 2; // unreachable: route yields 1000e6
         vm.prank(address(vault));
-        vm.expectRevert("MockRouter: amountOut < amountOutMin");
-        adapter.withdraw(DEPOSIT, strictMinOut, address(vault), "");
+        vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput (selector-only match unavailable for errors with args)
+        adapter.withdraw(DEPOSIT, strictMinOut, address(vault), _sellUsdy(USDY_EQUIV));
     }
 
     // ── Task 2.3 — emergencyWithdrawAll ──────────────────────────────────────
@@ -295,33 +331,17 @@ contract Phase2aTest is Test {
 
         uint256 balBefore = usdc.balanceOf(address(vault));
         vm.prank(address(vault));
-        adapter.emergencyWithdrawAll(0, address(vault), "");
+        adapter.emergencyWithdrawAll(0, address(vault), _sellUsdy(USDY_EQUIV));
 
         assertEq(usdy.balanceOf(address(adapter)), 0);
         assertGt(usdc.balanceOf(address(vault)) - balBefore, 0);
     }
 
     function test_EmergencyWithdrawAllNoop_WhenEmpty() public {
+        // No USDY held → early-return before any swap, so empty calldata is fine.
         vm.prank(address(vault));
         uint256 out = adapter.emergencyWithdrawAll(0, address(vault), "");
         assertEq(out, 0);
-    }
-
-    // ── swapData override path ────────────────────────────────────────────────
-
-    function test_DepositUsesSwapDataPath() public {
-        usdc.mint(address(vault), DEPOSIT);
-        vm.prank(address(vault));
-        usdc.approve(address(adapter), DEPOSIT);
-
-        // Encode custom path (same bin step, different version to exercise decode branch).
-        uint256[] memory bs = new uint256[](1); bs[0] = 5;
-        uint8[]   memory vs = new uint8[](1);   vs[0] = 1;
-        bytes memory swapData = abi.encode(bs, vs);
-
-        vm.prank(address(vault));
-        adapter.deposit(DEPOSIT, swapData); // should not revert — router ignores path params in mock
-        assertEq(usdy.balanceOf(address(adapter)), USDY_EQUIV);
     }
 
     // ── YieldVault integration — _buildMarketState reads USDY oracle ──────────
@@ -345,6 +365,7 @@ contract Phase2aTest is Test {
         // Max move = 50% of TVL — exactly at the 5000 bps cap.
         uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
+        sd[2] = _buyUsdy(DEPOSIT / 2); // 50% of $1k TVL → buy $500 of USDY
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://phase2a-test", bytes32(0), NAV);
 
@@ -367,6 +388,7 @@ contract Phase2aTest is Test {
         vm.warp(block.timestamp + 2 hours);
         uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
+        sd[2] = _buyUsdy(DEPOSIT / 2);
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), NAV);
 
@@ -374,8 +396,11 @@ contract Phase2aTest is Test {
         assertGt(usdyBefore, 0);
 
         // Guardian triggers deRisk (no oracle condition required for guardian).
+        // Supply aggregator calldata to unwind the full USDY balance.
+        bytes[] memory exit = new bytes[](4);
+        exit[2] = _sellUsdy(usdyBefore);
         vm.prank(guardian);
-        vault.deRisk(0, sd, "test de-risk", bytes32("evidence"), 0);
+        vault.deRisk(0, exit, "test de-risk", bytes32("evidence"), 0);
 
         // USDY bucket should be empty; USDC back in vault.
         assertEq(usdy.balanceOf(address(adapter)), 0);

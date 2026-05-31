@@ -5,6 +5,7 @@ on:
     branches: ["claude/features", "claude/**", "cursor/**", "main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch: # on-demand fork tests against live Mantle mainnet
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -18,9 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here — pnpm/action-setup@v4 reads it from the root
+      # package.json `packageManager` field. Pinning both causes the action to
+      # fail with "Multiple versions of pnpm specified".
       - uses: pnpm/action-setup@v4
-        with:
-          version: latest
 
       - uses: actions/setup-node@v4
         with:
@@ -66,12 +68,23 @@ jobs:
         # setUp() needs a live Mantle fork. Pattern matches any contract named *Fork*.
         run: forge test --no-match-contract 'Fork' -vv
 
-  # ── Fork tests (live Mantle RPC — only on pushes to main/feature branches) ───
+  # ── Fork tests (live Mantle RPC — post-merge on main only) ───────────────────
+  # These hit live Mantle mainnet (DEX liquidity, oracle NAV, Aave) so their
+  # result depends on real-time on-chain state — e.g. USDC→USDY DEX routability.
+  # Running them on every feature branch / PR would gate unrelated work (like
+  # frontend PRs) on live liquidity, so restrict to pushes to `main` where a
+  # failure is a genuine liquidity/integration regression signal. Run manually
+  # via the Actions tab (workflow_dispatch) when validating contract changes.
   fork-tests:
     name: Solidity — fork tests (Mantle mainnet)
     runs-on: ubuntu-latest
-    # Skip if the secret is absent (forks, first-time contributors).
-    if: ${{ vars.MANTLE_RPC_URL != '' || secrets.MANTLE_RPC_URL != '' }}
+    # `secrets` is NOT available in a job-level `if:`, so gate on the `vars` flag
+    # (set MANTLE_RPC_URL as a repo *variable* alongside the secret to enable);
+    # the secret still supplies the actual URL in the step env below.
+    if: >-
+      ${{ vars.MANTLE_RPC_URL != ''
+        && ((github.event_name == 'push' && github.ref == 'refs/heads/main')
+            || github.event_name == 'workflow_dispatch') }}
     steps:
       - uses: actions/checkout@v4
         with:

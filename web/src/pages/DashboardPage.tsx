@@ -5,7 +5,10 @@ import { Icon } from "../components/Icons";
 import { Card, Skeleton, EmptyState, InfoTip, ConfidenceMeter, SignalBadge } from "../components/Components";
 import { AllocationChart, AllocationLegend, Sparkline, PegGauge } from "../components/Charts";
 import * as fmt from "../lib/fmt";
-import { RISK, decisions, position, vault, baseline } from "../lib/data";
+import { RISK, decisions } from "../lib/data";
+import { useVaultData } from "../lib/useVaultData";
+import type { PositionState, VaultState } from "../lib/data";
+import type { VaultData } from "../lib/useVaultData";
 import type { Route } from "../components/Shell";
 
 function AgentStatusCard({ go }: { go: (r: Route) => void }) {
@@ -43,8 +46,7 @@ function AgentStatusCard({ go }: { go: (r: Route) => void }) {
   );
 }
 
-function BaselineCounter() {
-  const b = baseline;
+function BaselineCounter({ baseline: b }: { baseline: VaultData["baseline"] }) {
   return (
     <Card className="baseline">
       <div className="card-hl">
@@ -84,8 +86,9 @@ function BaselineCounter() {
   );
 }
 
-function PositionCard({ connected, empty, paused, killed, onDeposit, onWithdraw, onConnect }: {
+function PositionCard({ connected, empty, paused, killed, vault, position, onDeposit, onWithdraw, onConnect }: {
   connected: boolean; empty: boolean; paused: boolean; killed: boolean;
+  vault: VaultState; position: PositionState;
   onDeposit: () => void; onWithdraw: () => void; onConnect: () => void;
 }) {
   if (!connected) {
@@ -140,7 +143,7 @@ function PositionCard({ connected, empty, paused, killed, onDeposit, onWithdraw,
   );
 }
 
-function AllocationCard() {
+function AllocationCard({ vault }: { vault: VaultState }) {
   const instant = parseFloat(vault.instantWithdrawableUsdc);
   const tvl = parseFloat(vault.tvlUsdc);
   const instantPct = Math.round((instant / tvl) * 100);
@@ -171,7 +174,7 @@ function AllocationCard() {
   );
 }
 
-function VaultStatsCard() {
+function VaultStatsCard({ vault }: { vault: VaultState }) {
   const [open, setOpen] = useState(false);
   const tvl = parseFloat(vault.tvlUsdc), cap = parseFloat(vault.tvlCapUsdc);
   const usedPct = Math.round((tvl / cap) * 100);
@@ -226,6 +229,8 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ connected, paused, killed, emptyPosition, go, onDeposit, onWithdraw, onConnect, loading }: DashboardPageProps) {
+  const { vault, position, baseline } = useVaultData();
+
   if (loading) {
     return (
       <div className="page">
@@ -246,12 +251,12 @@ export function DashboardPage({ connected, paused, killed, emptyPosition, go, on
       </div>
       <div className="grid" style={{ gap: 16 }}>
         <AgentStatusCard go={go} />
-        <BaselineCounter />
+        <BaselineCounter baseline={baseline} />
         <div className="grid dash-cols">
-          <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
-          <AllocationCard />
+          <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} vault={vault} position={position} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
+          <AllocationCard vault={vault} />
         </div>
-        <VaultStatsCard />
+        <VaultStatsCard vault={vault} />
       </div>
     </div>
   );

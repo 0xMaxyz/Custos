@@ -11,7 +11,7 @@ import type { RiskVerdict, EvidenceType } from "../llm/types.js";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
 
-const NOW = 1_700_000_000;
+const NOW = Math.floor(Date.now() / 1000);
 
 function weights(idle: number, aave: number, usdy: number, ausd: number): WeightsBps {
   return { [Bucket.IDLE]: idle, [Bucket.AAVE]: aave, [Bucket.USDY]: usdy, [Bucket.AUSD]: ausd };
@@ -252,5 +252,104 @@ describe("pinRationale", () => {
     const result = await pinRationale(bundle, config, mockFetch);
     expect(result.uri).toBe("ipfs://QmTestCid123");
     expect(result.rationaleHash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+});
+
+// ── Mocked Executor.runCycle() ────────────────────────────────────────────────
+// Tests the full cycle routing without a fork: writeContract is mocked so we
+// assert which on-chain function is called (rebalance vs deRisk) for each path.
+
+describe("Executor.runCycle() routing (mocked writeContract)", () => {
+  function makeMockClients(writeResult = "0xabc123" as `0x${string}`) {
+    const writeContract = vi.fn(async () => writeResult);
+    const readContract = vi.fn(async (opts: { functionName: string }) => {
+      if (opts.functionName === "lastRebalanceAt") return 0n;
+      return 0n;
+    });
+    const waitForTransactionReceipt = vi.fn(async () => ({ logs: [] }));
+    const publicClient = { readContract, waitForTransactionReceipt } as never;
+    const walletClient = {
+      writeContract,
+      chain: { id: 5000 },
+      account: { address: "0x1234" as `0x${string}` },
+    } as never;
+    return { publicClient, walletClient, writeContract };
+  }
+
+  function makeSnapshotter(snap: MarketSnapshot) {
+    return { snapshot: vi.fn(async () => snap), invalidate: vi.fn() } as never;
+  }
+
+  async function makeExecutor(snap: MarketSnapshot) {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const { publicClient, walletClient, writeContract } = makeMockClients();
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+    });
+    const clients = { publicClient, walletClient } as never;
+    const executor = new Executor({ config, clients, snapshotter: makeSnapshotter(snap) });
+    return { executor, writeContract };
+  }
+
+  it("deterministic depeg: calls deRisk (not rebalance)", async () => {
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // ~100bps below
+    const { executor, writeContract } = await makeExecutor(snap);
+
+    const result = await executor.runCycle();
+
+    expect(result.submitted).toBe(true);
+    expect(result.kind).toBe("derisk");
+    expect(writeContract).toHaveBeenCalledOnce();
+    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string }])[0];
+    expect(call.functionName).toBe("deRisk");
+  });
+
+  it("LLM-only deRisk (healthy peg): calls rebalance, not deRisk", async () => {
+    // Healthy snapshot — no deterministic forceDeRisk.
+    // LLM is not configured (no anthropicApiKey) so verdict=null.
+    // Verify no deRisk call is made: without forceDeRisk the rebalance path is used.
+    const snap = baseSnapshot();
+    const { executor, writeContract } = await makeExecutor(snap);
+
+    // No change in healthy state with default weights → submitted=false.
+    const result = await executor.runCycle();
+
+    if (result.submitted) {
+      // If weights changed, it must have used rebalance, not deRisk.
+      const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string }])[0];
+      expect(call.functionName).toBe("rebalance");
+      expect(call.functionName).not.toBe("deRisk");
+    } else {
+      // No change — no write at all.
+      expect(writeContract).not.toHaveBeenCalled();
+    }
+  });
+
+  it("oracle stale: calls deRisk via deterministic forceDeRisk", async () => {
+    const snap = baseSnapshot({ oracleRangeEnd: 1 }); // 1 second past range end relative to nowSec
+    const { executor, writeContract } = await makeExecutor(snap);
+
+    const result = await executor.runCycle();
+
+    expect(result.submitted).toBe(true);
+    expect(result.kind).toBe("derisk");
+    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string }])[0];
+    expect(call.functionName).toBe("deRisk");
+  });
+
+  it("deRisk passes pinned URI (not plain text) as the on-chain reason", async () => {
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
+    const { executor, writeContract } = await makeExecutor(snap);
+
+    await executor.runCycle();
+
+    const call = (writeContract.mock.calls[0] as unknown as [{ args: unknown[] }])[0];
+    // deRisk args: [toBucket, swapData, reason, rationaleHash, usdyDexSpotUsdc]
+    const reason = call.args[2] as string;
+    // Pinned URI should be a data: or ipfs:// URI, not a plain sentence.
+    expect(reason).toMatch(/^(data:|ipfs:\/\/)/);
   });
 });

@@ -80,23 +80,35 @@ export class Executor {
     if (this.config.anthropicApiKey) {
       const llm = new AnthropicClient(this.config);
       const fetcher = buildEvidenceFetcher();
-      // Fetch evidence separately so it can be included in the pinned bundle.
       try { evidence = await fetcher(); } catch { evidence = []; }
       verdict = await runSignalLayer(snapshot, assessment, { llm, fetchEvidence: async () => evidence })
         .catch(() => null);
     }
 
-    // 4. Deterministic forceDeRisk always wins; honour LLM deRisk with cited evidence
-    //    only when the on-chain `evaluateUsdyRisk` conditions would allow it (i.e. the
-    //    depeg/oracle flag fired via the DEX spot we supply). Per SPEC §3.3 the LLM
-    //    may only tighten — if it requests deRisk, we treat it as forceDeRisk=true.
-    const llmDeRisk = verdict?.deRisk === true;
-    if (assessment.forceDeRisk || llmDeRisk) {
+    // 4. Route to deRisk or rebalance.
+    //
+    //    ALLOCATOR path: `deRisk()` on-chain requires `evaluateUsdyRisk` → `forceDeRisk`
+    //    (checked in YieldVault); calling it without that guard fires `DeRiskConditionNotMet`.
+    //    So we only call `_sendDeRisk()` when the deterministic engine raised `forceDeRisk`.
+    //
+    //    LLM-only deRisk (news/attestation hero path, ROADMAP 3.8):
+    //    When `verdict.deRisk === true` but `assessment.forceDeRisk` is false, the LLM
+    //    has detected a threat but on-chain conditions haven't tripped yet.  We honour
+    //    the tightening by routing through `rebalance()` with USDY clamped to 0 — this
+    //    achieves the same USDY→0 outcome through the regular rebalance path (which has
+    //    no guard precondition for ALLOCATOR).
+    if (assessment.forceDeRisk) {
       return this._sendDeRisk(snapshot, assessment, verdict, evidence);
     }
 
     // 5. Merge verdict with deterministic assessment.
-    const proposed = applyVerdict(assessment, verdict);
+    // If LLM requested deRisk (news path), force maxUsdy=0 so applyVerdict zeros USDY.
+    const llmDeRisk = verdict?.deRisk === true;
+    const effectiveVerdict = llmDeRisk && verdict
+      ? { ...verdict, usdyMaxWeightBps: 0 }
+      : verdict;
+
+    const proposed = applyVerdict(assessment, effectiveVerdict);
 
     // 6. Read chain context for the interval check.
     const lastRebalanceAt = await this.public.readContract({
@@ -129,7 +141,7 @@ export class Executor {
       return { submitted: false, reason: "No allocation change needed" };
     }
 
-    return this._sendRebalance(snapshot, assessment, verdict, evidence, finalWeights);
+    return this._sendRebalance(snapshot, assessment, effectiveVerdict, evidence, finalWeights);
   }
 
   private async _sendRebalance(
@@ -174,9 +186,8 @@ export class Executor {
     evidence: EvidenceItem[],
   ): Promise<CycleResult> {
     const flags = assessment.flags.join(", ");
-    const reason = verdict?.rationale ?? `Emergency de-risk: ${flags}`;
     const bundle: RationaleBundle = {
-      rationale: reason,
+      rationale: verdict?.rationale ?? `Emergency de-risk: ${flags}`,
       signals: (verdict?.signals ?? []) as RiskSignal[],
       evidence,
       candidateWeightsBps: assessment.candidateWeightsBps,
@@ -184,14 +195,15 @@ export class Executor {
       asOf: snapshot.asOf,
     };
 
-    const { rationaleHash } = await pinRationale(bundle, this.config);
+    // Pin the evidence bundle and use the URI as the on-chain reason/decisionURI field.
+    const { uri, rationaleHash } = await pinRationale(bundle, this.config);
     const emptySwap = ["0x", "0x", "0x", "0x"] as const;
 
     const hash = await this.wallet.writeContract({
       address: this.vault,
       abi: yieldVaultWriteAbi,
       functionName: "deRisk",
-      args: [0, emptySwap, reason, rationaleHash, snapshot.usdyDexSpotUsdc],
+      args: [0, emptySwap, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
       chain: this.wallet.chain,
       account: this.wallet.account!,
     });
@@ -227,7 +239,8 @@ function buildDeterministicRationale(assessment: ReturnType<typeof assess>): str
 
 /**
  * Extract decisionId from a `DecisionRecorded(uint256 indexed decisionId, ...)` event.
- * Filters by topic0 (event signature hash) to avoid mis-identifying other indexed events.
+ * Filters by topic0 (event signature hash) and vault address to avoid mis-identifying
+ * other indexed events from unrelated contracts.
  */
 function extractDecisionId(
   receipt: { logs: { address?: string; topics: readonly `0x${string}`[] }[] },

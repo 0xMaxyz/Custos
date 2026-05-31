@@ -31,6 +31,7 @@ Concrete specifications referenced by `PLAN.md` (strategy) and `ROADMAP.md`
 | `maxWeightBps[USDY]` | `6000` (60%) | Max share in the RWA yield core |
 | `maxWeightBps[AAVE]` | `9000` (90%) | Max share in Aave |
 | `maxWeightBps[AUSD]` | `10000` (100%) | Safety bucket may absorb all on de-risk |
+| `maxUsdyNotionalUsdc` | `$5,000` (0 = off) | Absolute USDY exposure cap; tracks real Mantle aggregator pool depth (~$1.5k total) independent of TVL/`maxWeightBps`. Checked on USDY-weight increase. |
 | `minIdleBps` | `200` (2%) | Always-idle USDC for tiny withdrawals |
 | `minInstantLiquidityBps` | `1500` (15%) | `IDLE + Aave-withdrawable` ≥ 15% of TVL after any rebalance |
 | weights sum | `== 10000` | Target weights must total 100% |
@@ -94,7 +95,9 @@ interface IStrategyAdapter {
     function maxWithdrawable() external view returns (uint256 usdcValue);
 
     /// @notice Deploy `usdcAmount` from the vault into the strategy.
-    /// @param swapData optional route hint (e.g. 1delta), validated against minOut on-chain.
+    /// @param swapData route data — for `UsdyAdapter` this is the calldata for the pinned
+    ///        aggregator router (from 1delta's routing quote); minOut is re-derived from the
+    ///        oracle and enforced on-chain via a balance-delta check. Empty for direct adapters.
     function deposit(uint256 usdcAmount, bytes calldata swapData) external returns (uint256 deployedUsdcValue);
 
     /// @notice Withdraw approximately `usdcAmount`, sending USDC to `to`, enforcing `minOut`.
@@ -163,6 +166,7 @@ interface IGuardrails {
         uint16[4] maxWeightBps;          // per bucket
         uint16 minIdleBps;
         uint16 minInstantLiquidityBps;
+        uint256 maxUsdyNotionalUsdc;     // absolute USDY exposure cap (6-dec USDC; 0 = disabled)
         uint16 maxSlippageBps;
         uint16 maxRebalanceMoveBps;
         uint32 minRebalanceInterval;

@@ -2,6 +2,7 @@ import {
   Bucket,
   MAX_WEIGHT_BPS,
   MAX_REBALANCE_MOVE_BPS,
+  MAX_USDY_NOTIONAL_USDC,
   MIN_IDLE_BPS,
   MIN_INSTANT_LIQUIDITY_BPS,
   MIN_REBALANCE_INTERVAL,
@@ -25,6 +26,7 @@ export type ValidationError =
   | "REBALANCE_TOO_SOON"
   | "MOVE_EXCEEDS_MAX"
   | "USDY_EXCEEDS_GUARDRAIL"
+  | "USDY_NOTIONAL_EXCEEDS_CAP"
   | "USDY_SPOT_REQUIRED"
   | "USDY_PEG_BLOCKED";
 
@@ -108,7 +110,16 @@ function checkErrors(
   // 7a. USDY guardrail ceiling.
   if (proposed[Bucket.USDY] > maxUsdyWeightBpsAllowed) errors.push("USDY_EXCEEDS_GUARDRAIL");
 
-  // 7b–7c. USDY depeg guard — only when weight is increasing (mirrors Guardrails check 7).
+  // 7b. Absolute USDY notional cap — only when weight is increasing (mirrors
+  //     Guardrails check 7 notional gate). 0 = disabled.
+  if (proposed[Bucket.USDY] > current[Bucket.USDY] && MAX_USDY_NOTIONAL_USDC > 0) {
+    const postUsdyNotional = (BigInt(proposed[Bucket.USDY]) * snapshot.totalAssetsUsdc) / 10_000n;
+    if (postUsdyNotional > BigInt(MAX_USDY_NOTIONAL_USDC)) {
+      errors.push("USDY_NOTIONAL_EXCEEDS_CAP");
+    }
+  }
+
+  // 7c–7d. USDY depeg guard — only when weight is increasing (mirrors Guardrails check 7).
   if (proposed[Bucket.USDY] > current[Bucket.USDY]) {
     if (snapshot.usdyOracleNavUsdc > 0n && snapshot.usdyDexSpotUsdc === 0n) {
       // Fail-closed: oracle live but no DEX spot → revert on-chain as UsdySpotRequired.
@@ -194,7 +205,13 @@ export function validateProposal(
     return { valid: false, errors };
   }
 
-  const repaired = repair(proposed, maxUsdyWeightBpsAllowed);
+  // Fold the absolute USDY notional cap into the weight ceiling repair clamps to,
+  // so an over-cap USDY proposal is auto-repaired down to a fillable size.
+  const notionalCeilBps =
+    snapshot.totalAssetsUsdc > 0n && MAX_USDY_NOTIONAL_USDC > 0
+      ? Number((BigInt(MAX_USDY_NOTIONAL_USDC) * 10_000n) / snapshot.totalAssetsUsdc)
+      : 10_000;
+  const repaired = repair(proposed, Math.min(maxUsdyWeightBpsAllowed, notionalCeilBps));
 
   // Re-check the repaired weights without recursion.
   const recheckErrors = checkErrors(repaired, current, snapshot, maxUsdyWeightBpsAllowed, ctx);

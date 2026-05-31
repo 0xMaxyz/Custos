@@ -179,12 +179,22 @@ guardrails, and deposit/withdraw.
 **Phase goal:** USDY bucket via DEX with oracle valuation, the depeg/oracle guard,
 the de-risk path, and the on-chain decision/benchmark ledger.
 
-### 2.1 — DEX swap library · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5)
+### 2.1 — DEX swap library · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5) · **REVISED PR-2d**
 
 - **What:** minimal `exactIn` swap wrapper for the chosen Mantle router with
   `minOut` + `deadline`; configured paths USDC↔USDY, USDC↔AUSD.
 - **Goal:** trustless swaps with on-chain slippage protection.
 - **Test:** fork test: USDC→USDY→USDC respects `minOut`; slippage within guardrail.
+- **⚠ REVISED (PR-2d):** Mantle USDY liquidity is fragmented across thin pools
+  (Agni USDY/USDT ~$0.97k, iZiSwap & Butter USDY/USDC ~$0.63k — ~$1.5k total), so a
+  single-pool Merchant Moe route is unusable. Replaced `SwapLib` (Merchant Moe LB)
+  with **`AggregatorSwapLib`**: `UsdyAdapter` runs swap calldata against ONE pinned,
+  allow-listed aggregator router (Odos on Mantle) and enforces an oracle-derived
+  **balance-delta `minOut`** (router output never trusted; output must land on the
+  adapter or the 0-delta reverts). Off-chain route comes from 1delta's routing quote
+  (`OneDeltaClient.getSwapQuote`). Boundary impact documented in `AGENTS.md` §2.1 /
+  `CLAUDE.md` #1. Swap-exec covered by offline mock tests (`Phase2a.t.sol`); live
+  fork swap dropped (can't generate aggregator calldata deterministically on a fork).
 
 ### 2.2 — USDY valuation via `RWADynamicOracle` · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5)
 
@@ -193,7 +203,7 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Test:** fork test: USDY holdings valued at oracle price; simulated stale oracle
   flips the staleness flag.
 
-### 2.3 — `UsdyAdapter` · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5)
+### 2.3 — `UsdyAdapter` · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5) · **REVISED PR-2d**
 
 - **What:** allocate = swap USDC→USDY (`minOut`); withdraw = swap USDY→USDC
   (`minOut`); `totalAssets` via oracle; `maxWithdrawable` via liquidity cap;
@@ -201,6 +211,13 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Goal:** USDY is a managed bucket the vault can enter/exit.
 - **Test:** fork test: rebalance into USDY; `totalAssets` stable; withdraw unwinds
   USDY→USDC ≥ `minOut`.
+- **⚠ REVISED (PR-2d):** executes via the pinned aggregator (see 2.1). Constructor
+  drops the Merchant Moe bin-step/version params; `swapData` now carries aggregator
+  calldata (empty reverts — no on-chain default route). Consequence: synchronous
+  user redemptions are served only from **instant liquidity (IDLE + Aave)**, since
+  USDY can only be unwound with off-chain calldata — `YieldVault._ensureLiquidity`
+  no longer drains USDY/AUSD on the redeem path (matches the 15% `minInstantLiquidityBps`
+  floor). Also added Guardrails `maxUsdyNotionalUsdc` ($5k) absolute USDY cap.
 
 ### 2.4 — Depeg / oracle-deviation guard · _PR-2b_ · `[x] DONE` · [PR #6](https://github.com/0xMaxyz/miu/pull/6)
 

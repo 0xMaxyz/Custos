@@ -30,11 +30,22 @@ product. See `PLAN.md`.
 ## 2. Non-negotiable rules
 
 1. **Data vs. execution boundary.** The **1delta API** may be used for **reading
-   data** and **optional swap routing only**. It must **NEVER** be in the
-   custody/execution path. The vault must **never execute arbitrary third-party
-   calldata.** Execution happens only through our own audited adapters
-   (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`) that call protocols/DEXs
-   directly with on-chain `minOut`/guardrail checks.
+   data** and **swap routing/quoting only** (it aggregates Odos/Eisen/Nordstern).
+   It must **NEVER** be in the custody/execution path. The vault must **never
+   execute arbitrary third-party calldata.** Execution happens only through our own
+   audited adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`).
+   **Aggregator exception (USDY only):** because USDY liquidity on Mantle is
+   fragmented across thin pools (Agni USDY/USDT, iZiSwap & Butter USDY/USDC —
+   together ~$1.5k), no single-pool route is usable. `UsdyAdapter` may run swap
+   calldata against **one pinned, allow-listed aggregator router** (Odos on Mantle,
+   immutable at deploy) — but this is *not* "arbitrary calldata", because the
+   adapter (a) only ever targets that single pinned address, (b) enforces a
+   **balance-delta `minOut`** it derives itself from the Ondo oracle NAV (the
+   router's reported output is never trusted), and (c) requires output to land on
+   the adapter, so calldata paying anyone else nets a 0 delta and reverts
+   (fail-closed). Aave/AUSD adapters still call their protocols/DEXs directly with
+   on-chain `minOut`. The aggregator router address is verified on-chain (Phase-0
+   gate) and pinned; changing it requires a redeploy.
 2. **Guardrails are the final authority.** On-chain guardrails (see `SPEC.md` §1:
    max weight/bucket, min idle+Aave liquidity buffer, max slippage, token/venue
    whitelist, rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy

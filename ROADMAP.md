@@ -33,7 +33,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               | `[x] DONE` |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               | `[x] DONE` · [PR #11](https://github.com/0xMaxyz/miu/pull/11) |
 | PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card | `[x] DONE` (fixtures; live reads → PR-5a) · [PR #13](https://github.com/0xMaxyz/miu/pull/13) |
-| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             | `[~] IN PROGRESS` |
+| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             | `[~] IN PROGRESS` · [PR #14](https://github.com/0xMaxyz/miu/pull/14) |
 | PR-6a | 6.1–6.5 | Public deploy, docs, video, submission                                       |
 | PR-7  | 7.1–7.4 | Buffer / contingency                                                         |
 
@@ -459,7 +459,7 @@ existing `use*Data` seams (consumers unchanged).
 
 **Phase goal:** deploy + verify on mainnet; prove the full loop with small real funds.
 
-### 5.1 — Deploy scripts · _PR-5a_ · `[x] DONE`
+### 5.1 — Deploy scripts · _PR-5a_ · `[~] PARTIAL` · [PR #14](https://github.com/0xMaxyz/miu/pull/14)
 
 - **What:** `forge script` deploy (vault, adapters, guardrails, benchmark, identity),
   parameterized; save addresses to `packages/shared` + `deployments.json`.
@@ -475,9 +475,11 @@ existing `use*Data` seams (consumers unchanged).
   canonical ERC-8004 `register(agentCardUri)`. `deployments/5000.json` +
   `deployments/5003.json` templates; `packages/shared/src/deployments.ts` exports
   `getDeployment(chainId)`. Web `useVaultData` and `useGuardianData` now read live
-  on-chain when `VITE_VAULT_ADDRESS` is set (wagmi `useReadContracts` + `useWatchContractEvent`);
-  fixture fallback unchanged. `web/src/lib/vaultAbi.ts` — minimal ABI. 64 web tests + 103
-  Solidity tests all pass.
+  on-chain when `VITE_VAULT_ADDRESS` is set (wagmi `useReadContracts` + `useWatchContractEvent`
+  + `getLogs` history backfill); fixture fallback unchanged. `web/src/lib/vaultAbi.ts` —
+  minimal ABI. 64 web tests + 103 Solidity tests all pass.
+  **Testnet broadcast (5.1 acceptance gate) pending deployer run** (`DEPLOYER_PRIVATE_KEY` +
+  `MANTLE_TESTNET_RPC_URL` required). Once run, populate `deployments/5003.json` and mark DONE.
 
 ### 5.2 — Mainnet deploy + verify · _PR-5a_ · `[ ]` pending RPC + keys
 

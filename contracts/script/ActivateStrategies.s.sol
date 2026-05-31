@@ -24,13 +24,14 @@ contract ActivateStrategies is Script {
         // Bucket 1 = AAVE, Bucket 2 = USDY
         try vault.activateStrategy(1) {
             console2.log("Bucket 1 (AAVE) activated");
-        } catch Error(string memory r) {
-            console2.log("Bucket 1 skip:", r);
+        } catch {
+            // Custom errors (TimelockNotElapsed, NothingToWithdraw) land here too.
+            console2.log("Bucket 1 skip: timelock not elapsed or no pending adapter");
         }
         try vault.activateStrategy(2) {
             console2.log("Bucket 2 (USDY) activated");
-        } catch Error(string memory r) {
-            console2.log("Bucket 2 skip:", r);
+        } catch {
+            console2.log("Bucket 2 skip: timelock not elapsed or no pending adapter");
         }
         vm.stopBroadcast();
     }

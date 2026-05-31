@@ -1,11 +1,12 @@
 // Risk-guardian + identity data seams (ROADMAP 4.6 / 4.8 / 5.1).
 //
-// When VITE_VAULT_ADDRESS is set, reads live DecisionRecorded events from the
-// vault and the agent identity from the ERC-8004 canonical registry.
-// Until then returns typed fixtures. Consumers are unchanged.
+// When VITE_VAULT_ADDRESS is set, backfills historical DecisionRecorded events
+// via getLogs from block 0 then watches for new ones via useWatchContractEvent.
+// Reads the agent identity from the ERC-8004 canonical registry when VITE_AGENT_ID
+// is set. Fixture fallback when undeployed; consumers are unchanged.
 
-import { useReadContract, useWatchContractEvent } from "wagmi";
-import { useRef, useState }                        from "react";
+import { useReadContract, useWatchContractEvent, usePublicClient } from "wagmi";
+import { useRef, useState, useEffect }                              from "react";
 import { decisions as fixtureDecisions, identity, baseline, type Decision } from "./data";
 import { erc8004 }        from "./data";
 import { computeBaseline, type BaselineSummary } from "./baseline";
@@ -23,13 +24,6 @@ const IDENTITY_ABI = [
     inputs: [{ name: "agentId", type: "uint256" }],
     outputs: [{ name: "", type: "string" }],
   },
-  {
-    name: "ownerOf",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [{ name: "", type: "address" }],
-  },
 ] as const;
 
 export interface GuardianFeed {
@@ -38,11 +32,57 @@ export interface GuardianFeed {
   isLive: boolean;
 }
 
+function mergeDecision(base: Decision, log: {
+  id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
+}): Decision {
+  return {
+    ...base,
+    id: Number(log.id),
+    kind: log.kind as 0 | 1,
+    rationaleHash: log.rationaleHash as string,
+    decisionURI: log.decisionURI,
+    timestamp: new Date().toISOString(),
+  };
+}
+
 export function useDecisions(): GuardianFeed {
-  // Accumulate live DecisionRecorded events.
   const [liveDecisions, setLiveDecisions] = useState<Decision[]>([]);
   const seenIds = useRef(new Set<number>());
+  const client = usePublicClient();
 
+  // Backfill historical DecisionRecorded events on mount.
+  useEffect(() => {
+    if (!isDeployed || !client) return;
+    client.getLogs({
+      address: VAULT_ADDRESS,
+      event: {
+        type: "event",
+        name: "DecisionRecorded",
+        inputs: [
+          { name: "id",            type: "uint256", indexed: true  },
+          { name: "kind",          type: "uint8",   indexed: false },
+          { name: "rationaleHash", type: "bytes32", indexed: false },
+          { name: "decisionURI",   type: "string",  indexed: false },
+        ],
+      },
+      fromBlock: 0n,
+    }).then((logs) => {
+      if (logs.length === 0) return;
+      setLiveDecisions(() => {
+        const next: Decision[] = [];
+        for (const log of [...logs].reverse()) {
+          const args = log.args as { id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string };
+          const nId = Number(args.id);
+          if (seenIds.current.has(nId)) continue;
+          seenIds.current.add(nId);
+          next.push(mergeDecision(fixtureDecisions[0]!, args));
+        }
+        return next;
+      });
+    }).catch(() => { /* getLogs unavailable — watch-only fallback */ });
+  }, [client]);
+
+  // Watch for new events after mount.
   useWatchContractEvent({
     address: VAULT_ADDRESS,
     abi: VAULT_ABI,
@@ -58,15 +98,7 @@ export function useDecisions(): GuardianFeed {
           const nId = Number(id);
           if (seenIds.current.has(nId)) continue;
           seenIds.current.add(nId);
-          // Minimal shape — outcome + signals resolved lazily via AgentBenchmark (Phase 5b).
-          next.unshift({
-            ...fixtureDecisions[0]!,
-            id: nId,
-            kind: kind as 0 | 1,
-            rationaleHash: rationaleHash as string,
-            decisionURI,
-            timestamp: new Date().toISOString(),
-          });
+          next.unshift(mergeDecision(fixtureDecisions[0]!, { id, kind, rationaleHash, decisionURI }));
         }
         return next;
       });
@@ -110,8 +142,6 @@ export function useIdentity(): IdentityData {
     return { identity, baseline: computeBaseline(baseline), isLive: false };
   }
 
-  // Merge live agentURI into the identity fixture; other fields (trackRecord)
-  // come from AgentBenchmark reads wired in Phase 5b addendum.
   return {
     identity: { ...identity, agentURI: tokenUri as string },
     baseline: computeBaseline(baseline),

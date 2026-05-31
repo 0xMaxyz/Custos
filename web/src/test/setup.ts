@@ -7,15 +7,18 @@ vi.mock("wagmi", () => ({
   useReadContracts:       () => ({ data: undefined }),
   useReadContract:        () => ({ data: undefined }),
   useWatchContractEvent:  () => undefined,
+  usePublicClient:        () => undefined,
   useWriteContract:       () => ({ writeContract: vi.fn(), status: "idle", error: null }),
   useWaitForTransactionReceipt: () => ({ status: "idle", isLoading: false }),
   useAccount:             () => ({ address: undefined, isConnected: false }),
   useChainId:             () => 5000,
 }));
 
-// Stub React hooks used in seam hooks so they work outside a component tree.
+// Stub React hooks so seam hooks work outside a component tree.
+// importOriginal is typed as Record<string, unknown> to avoid the
+// @typescript-eslint/consistent-type-imports restriction on import() in type positions.
 vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();  // eslint-disable-line @typescript-eslint/consistent-type-imports
+  const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
     useState: <T>(init: T | (() => T)) => {

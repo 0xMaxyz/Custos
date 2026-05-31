@@ -187,21 +187,21 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Test:** fork test: rebalance into USDY; `totalAssets` stable; withdraw unwinds
   USDY→USDC ≥ `minOut`.
 
-### 2.4 — Depeg / oracle-deviation guard · _PR-2b_ `[x] DONE`
+### 2.4 — Depeg / oracle-deviation guard · _PR-2b_ · `[x] DONE` · [PR #6](https://github.com/0xMaxyz/miu/pull/6)
 - **What:** on-chain guard comparing USDY DEX spot vs oracle NAV (deviation bps) +
   staleness; on breach, block new USDY allocation and allow/force de-risk.
 - **Goal:** deterministic on-chain trigger gating USDY exposure.
 - **Test:** fork test with mocked router spot (or a depeg block): guard flips and
   new USDY allocation reverts; normal conditions pass.
 
-### 2.5 — De-risk path · _PR-2b_ `[x] DONE`
+### 2.5 — De-risk path · _PR-2b_ · `[x] DONE` · [PR #6](https://github.com/0xMaxyz/miu/pull/6)
 - **What:** `deRisk()` (ALLOCATOR/GUARDIAN) rotates USDY→USDC/AUSD; emits `Decision`
   with `reason` + `evidenceHash`.
 - **Goal:** one call exits USDY to safety, logged with evidence.
 - **Test:** fork test: trip guard → `deRisk` → USDY balance 0, safe bucket up,
   `Decision` carries evidence fields.
 
-### 2.6 — `AgentBenchmark` ledger + passive-USDY baseline · _PR-2b_ `[x] DONE`
+### 2.6 — `AgentBenchmark` ledger + passive-USDY baseline · _PR-2b_ · `[x] DONE` · [PR #6](https://github.com/0xMaxyz/miu/pull/6)
 - **What:** record each decision (pre/post weights, `rationaleHash`, `evidenceURI`,
   timestamp); `updateOutcome()` writes realized APY / drawdown-avoided; **baseline
   tracking**: each cycle snapshots what a 100%-USDY passive holder would hold

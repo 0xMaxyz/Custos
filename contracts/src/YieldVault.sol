@@ -333,17 +333,21 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
      *         Callable by ALLOCATOR or GUARDIAN.
      *         Requires the depeg/oracle guard to be tripped, OR caller is GUARDIAN.
      *
-     * @param toBucket     Target bucket: 0 (IDLE) or 3 (AUSD).
-     * @param swapData     Per-bucket routing hint for the USDY adapter.
-     * @param reason       Human-readable reason string.
-     * @param evidenceHash keccak256 of evidence (attestation, oracle reading, etc.).
-     * @return decisionId  Monotonic id for this decision.
+     * @param toBucket          Target bucket: 0 (IDLE) or 3 (AUSD).
+     * @param swapData          Per-bucket routing hint for the USDY adapter.
+     * @param reason            Human-readable reason string.
+     * @param evidenceHash      keccak256 of evidence (attestation, oracle reading, etc.).
+     * @param usdyDexSpotUsdc   Current USDY/USDC DEX spot (18-dec). Required for allocator
+     *                          de-risk so the oracle/depeg guard can evaluate peg health on
+     *                          Mantle where `currentRange()` is absent. GUARDIAN may pass 0.
+     * @return decisionId       Monotonic id for this decision.
      */
     function deRisk(
         uint8     toBucket,
         bytes[]   calldata swapData,
         string    calldata reason,
-        bytes32            evidenceHash
+        bytes32            evidenceHash,
+        uint256            usdyDexSpotUsdc
     )
         external
         nonReentrant
@@ -357,9 +361,11 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         if (toBucket != BUCKET_IDLE && toBucket != BUCKET_AUSD) revert InvalidToBucket();
 
         // Allocator de-risk requires the oracle/depeg guard to have fired.
+        // Pass usdyDexSpotUsdc so the guard can evaluate peg deviation on Mantle
+        // (where currentRange() is absent and rangeEnd=0 alone won't fire forceDeRisk).
         if (isAllocator && !isGuardian) {
             uint256 tvl = totalAssets();
-            Guardrails.MarketState memory s = _buildMarketState(tvl, 0);
+            Guardrails.MarketState memory s = _buildMarketState(tvl, usdyDexSpotUsdc);
             (, bool forceDeRisk,) = guardrails.evaluateUsdyRisk(s);
             if (!forceDeRisk) revert DeRiskConditionNotMet();
         }
@@ -381,7 +387,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         IAgentBenchmark bm = benchmark;
         if (address(bm) != address(0)) {
             uint256 tvl = totalAssets();
-            Guardrails.MarketState memory s = _buildMarketState(tvl, 0);
+            Guardrails.MarketState memory s = _buildMarketState(tvl, usdyDexSpotUsdc);
             bm.recordDecision(decisionId, evidenceHash, reason, s.usdyOracleNav);
         }
     }

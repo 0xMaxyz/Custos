@@ -346,7 +346,7 @@ contract Phase2aTest is Test {
         uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://phase2a-test", bytes32(0), 0);
+        vault.rebalance(target, sd, "ipfs://phase2a-test", bytes32(0), NAV);
 
         // USDY adapter should now hold USDY.
         assertGt(usdy.balanceOf(address(adapter)), 0);
@@ -368,14 +368,14 @@ contract Phase2aTest is Test {
         uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), 0);
+        vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), NAV);
 
         uint256 usdyBefore = usdy.balanceOf(address(adapter));
         assertGt(usdyBefore, 0);
 
         // Guardian triggers deRisk (no oracle condition required for guardian).
         vm.prank(guardian);
-        vault.deRisk(0, sd, "test de-risk", bytes32("evidence"));
+        vault.deRisk(0, sd, "test de-risk", bytes32("evidence"), 0);
 
         // USDY bucket should be empty; USDC back in vault.
         assertEq(usdy.balanceOf(address(adapter)), 0);
@@ -394,6 +394,6 @@ contract Phase2aTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.prank(allocator);
         vm.expectRevert(YieldVault.DeRiskConditionNotMet.selector);
-        vault.deRisk(0, sd, "premature", bytes32(0));
+        vault.deRisk(0, sd, "premature", bytes32(0), 0);
     }
 }

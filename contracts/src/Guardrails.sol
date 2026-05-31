@@ -25,6 +25,7 @@ contract Guardrails is AccessControl {
     error RebalanceIntervalNotElapsed();
     error RebalanceMoveTooLarge();
     error UsdyAllocationBlocked();
+    error UsdySpotRequired();
     error InvalidBucket();
     error TimelockNotElapsed();
     error InvalidConfig();
@@ -185,13 +186,19 @@ contract Guardrails is AccessControl {
             return (false, RebalanceMoveTooLarge.selector);
         }
 
-        // 7. USDY depeg / oracle guard: block any increase in USDY weight when
-        //    the oracle or DEX spot signals a breach. Only applies when both
-        //    oracle NAV and DEX spot are non-zero (otherwise guard is inactive).
-        if (s.usdyOracleNav > 0 && s.usdyDexSpot > 0) {
-            (bool blockNewUsdy,,) = _evaluateUsdyRisk(s, c);
-            if (blockNewUsdy && postWeightsBps[_USDY] > preWeightsBps[_USDY]) {
-                return (false, UsdyAllocationBlocked.selector);
+        // 7. USDY depeg / oracle guard.
+        //    When USDY weight is increasing the caller MUST supply a non-zero DEX spot
+        //    so the guard can evaluate peg health — fail closed.
+        //    When oracle NAV is available and spot is non-zero, evaluate deviation.
+        if (postWeightsBps[_USDY] > preWeightsBps[_USDY]) {
+            if (s.usdyOracleNav > 0 && s.usdyDexSpot == 0) {
+                return (false, UsdySpotRequired.selector);
+            }
+            if (s.usdyOracleNav > 0 && s.usdyDexSpot > 0) {
+                (bool blockNewUsdy,,) = _evaluateUsdyRisk(s, c);
+                if (blockNewUsdy) {
+                    return (false, UsdyAllocationBlocked.selector);
+                }
             }
         }
 

@@ -79,6 +79,7 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
         onlyRole(Roles.ALLOCATOR)
     {
         if (!_recorded[decisionId]) revert DecisionNotFound();
+        if (_outcomes[decisionId].measuredAt != 0) revert OutcomeAlreadySet();
         _outcomes[decisionId] = o;
         emit OutcomeUpdated(decisionId, o.realizedYieldBps, o.drawdownAvoidedUsdc, o.passiveDeltaBps);
     }
@@ -93,10 +94,4 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
         return _navAtDecision[decisionId];
     }
 
-    // ── Modifier ──────────────────────────────────────────────────────────────
-
-    modifier onlyVault() {
-        if (msg.sender != VAULT) revert OnlyVault();
-        _;
-    }
 }

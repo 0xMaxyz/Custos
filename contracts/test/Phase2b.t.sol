@@ -140,13 +140,26 @@ contract Phase2bTest is Test {
         vault.rebalance(target, sd, "ipfs://normal", bytes32(0), NAV);
     }
 
-    function test_RebalancePassesWhenDexSpotZero() public {
-        // usdyDexSpotUsdc=0 disables the guard
+    function test_RebalanceRevertsWhenDexSpotZeroAndUsdyIncreasing() public {
+        // usdyDexSpotUsdc=0 while oracle NAV is live and USDY weight increases → fail closed
         uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
         bytes[] memory sd = new bytes[](3);
 
         vm.prank(allocator);
+        vm.expectRevert(
+            abi.encodeWithSelector(YieldVault.GuardrailsRejected.selector, Guardrails.UsdySpotRequired.selector)
+        );
         vault.rebalance(target, sd, "ipfs://no-spot", bytes32(0), 0);
+    }
+
+    function test_RebalancePassesWhenDexSpotZeroButUsdyNotIncreasing() public {
+        // spot=0 is fine when USDY weight is flat or decreasing (guard only fires on increase)
+        // All idle → all idle (USDY = 0, no increase)
+        uint16[4] memory target = [uint16(10_000), 0, 0, 0];
+        bytes[] memory sd = new bytes[](3);
+
+        vm.prank(allocator);
+        vault.rebalance(target, sd, "ipfs://no-usdy", bytes32(0), 0);
     }
 
     function test_RebalanceBlockOnlyWhenIncreasingUsdyWeight() public {
@@ -264,8 +277,10 @@ contract Phase2bTest is Test {
         uint256 bmCountBefore = bm.decisionCount();
 
         bytes[] memory dsd = new bytes[](3);
+        // Pass a depegged DEX spot so forceDeRisk fires for the allocator.
+        uint256 depeggedSpot = NAV * 97 / 100; // 3% below → past pegDeRiskBps=100
         vm.prank(allocator);
-        vault.deRisk(0, dsd, "depeg detected", keccak256("evidence"));
+        vault.deRisk(0, dsd, "depeg detected", keccak256("evidence"), depeggedSpot);
 
         assertEq(bm.decisionCount(), bmCountBefore + 1);
     }
@@ -286,6 +301,27 @@ contract Phase2bTest is Test {
         bytes[] memory sd = new bytes[](3);
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://no-bm", bytes32(0), NAV);
+    }
+
+    function test_BenchmarkOutcomeAlreadySetReverts() public {
+        uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
+        bytes[] memory sd = new bytes[](3);
+        vm.prank(allocator);
+        uint256 did = vault.rebalance(target, sd, "ipfs://bm-dup", bytes32(0), NAV);
+
+        IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
+            realizedYieldBps:    10,
+            drawdownAvoidedUsdc: 0,
+            passiveDeltaBps:     10,
+            measuredAt:          uint64(block.timestamp)
+        });
+
+        vm.prank(allocator);
+        bm.updateOutcome(did, o);
+
+        vm.prank(allocator);
+        vm.expectRevert(AgentBenchmark.OutcomeAlreadySet.selector);
+        bm.updateOutcome(did, o);
     }
 
     // ── AgentBenchmark: OnlyVault ──────────────────────────────────────────────

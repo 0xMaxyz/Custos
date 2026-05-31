@@ -333,7 +333,7 @@ contract Phase1bTest is Test {
 
         bytes[] memory sd = new bytes[](4);
         vm.prank(guardian);
-        uint256 did = vault.deRisk(0, sd, "oracle stale", keccak256("evidence"));
+        uint256 did = vault.deRisk(0, sd, "oracle stale", keccak256("evidence"), 0);
 
         assertGt(did, 0);
         assertEq(usdyAdapter.totalAssets(), 0);
@@ -346,13 +346,13 @@ contract Phase1bTest is Test {
         // Market is normal, so allocator de-risk should fail.
         vm.prank(allocator);
         vm.expectRevert(YieldVault.DeRiskConditionNotMet.selector);
-        vault.deRisk(0, sd, "test", bytes32(0));
+        vault.deRisk(0, sd, "test", bytes32(0), 0);
     }
 
     function test_DeRiskInvalidToBucket() public {
         bytes[] memory sd = new bytes[](4);
         vm.prank(guardian);
         vm.expectRevert(YieldVault.InvalidToBucket.selector);
-        vault.deRisk(1, sd, "bad bucket", bytes32(0)); // AAVE is not a valid safety bucket
+        vault.deRisk(1, sd, "bad bucket", bytes32(0), 0); // AAVE is not a valid safety bucket
     }
 }

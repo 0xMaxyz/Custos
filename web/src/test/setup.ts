@@ -15,7 +15,7 @@ vi.mock("wagmi", () => ({
 
 // Stub React hooks used in seam hooks so they work outside a component tree.
 vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();
+  const actual = await importOriginal<typeof import("react")>();  // eslint-disable-line @typescript-eslint/consistent-type-imports
   return {
     ...actual,
     useState: <T>(init: T | (() => T)) => {

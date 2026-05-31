@@ -209,8 +209,9 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 
 ### 5.4 `/insights` — Risk radar (Should)
 **Purpose:** the insight layer (absorbs Option B).
-- Charts/cards: USDY **NAV vs DEX price** (peg) over time; **oracle freshness**
-  timeline; **AUSD proof-of-reserves** status; **Aave USDC utilization & APY**.
+- Charts/cards: USDY **NAV vs DEX price** (peg) over time; **oracle range-end**
+  timeline (range-based, per §15.3 — not Chainlink staleness); **AUSD
+  proof-of-reserves** status; **Aave USDC utilization & APY**.
 - Each chart has a **data-table fallback** for accessibility.
 - **States:** loading, error, "data delayed" notice if 1delta lags.
 
@@ -423,7 +424,8 @@ Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR*
 | Confidence | `confidence` | 0–1 | `0.86` | AGENT |
 | Decision id | `id` | uint | `14` | VAULT |
 | Kind | `kind` | 0 REBALANCE / 1 DERISK | `1` | VAULT |
-| Pre/post weights | `preWeightsBps` / `postWeightsBps` | bps[4] | `[300,4700,5000,0]→[500,4500,0,5000]` | VAULT |
+| Post weights | `postWeightsBps` | bps[4] | `[500,4500,0,5000]` | VAULT (`Rebalanced` event) |
+| Pre weights | `preWeightsBps` | bps[4] | `[300,4700,5000,0]` | AGENT / `decisionURI` (derived from prior `postWeightsBps`) |
 | To-bucket (de-risk) | `toBucket` | 0 IDLE / 3 AUSD | `3` | VAULT |
 | Rationale (text) | `rationale` | string | "Peg 122 bps below NAV…" | AGENT |
 | Rationale hash | `rationaleHash` | bytes32 | `0x9f2c…` | VAULT |

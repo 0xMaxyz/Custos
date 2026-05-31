@@ -6,7 +6,8 @@ import { Card, RiskLevelChip, SignalBadge, EvidenceChip, FlagChip, OutcomeStrip,
 import { WeightBars } from "../components/Charts";
 import { Modal } from "../modals/Modals";
 import * as fmt from "../lib/fmt";
-import { RISK, decisions, explorer, type Decision } from "../lib/data";
+import { RISK, explorer, type Decision } from "../lib/data";
+import { useDecisions } from "../lib/useGuardianData";
 
 const KIND: Record<number, { label: string; icon: string }> = {
   0: { label: "Rebalance", icon: "refresh-cw" },
@@ -154,6 +155,7 @@ export function ActivityPage({ loading, activityError }: ActivityPageProps) {
   const [risk, setRisk] = useState("all");
   const [openDecision, setOpenDecision] = useState<Decision | null>(null);
 
+  const { decisions } = useDecisions();
   let list = decisions;
   if (filter === "derisk") list = list.filter((d) => d.kind === 1);
   else if (filter === "rebalance") list = list.filter((d) => d.kind === 0);

@@ -32,7 +32,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    | `[x] DONE` · [PR #10](https://github.com/0xMaxyz/miu/pull/10) |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               | `[x] DONE` |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               | `[x] DONE` · [PR #11](https://github.com/0xMaxyz/miu/pull/11) |
-| PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card |
+| PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card | `[x] DONE` (fixtures; live reads → PR-5a) |
 | PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             |
 | PR-6a | 6.1–6.5 | Public deploy, docs, video, submission                                       |
 | PR-7  | 7.1–7.4 | Buffer / contingency                                                         |
@@ -397,34 +397,56 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
   there is no vault address to read yet. When deployed, swap the hook body for
   `useReadContract` keyed off `VITE_VAULT_ADDRESS`; consumers are unchanged.
 
-### 4.5 — Deposit/withdraw flow · _PR-4c_
+### 4.5 — Deposit/withdraw flow · _PR-4c_ · `[x] DONE`
 
 - **What:** approve+deposit, withdraw/redeem, tx status, testnet/mainnet toggle.
 - **Goal:** user deposits/withdraws on testnet.
 - **Test:** manual e2e on testnet; component tests for the tx state machine.
+- **Built:** `lib/txMachine.ts` — pure, tested deposit/withdraw logic:
+  `previewDeposit`/`previewWithdraw` (guardrail-mirrored per-tx/capacity/balance/
+  position caps, shares↔USDC conversion, instant-liquidity flag, `maxDepositable`)
+  and the approve→deposit machine (`nextDepositPhase`/`depositStepIndex`/
+  `isDepositBusy`/`failDeposit`). `TradeModals` refactored onto it. 18 Vitest cases.
+  Live wallet writes (wagmi `useWriteContract`) land with the testnet deploy.
 
-### 4.6 — Risk-guardian feed + decision detail · _PR-4c_
+### 4.6 — Risk-guardian feed + decision detail · _PR-4c_ · `[x] DONE` (fixtures; live indexing deferred)
 
 - **What:** timeline of `Decision` events with rationale + evidence (resolve IPFS);
   decision-detail view.
 - **Goal:** the transparency hero view.
 - **Test:** Vitest with mocked events/IPFS; manual vs real testnet decisions.
+- **Built:** `lib/decisionUri.ts` — resolve a `decisionURI` (`ipfs://` → gateway,
+  `data:`/`http(s)` passthrough, inline-JSON decode) with 16 tests. `useDecisions`/
+  `useDecision` seam (`lib/useGuardianData.ts`) feeds `ActivityPage`. Live
+  `DecisionRecorded`/`OutcomeUpdated` event indexing **deferred** until the vault +
+  AgentBenchmark deploy (no contract to index yet); consumers unchanged.
 
-### 4.7 — Baseline counter · _PR-4c_
+### 4.7 — Baseline counter · _PR-4c_ · `[x] DONE` (fixtures; live `AgentBenchmark` deferred)
 
 - **What:** UI widget showing "Sentinel vs passive USDY holder" — running bps delta
   since the last de-risk event; pulled from `AgentBenchmark` baseline data.
 - **Goal:** the Turing Test answer visible to anyone visiting the app.
 - **Test:** Vitest mocked; correct delta rendered; manual vs testnet.
+- **Built:** `lib/baseline.ts` — `computeBaseline` (per-point Sentinel−passive
+  spread, latest delta, peak, ahead/behind, empty-series fallback) + `formatDeltaPct`.
+  Surfaced via `useIdentity().baseline`. 8 tests incl. a canonical-fixture cross-check.
 
-### 4.8 — Identity card · _PR-4c_
+### 4.8 — Identity card · _PR-4c_ · `[x] DONE` (fixtures; live registry reads deferred)
 
 - **What:** show the ERC-8004 NFT + track record (decisions handled, de-risk events,
   realized yield vs passive).
 - **Goal:** verifiable agent reputation surfaced in the UI.
 - **Test:** Vitest mocked; manual.
+- **Built:** `useIdentity` seam (`lib/useGuardianData.ts`) feeds `AgentPage`'s
+  identity card. Live `tokenURI`/`getAgentWallet` (canonical IdentityRegistry) +
+  AgentBenchmark track-record reads **deferred** to the deploy wiring (PR-5a).
 
 **Exit:** clickable end-to-end app on testnet with baseline counter visible.
+**Status:** app is clickable on fixtures end-to-end (deposit/withdraw machine, decision
+feed + detail, baseline counter, identity card). The remaining live-chain reads/writes
+across 4.4/4.6/4.7/4.8 share one dependency — a deployed vault + AgentBenchmark +
+ERC-8004 registration on testnet — and land with PR-5a's deploy wiring behind the
+existing `use*Data` seams (consumers unchanged).
 
 ---
 

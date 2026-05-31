@@ -4,10 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { Icon } from "../components/Icons";
 import { Card, AddressChip, StatusDot, Skeleton } from "../components/Components";
 import * as fmt from "../lib/fmt";
-import { RISK, SIGNAL_TYPES, identity, watchlist, guardrails, askSuggestions, askAnswers } from "../lib/data";
+import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions, askAnswers } from "../lib/data";
+import { useIdentity } from "../lib/useGuardianData";
 
 function IdentityCard() {
-  const id = identity, tr = id.trackRecord;
+  const { identity: id } = useIdentity();
+  const tr = id.trackRecord;
   return (
     <Card>
       <span className="card-title"><Icon name="fingerprint" size={14} />Agent identity · ERC-8004</span>

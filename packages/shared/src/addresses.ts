@@ -56,9 +56,12 @@ export const PROTOCOLS: Record<string, Address | null> = {
   // Ondo USDY Redemption Price Oracle — exposes getPrice() (18-dec NAV).
   // currentRange() is NOT implemented on this deployment; UsdyAdapter handles
   // that via try/catch. source: Ondo docs / Phase 0.3 gate
+  // TODO: upgrade to "verified @ block N" once fork-tests CI job confirms
+  //       extcodesize > 0 and getPrice() returns a plausible NAV.
   usdyRWADynamicOracle: "0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f",
   // DEX router for USDC<->USDY (Merchant Moe LB Router v2).
   // source: docs.merchantmoe.com/developer-resources/contract-addresses
+  // TODO: upgrade to "verified @ block N" once fork-tests CI job confirms.
   dexRouterUsdy: "0xeaEE7EE68874218c3558b40063c42B82D3E7232a",
   dexRouterAusd: null,
 };

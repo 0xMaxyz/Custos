@@ -381,10 +381,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             if (available == 0) continue;
 
             uint256 toWithdraw = available < remaining ? available : remaining;
-            // minOut=0 is safe here: the Aave leg is 1:1, and UsdyAdapter.withdraw
-            // self-enforces minOut = max(minOutUsdc, usdcAmount) — it always returns
-            // at least the requested USDC or reverts. The DEX slippage floor lives
-            // inside the adapter (derived from its MAX_SLIPPAGE_BPS), not here.
+            // minOut=0 is safe: Aave is 1:1 and UsdyAdapter.withdraw internally sets
+            // minOut = max(minOutUsdc, usdcAmount) so it always returns ≥ toWithdraw USDC.
+            // TODO(2b): for any future adapter that does NOT self-enforce minOut, derive
+            // a vault-side floor here: toWithdraw * (10_000 - guardrails.config().maxSlippageBps) / 10_000.
             adapter.withdraw(toWithdraw, 0, address(this), "");
             remaining = remaining > toWithdraw ? remaining - toWithdraw : 0;
         }

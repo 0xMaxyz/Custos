@@ -240,4 +240,30 @@ contract ForkPhase2aTest is Test {
         console2.log("[2.1] TVL after USDC->USDY->USDC round trip:", tvl);
         assertGe(tvl, DEPOSIT * 98 / 100, "round-trip lost more than ~2% to slippage");
     }
+
+    // ── Task 2.3 — Blocklist check (Phase 0.5 gate, adapter-specific) ─────────
+
+    /// @notice Verifies that neither the vault nor the UsdyAdapter is on the USDY
+    ///         blocklist at test time. A blocked address would cause all USDY swaps
+    ///         to revert silently. This gate must pass before activating the adapter
+    ///         in any deployment (mainnet or testnet).
+    function testForkUsdyAdapterNotBlocklisted() public view {
+        // Try the standard Ondo blocklist interface. USDY may expose isBlocked(address).
+        _assertNotBlocked(address(vault),   "vault");
+        _assertNotBlocked(address(adapter), "adapter");
+    }
+
+    function _assertNotBlocked(address target, string memory label) internal view {
+        (bool ok, bytes memory data) = USDY.staticcall(
+            abi.encodeWithSignature("isBlocked(address)", target)
+        );
+        if (ok && data.length == 32) {
+            bool blocked = abi.decode(data, (bool));
+            assertFalse(blocked, string.concat("USDY blocklist: ", label, " is blocked"));
+            console2.log(string.concat("[0.5] USDY.isBlocked(", label, "):"), blocked);
+        } else {
+            // Interface not exposed or call failed — transfer-based check is the fallback.
+            console2.log(string.concat("[0.5] USDY.isBlocked not accessible for ", label, " (transfer test covers this)"));
+        }
+    }
 }

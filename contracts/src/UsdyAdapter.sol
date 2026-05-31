@@ -22,6 +22,10 @@ import {SwapLib}            from "./SwapLib.sol";
  * - `swapData` (per IStrategyAdapter) overrides the default Merchant Moe path
  *   as abi.encode(uint256[] pairBinSteps, uint8[] versions). Empty = use defaults.
  * - Only the vault (VAULT immutable) can call fund-moving functions.
+ * - **Blocklist**: USDY enforces a transfer blocklist. The vault and this adapter
+ *   must NOT be on the USDY blocklist at deploy time, or swaps will revert.
+ *   Verify with `USDY.isBlocked(adapter)` before activating (Phase 0.5 gate).
+ *   Phase 2b will add an on-chain pre-swap blocklist check.
  */
 contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -114,7 +118,12 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
         try ORACLE.currentRange() returns (uint256, uint256 end) {
             rangeEnd = end > type(uint64).max ? type(uint64).max : uint64(end);
         } catch {
-            rangeEnd = 0; // range not exposed on this oracle — staleness via range disabled
+            // currentRange() absent on Mantle's Ondo oracle → rangeEnd=0 disables
+            // the adapter-level range-staleness check. The Guardrails depeg guard
+            // (evaluateUsdyRisk) remains the deterministic backstop.
+            // TODO(2b): when Guardrails gets a live DEX spot feed, verify oracleRangeEnd=0
+            // doesn't silently suppress the allocator de-risk condition path.
+            rangeEnd = 0;
         }
     }
 

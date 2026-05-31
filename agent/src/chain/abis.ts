@@ -52,6 +52,43 @@ export const yieldVaultAbi = [
     inputs: [{ name: "", type: "uint256" }],
     outputs: [{ name: "", type: "address" }],
   },
+  {
+    type: "function",
+    name: "lastRebalanceAt",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+] as const;
+
+/** YieldVault write ABI: rebalance + deRisk (ALLOCATOR). */
+export const yieldVaultWriteAbi = [
+  {
+    type: "function",
+    name: "rebalance",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "targetWeightsBps", type: "uint16[4]" },
+      { name: "swapData",         type: "bytes[]" },
+      { name: "decisionURI",      type: "string" },
+      { name: "rationaleHash",    type: "bytes32" },
+      { name: "usdyDexSpotUsdc",  type: "uint256" },
+    ],
+    outputs: [{ name: "decisionId", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "deRisk",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "toBucket",        type: "uint8" },
+      { name: "swapData",        type: "bytes[]" },
+      { name: "reason",          type: "string" },
+      { name: "evidenceHash",    type: "bytes32" },
+      { name: "usdyDexSpotUsdc", type: "uint256" },
+    ],
+    outputs: [{ name: "decisionId", type: "uint256" }],
+  },
 ] as const;
 
 /** IStrategyAdapter subset: per-bucket value + instant liquidity. */

@@ -64,16 +64,14 @@ describe("validateProposal", () => {
   });
 
   it("rejects a move exceeding the 50% cap", () => {
-    // USDY 5000→0 (−5000), IDLE 300→5301 (+5001) → totalMove = 5001 bps > 5000 cap.
-    const r = validateProposal(weights(5_301, 4_700, 0, -1), CURRENT, BASE_SNAPSHOT, MAX_USDY);
-    // Use a move that actually crosses the boundary: shift 5001 bps from USDY to IDLE.
-    const r2 = validateProposal(
+    // IDLE 300→5301 (+5001), AAVE 4700→4699 (−1), USDY 5000→0 (−5000) → totalMove = 5001 > 5000 cap.
+    const r = validateProposal(
       { [Bucket.IDLE]: 5_301, [Bucket.AAVE]: 4_699, [Bucket.USDY]: 0, [Bucket.AUSD]: 0 },
       CURRENT,
       BASE_SNAPSHOT,
       MAX_USDY,
     );
-    expect(r2.errors).toContain("MOVE_EXCEEDS_MAX");
+    expect(r.errors).toContain("MOVE_EXCEEDS_MAX");
   });
 
   it("provides repaired weights when validation fails", () => {

@@ -28,7 +28,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-2a | 2.1–2.3 | DEX lib + USDY valuation + UsdyAdapter                                       |
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline**   | `[x] DONE` |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7) |
-| PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  | `[x] DONE` · [PR #8](https://github.com/0xMaxyz/miu/pull/8) |
+| PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  | `[x] DONE` · [PR #9](https://github.com/0xMaxyz/miu/pull/9) |
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    |
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               |

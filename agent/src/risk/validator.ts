@@ -40,6 +40,9 @@ export function applyVerdict(
   assessment: RiskAssessment,
   verdict: RiskVerdict | null,
 ): WeightsBps {
+  // verdict.deRisk (LLM-requested de-risk with cited evidence) is acknowledged here
+  // but weight execution is owned by the executor/scheduler in PR-3c. forceDeRisk
+  // (deterministic) always wins regardless.
   if (verdict === null || assessment.forceDeRisk) return assessment.candidateWeightsBps;
 
   // The LLM may only reduce USDY (tighten). Clamp to both the guardrail ceiling

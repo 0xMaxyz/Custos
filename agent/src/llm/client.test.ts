@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Bucket } from "@sentinel/shared";
-import type { LLMClient, LLMInput, RiskVerdict } from "./types.js";
+import type { LLMClient, RiskVerdict } from "./types.js";
 import { runSignalLayer, type EvidenceFetcher } from "./signals.js";
 import type { MarketSnapshot, RiskAssessment, WeightsBps } from "../types.js";
 
@@ -87,14 +87,18 @@ describe("runSignalLayer — contract tests", () => {
     expect(result!.deRisk).toBe(false);
   });
 
-  it("preserves deRisk=true when at least one cited signal is present", async () => {
+  it("preserves deRisk=true when at least one cited signal resolves in evidence[]", async () => {
     const verdict: RiskVerdict = {
       ...CLEAN_VERDICT,
       deRisk: true,
       signals: [{ type: "ISSUER", severity: "HIGH", summary: "Downgrade", evidenceId: "e1" }],
     };
+    const fetchEvidence: EvidenceFetcher = async () => [
+      { id: "e1", type: "NEWS", source: "test", url: "https://example.com", publishedAt: "2026-06-01", summary: "Downgrade." },
+    ];
     const result = await runSignalLayer(BASE_SNAPSHOT, BASE_ASSESSMENT, {
       llm: mockLLM(verdict),
+      fetchEvidence,
     });
     expect(result!.deRisk).toBe(true);
   });

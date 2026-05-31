@@ -73,7 +73,7 @@ export class AnthropicClient implements LLMClient {
       temperature: 0.1,
       system: SYSTEM_PROMPT,
       tools: [OUTPUT_SCHEMA],
-      tool_choice: { type: "auto" },
+      tool_choice: { type: "tool", name: "risk_verdict" },
       messages: [{ role: "user", content: userMessage }],
     });
 

@@ -1,6 +1,4 @@
 import { z } from "zod";
-import type { RiskLevel } from "@sentinel/shared";
-import type { Severity, SignalType } from "../types.js";
 
 // ── LLM output schema (SPEC §3.2) ─────────────────────────────────────────────
 

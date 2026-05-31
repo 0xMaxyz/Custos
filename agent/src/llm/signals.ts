@@ -50,7 +50,7 @@ export async function runSignalLayer(
       return null;
     }
 
-    const clamped = clampVerdict(raw, assessment);
+    const clamped = clampVerdict(raw, assessment, evidence);
     if (clamped !== null) return clamped;
     // clamped === null means schema/sanity rejection → retry once
   }
@@ -67,8 +67,6 @@ function buildLLMInput(
 ): LLMInput {
   const nav18 = snapshot.usdyOracleNavUsdc;
   const spot18 = snapshot.usdyDexSpotUsdc;
-  const e18 = 10n ** 18n;
-  const e6 = 10n ** 6n;
 
   const fmt18 = (v: bigint): string => (Number(v) / 1e18).toFixed(6);
   const fmt6 = (v: bigint): string => (Number(v) / 1e6).toFixed(2);
@@ -117,7 +115,11 @@ function buildLLMInput(
  * Validate and clamp a raw verdict from the model (SPEC §3.3).
  * Returns null if the verdict is structurally unsalvageable.
  */
-function clampVerdict(raw: RiskVerdict, assessment: RiskAssessment): RiskVerdict | null {
+function clampVerdict(
+  raw: RiskVerdict,
+  assessment: RiskAssessment,
+  evidence: EvidenceItem[],
+): RiskVerdict | null {
   // Hard schema re-check (belt-and-suspenders — AnthropicClient already parsed).
   const parsed = RiskVerdictSchema.safeParse(raw);
   if (!parsed.success) return null;
@@ -126,8 +128,12 @@ function clampVerdict(raw: RiskVerdict, assessment: RiskAssessment): RiskVerdict
   // LLM may only tighten: USDY weight clamped to deterministic ceiling.
   const usdyMaxWeightBps = Math.min(v.usdyMaxWeightBps, assessment.maxUsdyWeightBpsAllowed);
 
-  // deRisk=true requires at least one signal with an evidenceId citation.
-  const deRisk = v.deRisk && v.signals.some((s) => s.evidenceId !== undefined) ? true : false;
+  // deRisk=true requires at least one signal whose evidenceId resolves in evidence[] (SPEC §3.3).
+  const evidenceIds = new Set(evidence.map((e) => e.id));
+  const deRisk =
+    v.deRisk && v.signals.some((s) => s.evidenceId !== undefined && evidenceIds.has(s.evidenceId))
+      ? true
+      : false;
 
   // riskLevel may only match or escalate the deterministic level.
   const riskLevel = escalate(assessment.riskLevel, v.riskLevel);

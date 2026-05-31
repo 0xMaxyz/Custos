@@ -12,6 +12,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Roles}           from "./Roles.sol";
 import {Guardrails}      from "./Guardrails.sol";
 import {IStrategyAdapter} from "./interfaces/IStrategyAdapter.sol";
+import {IUsdyAdapter}    from "./interfaces/IUsdyAdapter.sol";
 
 /**
  * @title YieldVault
@@ -42,6 +43,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     error DeRiskConditionNotMet();
     error InvalidToBucket();
     error NotAllocatorOrGuardian();
+    error AdapterStillHasAssets();
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -241,7 +243,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         IStrategyAdapter adapter = adapters[bucket];
         if (address(adapter) == address(0)) revert NothingToWithdraw();
         // Require that the adapter holds nothing before removal.
-        require(adapter.totalAssets() == 0, "YieldVault: adapter still holds assets");
+        if (adapter.totalAssets() != 0) revert AdapterStillHasAssets();
         delete adapters[bucket];
         emit StrategyRemoved(bucket);
     }
@@ -379,8 +381,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             if (available == 0) continue;
 
             uint256 toWithdraw = available < remaining ? available : remaining;
-            // minOut=0 is safe for the 1:1 Aave leg. Phase 2 (USDY/DEX adapters)
-            // must derive a floor from guardrails.config().maxSlippageBps here.
+            // minOut=0 is safe: Aave is 1:1 and UsdyAdapter.withdraw internally sets
+            // minOut = max(minOutUsdc, usdcAmount) so it always returns ≥ toWithdraw USDC.
+            // TODO(2b): for any future adapter that does NOT self-enforce minOut, derive
+            // a vault-side floor here: toWithdraw * (10_000 - guardrails.config().maxSlippageBps) / 10_000.
             adapter.withdraw(toWithdraw, 0, address(this), "");
             remaining = remaining > toWithdraw ? remaining - toWithdraw : 0;
         }
@@ -412,8 +416,20 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             : 0;
         s.totalAssets     = tvl;
         s.lastRebalanceAt = lastRebalanceAt;
-        // USDY oracle values: Phase 2 will populate from RWADynamicOracle.
-        // Phase 1b: no USDY adapter; usdyOracleNav + usdyDexSpot left as 0 (guard inactive).
+
+        // USDY oracle values: populated when the USDY adapter (bucket 2) is registered.
+        // Casting is safe because only a USDY adapter implementing IUsdyAdapter is ever
+        // placed in this slot (enforced off-chain and by the adapter's constructor).
+        IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
+        if (address(usdyAdapter) != address(0)) {
+            try IUsdyAdapter(address(usdyAdapter)).oracleData() returns (uint256 nav, uint64 rangeEnd) {
+                s.usdyOracleNav = nav;
+                s.usdyDexSpot   = nav; // Phase 2b will replace with actual DEX TWAP/quote.
+                s.oracleRangeEnd = rangeEnd;
+                // oracleUpdatedAt is not exposed by RWADynamicOracle; leave as 0
+                // (secondary oracleMaxAge check stays inactive until Phase 2b).
+            } catch { /* oracle down: leave as 0, guard will remain inactive this cycle */ }
+        }
     }
 
     /**
@@ -436,8 +452,8 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             uint256 delta = ((uint256(preWeights[i]) - targetWeights[i]) * tvl) / 10_000;
             if (delta == 0) continue;
             bytes memory sd = swapData.length > i ? swapData[i] : bytes("");
-            // minOut=0 safe for 1:1 Aave; Phase 2 DEX adapters must enforce a
-            // maxSlippageBps-derived floor here.
+            // minOut=0 safe: Aave is 1:1 and UsdyAdapter.withdraw self-enforces
+            // minOut = max(minOutUsdc, usdcAmount) using its own MAX_SLIPPAGE_BPS.
             adapter.withdraw(delta, 0, address(this), sd);
         }
 

@@ -6,7 +6,9 @@ import { Spinner } from "../components/Components";
 import { Modal } from "./Modals";
 import * as fmt from "../lib/fmt";
 import { explorer, type VaultState, type PositionState } from "../lib/data";
-import type { WalletState } from "../components/Shell";
+
+// Minimal wallet shape the trade modals need (address + spendable USDC balance).
+export interface TradeWallet { connected: boolean; address?: string | undefined; balance?: string | undefined; }
 
 const PER_TX_CAP = 10000;
 
@@ -48,7 +50,7 @@ function TxResult({ kind, title, lines, tx, onClose }: { kind: "confirmed" | "fa
 }
 
 // ---------- Deposit ----------
-export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: WalletState; vault: VaultState; onClose: () => void; onToast: (t: ToastPayload) => void }) {
+export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: TradeWallet; vault: VaultState; onClose: () => void; onToast: (t: ToastPayload) => void }) {
   const [amt, setAmt] = useState("");
   const [phase, setPhase] = useState<"form" | "approving" | "approved" | "depositing" | "done" | "failed">("form");
   const sharePrice = parseFloat(vault.sharePrice);

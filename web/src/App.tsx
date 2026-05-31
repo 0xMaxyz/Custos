@@ -1,29 +1,25 @@
-// App controller: routing, theme/network/wallet state, modal host, toasts. Matches Design/src/app.jsx.
+// App controller: routing, theme, modal host, toasts. Wallet/chain state comes
+// from wagmi (useAccount) + RainbowKit; the topbar ConnectButton drives connect,
+// account, and chain switching.
 
 import { useState, useEffect, useCallback } from "react";
+import { useAccount } from "wagmi";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Icon } from "./components/Icons";
-import { Topbar, MobileNav, Banners, Footer, type Route, type NetKey, type WalletState } from "./components/Shell";
+import { Topbar, MobileNav, Banners, Footer, type Route } from "./components/Shell";
 import { DevFlags, type AppFlags } from "./components/DevFlags";
-import { ConnectModal, NetworkSwitchModal, AccountModal } from "./modals/Modals";
 import { DepositModal, WithdrawModal, type ToastPayload } from "./modals/TradeModals";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { AgentPage } from "./pages/AgentPage";
 import { InsightsPage } from "./pages/InsightsPage";
-import * as fmt from "./lib/fmt";
 import { vault, position, walletUsdcBalance } from "./lib/data";
+import { supportedChains } from "./lib/chains";
 
 const ROUTES: Route[] = ["dashboard", "activity", "agent", "insights"];
-const MOCK_WALLET = { address: "0xA11c3b9D7e2F4a8c6B0d1E5f9A3c7B2d4E6f8A0E", balance: walletUsdcBalance, connector: "MetaMask" };
+const SUPPORTED_IDS = supportedChains.map((c) => c.id) as number[];
 
-type ModalState =
-  | { type: "connect" }
-  | { type: "network" }
-  | { type: "account" }
-  | { type: "deposit" }
-  | { type: "withdraw" }
-  | null;
-
+type ModalState = { type: "deposit" } | { type: "withdraw" } | null;
 interface Toast extends ToastPayload { id: number; }
 
 function useHashRoute(): [Route, (r: Route) => void] {
@@ -67,8 +63,6 @@ export default function App() {
   const [theme, setThemeState] = useState(() =>
     localStorage.getItem("sentinel-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "sentinel-dark" : "sentinel-light")
   );
-  const [net, setNet] = useState<NetKey>("mainnet");
-  const [wallet, setWallet] = useState<WalletState>({ connected: false });
   const [route, go] = useHashRoute();
   const [modal, setModal] = useState<ModalState>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -76,6 +70,11 @@ export default function App() {
   const [flags, setFlags] = useState<AppFlags>({
     paused: vault.paused, killed: vault.killed, wrongNet: false, emptyPosition: false, activityError: false,
   });
+
+  const { address, isConnected, chainId } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  // Demo wrong-net flag OR a genuinely unsupported chain while connected.
+  const wrongNet = (flags.wrongNet || (isConnected && chainId !== undefined && !SUPPORTED_IDS.includes(chainId)));
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -94,18 +93,16 @@ export default function App() {
   }, []);
   const dismiss = (id: number) => setToasts((arr) => arr.filter((x) => x.id !== id));
 
-  const connect = (connector: { name: string }) => {
-    setWallet({ connected: true, ...MOCK_WALLET, connector: connector.name });
-    setModal(null);
-    pushToast({ kind: "success", title: "Wallet connected", body: fmt.shortAddr(MOCK_WALLET.address, 6, 4) });
-  };
-  const disconnect = () => { setWallet({ connected: false }); pushToast({ kind: "info", title: "Wallet disconnected" }); };
-  const needWallet = (next: () => void) => { if (!wallet.connected) { setModal({ type: "connect" }); } else { next(); } };
+  // Not connected → open RainbowKit's connect modal; otherwise run the action.
+  const needWallet = (next: () => void) => { if (!isConnected) { openConnectModal?.(); } else { next(); } };
+
+  // Wallet balance is still a fixture until live ERC-20 reads land (see useVaultData seam).
+  const tradeWallet = { connected: isConnected, address, balance: walletUsdcBalance };
 
   const pageProps = {
-    connected: wallet.connected, paused: flags.paused, killed: flags.killed,
+    connected: isConnected, paused: flags.paused, killed: flags.killed,
     emptyPosition: flags.emptyPosition, go, loading,
-    onConnect: () => setModal({ type: "connect" }),
+    onConnect: () => openConnectModal?.(),
     onDeposit: () => needWallet(() => setModal({ type: "deposit" })),
     onWithdraw: () => needWallet(() => setModal({ type: "withdraw" })),
     onToast: pushToast,
@@ -113,10 +110,8 @@ export default function App() {
 
   return (
     <div className="app-root" data-theme={theme}>
-      <Topbar route={route} go={go} theme={theme} setTheme={setThemeState} net={net}
-        onSwitchNet={() => setModal({ type: "network" })} wallet={wallet}
-        onConnect={() => setModal({ type: "connect" })} onManage={() => setModal({ type: "account" })} />
-      <Banners wrongNet={flags.wrongNet && wallet.connected} paused={flags.paused} killed={flags.killed} onSwitch={() => setModal({ type: "network" })} />
+      <Topbar route={route} go={go} theme={theme} setTheme={setThemeState} />
+      <Banners wrongNet={wrongNet} paused={flags.paused} killed={flags.killed} />
       <main>
         {route === "dashboard" && <DashboardPage {...pageProps} />}
         {route === "activity" && <ActivityPage loading={loading} activityError={flags.activityError} />}
@@ -126,14 +121,11 @@ export default function App() {
       <Footer />
       <MobileNav route={route} go={go} />
 
-      {modal?.type === "connect" && <ConnectModal onClose={() => setModal(null)} onConnect={connect} />}
-      {modal?.type === "network" && <NetworkSwitchModal net={net} onClose={() => setModal(null)} onSwitch={setNet} />}
-      {modal?.type === "account" && wallet.connected && <AccountModal wallet={wallet} net={net} onClose={() => setModal(null)} onDisconnect={disconnect} onSwitchNet={() => setModal({ type: "network" })} />}
-      {modal?.type === "deposit" && wallet.connected && <DepositModal wallet={wallet} vault={vault} onClose={() => setModal(null)} onToast={pushToast} />}
+      {modal?.type === "deposit" && isConnected && <DepositModal wallet={tradeWallet} vault={vault} onClose={() => setModal(null)} onToast={pushToast} />}
       {modal?.type === "withdraw" && <WithdrawModal position={position} vault={vault} onClose={() => setModal(null)} onToast={pushToast} />}
 
       <Toasts items={toasts} dismiss={dismiss} />
-      <DevFlags flags={flags} setFlags={setFlags} />
+      {import.meta.env.DEV && <DevFlags flags={flags} setFlags={setFlags} />}
     </div>
   );
 }

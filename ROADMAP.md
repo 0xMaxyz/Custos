@@ -336,19 +336,28 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
 - **Goal:** a resolvable, schema-valid agent card.
 - **Test:** Vitest: fetched `tokenURI` JSON validates against the expected schema.
 
-### 4.3 — Web scaffold + chain config · _PR-4b_
+### 4.3 — Web scaffold + chain config · _PR-4b_ · `[x] DONE` (PR #11)
 
 - **What:** Vite React app, Tailwind+daisyUI theme, wagmi/viem wallet connect,
   Mantle mainnet+testnet config.
 - **Goal:** app connects a wallet and reads the vault.
 - **Test:** Vitest component render with mocked reads; manual connect on testnet.
+- **Built:** wagmi + RainbowKit + react-query providers (`providers.tsx`), Mantle
+  5000/5003 chain config with env-overridable RPC (`lib/chains.ts`), topbar
+  `ConnectButton` (connect/account/chain-switch + wrong-network guard). Vitest
+  covers chain config + format/fixture logic (25 tests).
 
-### 4.4 — Dashboard (reads) · _PR-4b_
+### 4.4 — Dashboard (reads) · _PR-4b_ · `[~] PARTIAL` (PR #11)
 
 - **What:** balance, share price, blended APY, allocation breakdown
   (USDY/Aave/idle/AUSD), TVL.
 - **Goal:** an accurate live view from chain.
 - **Test:** Vitest with mocked viem reads → expected figures; manual vs testnet.
+- **Status:** dashboard renders the full layout from typed fixtures behind a
+  reads-hook seam (`lib/useVaultData.ts`). **Live on-chain reads are DEFERRED**
+  until the Sentinel vault is deployed to Mantle testnet (Phase 1 dependency) —
+  there is no vault address to read yet. When deployed, swap the hook body for
+  `useReadContract` keyed off `VITE_VAULT_ADDRESS`; consumers are unchanged.
 
 ### 4.5 — Deposit/withdraw flow · _PR-4c_
 

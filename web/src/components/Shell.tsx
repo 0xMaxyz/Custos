@@ -1,8 +1,8 @@
 // App shell: Topbar, MobileNav, Banners, Footer. Matches Design/src/shell.jsx.
 
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Icon } from "./Icons";
-import * as fmt from "../lib/fmt";
-import { chains, explorer, tokens } from "../lib/data";
+import { explorer, tokens } from "../lib/data";
 
 const NAV = [
   { route: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
@@ -13,7 +13,6 @@ const NAV = [
 
 export type Route = "dashboard" | "activity" | "agent" | "insights";
 export type NetKey = "mainnet" | "testnet";
-export interface WalletState { connected: boolean; address?: string; balance?: string; connector?: string; }
 
 function Brand({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
@@ -34,34 +33,8 @@ function ThemeToggle({ theme, setTheme }: { theme: string; setTheme: (t: string)
   );
 }
 
-function NetworkPill({ net, onSwitch }: { net: NetKey; onSwitch: () => void }) {
-  const isTest = net === "testnet";
-  return (
-    <button className={"netpill" + (isTest ? " testnet" : "")} onClick={onSwitch} title="Switch network">
-      <span className="dot" style={{ background: isTest ? "var(--warning)" : "var(--success)" }} />
-      {chains[net].label}
-      <Icon name="chevron-down" size={14} style={{ opacity: 0.6 }} />
-    </button>
-  );
-}
-
-function WalletButton({ wallet, onConnect, onManage }: { wallet: WalletState; onConnect: () => void; onManage: () => void }) {
-  if (!wallet.connected) {
-    return <button className="wallet-btn" onClick={onConnect}><Icon name="wallet" size={16} />Connect</button>;
-  }
-  return (
-    <button className="wallet-chip" onClick={onManage} title="Account">
-      <span className="num">{fmt.usd(wallet.balance ?? "0", { cents: false })} USDC</span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, paddingLeft: 8, borderLeft: "1px solid var(--border)" }}>
-        <span className="avatar" /><span className="mono">{fmt.shortAddr(wallet.address ?? "", 4, 4)}</span>
-      </span>
-    </button>
-  );
-}
-
-export function Topbar({ route, go, theme, setTheme, net, onSwitchNet, wallet, onConnect, onManage }: {
+export function Topbar({ route, go, theme, setTheme }: {
   route: Route; go: (r: Route) => void; theme: string; setTheme: (t: string) => void;
-  net: NetKey; onSwitchNet: () => void; wallet: WalletState; onConnect: () => void; onManage: () => void;
 }) {
   return (
     <header className="topbar">
@@ -77,9 +50,9 @@ export function Topbar({ route, go, theme, setTheme, net, onSwitchNet, wallet, o
           ))}
         </nav>
         <div className="topbar-right">
-          <NetworkPill net={net} onSwitch={onSwitchNet} />
           <ThemeToggle theme={theme} setTheme={setTheme} />
-          <WalletButton wallet={wallet} onConnect={onConnect} onManage={onManage} />
+          {/* RainbowKit handles connect, account, and chain switching (incl. wrong-network) */}
+          <ConnectButton chainStatus="icon" accountStatus="address" showBalance={false} />
         </div>
       </div>
     </header>
@@ -99,15 +72,14 @@ export function MobileNav({ route, go }: { route: Route; go: (r: Route) => void 
   );
 }
 
-export function Banners({ wrongNet, paused, killed, onSwitch }: { wrongNet: boolean; paused: boolean; killed: boolean; onSwitch: () => void }) {
+export function Banners({ wrongNet, paused, killed }: { wrongNet: boolean; paused: boolean; killed: boolean }) {
   return (
     <>
       {wrongNet && (
         <div className="banner err" role="alert">
           <div className="banner-inner">
             <Icon name="alert-triangle" size={18} />
-            <span style={{ flex: 1 }}>You're connected to an unsupported network. Write actions are disabled.</span>
-            <button className="btn btn-danger btn-sm" onClick={onSwitch}>Switch to Mantle</button>
+            <span style={{ flex: 1 }}>You're connected to an unsupported network. Switch to Mantle from the wallet button — write actions are disabled.</span>
           </div>
         </div>
       )}

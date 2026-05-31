@@ -29,7 +29,9 @@ contract ForkTest is Test {
 
     // ── Aave v3 on Mantle ─────────────────────────────────────────────────────
     // Source: https://aave.com/docs/resources/addresses - Mantle mainnet
-    address internal constant AAVE_ADDRESSES_PROVIDER = 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb;
+    // NOTE: 0xa97684... is the Polygon provider and is an empty slot on Mantle.
+    // The Mantle PoolAddressesProvider is the address below.
+    address internal constant AAVE_ADDRESSES_PROVIDER = 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f;
 
     // ── Ondo USDY oracle - resolved from USDY contract during 0.3 gate ───────
     // Populated in setUp() via on-chain read; recorded in addresses.ts after gate.

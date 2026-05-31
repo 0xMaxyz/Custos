@@ -29,7 +29,9 @@ contract ForkPhase1bTest is Test {
 
     // Verified against the Phase 0.3 on-chain gate (Fork.t.sol::testAddressesHaveCode).
     address internal constant USDC = 0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9; // 1delta curated list
-    address internal constant AAVE_ADDRESSES_PROVIDER = 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb; // aave.com/docs Mantle
+    // NOTE: 0xa97684... is the Polygon provider (empty on Mantle). Below is the
+    // Mantle mainnet PoolAddressesProvider — aave.com/docs/resources/addresses.
+    address internal constant AAVE_ADDRESSES_PROVIDER = 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f;
 
     // ── Actors ────────────────────────────────────────────────────────────────
 

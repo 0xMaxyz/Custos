@@ -101,7 +101,7 @@ contract ForkPhase1bTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-test", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://fork-test", bytes32(0), 0);
 
         uint256 aUsdcBal = IERC20(aUsdc).balanceOf(address(adapter));
         assertApproxEqAbs(aUsdcBal, DEPOSIT / 2, 1e6); // ~$500 in Aave
@@ -137,7 +137,7 @@ contract ForkPhase1bTest is Test {
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
-        vault.rebalance(target, sd, "ipfs://fork-test-2", bytes32(0));
+        vault.rebalance(target, sd, "ipfs://fork-test-2", bytes32(0), 0);
 
         uint256 mw = adapter.maxWithdrawable();
         uint256 ta = adapter.totalAssets();

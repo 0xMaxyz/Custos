@@ -142,9 +142,9 @@ describe("end-to-end cycle pipeline (mocked, no network)", () => {
     expect(sum).toBe(10_000);
   });
 
-  it("LLM deRisk=true (with cited evidence) triggers de-risk even without deterministic flag", async () => {
+  it("LLM deRisk=true (with cited evidence) preserves verdict when peg is healthy", async () => {
     // Healthy snapshot — no deterministic forceDeRisk.
-    // LLM requests deRisk with cited evidence; executor should honour it.
+    // Signal layer must keep deRisk=true; executor honours via rebalance (see mocked suite).
     const { assess } = await import("../risk/engine.js");
     const { runSignalLayer } = await import("../llm/signals.js");
 
@@ -166,10 +166,7 @@ describe("end-to-end cycle pipeline (mocked, no network)", () => {
     const mockLLM = { complete: vi.fn(async () => verdict) };
     const llmResult = await runSignalLayer(snap, assessment, { llm: mockLLM, fetchEvidence });
 
-    // LLM-requested deRisk should be preserved.
     expect(llmResult?.deRisk).toBe(true);
-    // In the executor cycle: llmDeRisk=true → _sendDeRisk path taken.
-    // Verified through the verdict property — executor wiring tested in fork tests.
   });
 
   it("evidence is included in the pinned bundle (not empty array)", async () => {
@@ -280,7 +277,10 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     return { snapshot: vi.fn(async () => snap), invalidate: vi.fn() } as never;
   }
 
-  async function makeExecutor(snap: MarketSnapshot) {
+  async function makeExecutor(
+    snap: MarketSnapshot,
+    env: Record<string, string> = {},
+  ) {
     const { Executor } = await import("./index.js");
     const { loadConfig } = await import("../config.js");
     const { publicClient, walletClient, writeContract } = makeMockClients();
@@ -288,6 +288,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
       MANTLE_RPC_URL: "https://rpc.mantle.xyz",
       VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
       ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      ...env,
     });
     const clients = { publicClient, walletClient } as never;
     const executor = new Executor({ config, clients, snapshotter: makeSnapshotter(snap) });
@@ -307,25 +308,47 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(call.functionName).toBe("deRisk");
   });
 
-  it("LLM-only deRisk (healthy peg): calls rebalance, not deRisk", async () => {
-    // Healthy snapshot — no deterministic forceDeRisk.
-    // LLM is not configured (no anthropicApiKey) so verdict=null.
-    // Verify no deRisk call is made: without forceDeRisk the rebalance path is used.
-    const snap = baseSnapshot();
-    const { executor, writeContract } = await makeExecutor(snap);
+  it("LLM-only deRisk (healthy peg): calls rebalance with USDY=0, not deRisk", async () => {
+    const signalsMod = await import("../llm/signals.js");
+    const evidenceMod = await import("../llm/evidence.js");
+    const runSignalLayer = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
+      riskLevel: "DERISK",
+      usdyMaxWeightBps: 5_000,
+      deRisk: true,
+      rationale: "Issuer regulatory action — route USDY to zero via rebalance.",
+      signals: [{ type: "REGULATORY", severity: "HIGH", summary: "SEC action", evidenceId: "r1" }],
+      confidence: 0.95,
+    });
+    const buildEvidenceFetcher = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
+      async () => [
+        {
+          id: "r1",
+          type: "REGULATORY" as EvidenceType,
+          source: "sec.gov",
+          url: "https://sec.gov",
+          publishedAt: "2026-06-01",
+          summary: "Action.",
+        },
+      ],
+    );
 
-    // No change in healthy state with default weights → submitted=false.
+    const snap = baseSnapshot();
+    const { executor, writeContract } = await makeExecutor(snap, {
+      ANTHROPIC_API_KEY: "sk-test",
+    });
+
     const result = await executor.runCycle();
 
-    if (result.submitted) {
-      // If weights changed, it must have used rebalance, not deRisk.
-      const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string }])[0];
-      expect(call.functionName).toBe("rebalance");
-      expect(call.functionName).not.toBe("deRisk");
-    } else {
-      // No change — no write at all.
-      expect(writeContract).not.toHaveBeenCalled();
-    }
+    expect(result.submitted).toBe(true);
+    expect(result.kind).toBe("rebalance");
+    expect(writeContract).toHaveBeenCalledOnce();
+    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string; args: unknown[] }])[0];
+    expect(call.functionName).toBe("rebalance");
+    const weights = call.args[0] as readonly number[];
+    expect(weights[Bucket.USDY]).toBe(0);
+
+    runSignalLayer.mockRestore();
+    buildEvidenceFetcher.mockRestore();
   });
 
   it("oracle stale: calls deRisk via deterministic forceDeRisk", async () => {

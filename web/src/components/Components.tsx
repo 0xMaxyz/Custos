@@ -28,7 +28,7 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    try { void navigator.clipboard.writeText(text); } catch (_) {}
+    try { void navigator.clipboard.writeText(text); } catch { /* clipboard unavailable */ }
     setDone(true);
     setTimeout(() => setDone(false), 1200);
   };

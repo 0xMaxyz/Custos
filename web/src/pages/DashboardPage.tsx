@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "../components/Icons";
-import { Card, RiskLevelChip, OutcomeStrip, Skeleton, EmptyState, InfoTip, ConfidenceMeter, SignalBadge } from "../components/Components";
+import { Card, Skeleton, EmptyState, InfoTip, ConfidenceMeter, SignalBadge } from "../components/Components";
 import { AllocationChart, AllocationLegend, Sparkline, PegGauge } from "../components/Charts";
 import * as fmt from "../lib/fmt";
 import { RISK, decisions, position, vault, baseline } from "../lib/data";

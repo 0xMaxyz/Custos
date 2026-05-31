@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Bucket } from "@sentinel/shared";
 import type { MarketSnapshot, WeightsBps } from "../types.js";
-import type { RiskVerdict } from "../llm/types.js";
+import type { RiskVerdict, EvidenceType } from "../llm/types.js";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
 
@@ -140,6 +140,67 @@ describe("end-to-end cycle pipeline (mocked, no network)", () => {
     // deRisk path skips validateProposal — just verify the weights are sane.
     const sum = proposed[Bucket.IDLE] + proposed[Bucket.AAVE] + proposed[Bucket.USDY] + proposed[Bucket.AUSD];
     expect(sum).toBe(10_000);
+  });
+
+  it("LLM deRisk=true (with cited evidence) triggers de-risk even without deterministic flag", async () => {
+    // Healthy snapshot — no deterministic forceDeRisk.
+    // LLM requests deRisk with cited evidence; executor should honour it.
+    const { assess } = await import("../risk/engine.js");
+    const { runSignalLayer } = await import("../llm/signals.js");
+
+    const snap = baseSnapshot();
+    const assessment = assess(snap, { nowSec: NOW });
+    expect(assessment.forceDeRisk).toBe(false);
+
+    const verdict: RiskVerdict = {
+      riskLevel: "DERISK",
+      usdyMaxWeightBps: 0,
+      deRisk: true,
+      rationale: "Issuer regulatory action — immediate de-risk required.",
+      signals: [{ type: "REGULATORY", severity: "HIGH", summary: "SEC action", evidenceId: "r1" }],
+      confidence: 0.95,
+    };
+    const fetchEvidence = vi.fn(async () => [
+      { id: "r1", type: "REGULATORY" as EvidenceType, source: "sec.gov", url: "https://sec.gov", publishedAt: "2026-06-01", summary: "Action." },
+    ]);
+    const mockLLM = { complete: vi.fn(async () => verdict) };
+    const llmResult = await runSignalLayer(snap, assessment, { llm: mockLLM, fetchEvidence });
+
+    // LLM-requested deRisk should be preserved.
+    expect(llmResult?.deRisk).toBe(true);
+    // In the executor cycle: llmDeRisk=true → _sendDeRisk path taken.
+    // Verified through the verdict property — executor wiring tested in fork tests.
+  });
+
+  it("evidence is included in the pinned bundle (not empty array)", async () => {
+    const { pinRationale } = await import("./ipfs.js");
+    const { loadConfig } = await import("../config.js");
+
+    const config = loadConfig({ MANTLE_RPC_URL: "https://rpc.mantle.xyz" });
+    const evidenceItem = {
+      id: "e1",
+      type: "ATTESTATION" as const,
+      source: "ondo.finance",
+      url: "https://ondo.finance",
+      publishedAt: "2026-06-01",
+      summary: "Monthly attestation: 99.8% T-bills.",
+    };
+    const bundle = {
+      rationale: "USDY attestation clean.",
+      signals: [],
+      evidence: [evidenceItem],
+      candidateWeightsBps: weights(200, 4_800, 5_000, 0),
+      riskLevel: "NORMAL",
+      asOf: new Date(NOW * 1000).toISOString(),
+    };
+
+    const { uri, rationaleHash } = await pinRationale(bundle, config);
+    // The data: URI should contain the evidence item.
+    const decoded = Buffer.from(uri.split(",")[1]!, "base64").toString("utf-8");
+    const parsed = JSON.parse(decoded) as typeof bundle;
+    expect(parsed.evidence).toHaveLength(1);
+    expect(parsed.evidence[0]?.id).toBe("e1");
+    expect(rationaleHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 });
 

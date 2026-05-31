@@ -94,9 +94,11 @@ describe("pinAgentCard", () => {
     expect(result.uri).toMatch(/^data:application\/json;base64,/);
     expect(result.rationaleHash).toMatch(/^0x[0-9a-f]{64}$/);
 
-    // The data URI should decode back to the same card.
+    // The data URI should decode back to a schema-valid card (mirrors ROADMAP §4.2:
+    // "fetched tokenURI JSON validates against the expected schema" — full parse,
+    // not just spot fields).
     const decoded = Buffer.from(result.uri.split(",")[1]!, "base64").toString("utf-8");
-    const parsed = JSON.parse(decoded);
+    const parsed = agentCardSchema.parse(JSON.parse(decoded));
     expect(parsed.vault).toBe(VAULT);
     expect(parsed.name).toBe("Sentinel");
   });

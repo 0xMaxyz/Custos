@@ -167,19 +167,19 @@ guardrails, and deposit/withdraw.
 **Phase goal:** USDY bucket via DEX with oracle valuation, the depeg/oracle guard,
 the de-risk path, and the on-chain decision/benchmark ledger.
 
-### 2.1 — DEX swap library · _PR-2a_ · `[x] DONE`
+### 2.1 — DEX swap library · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5)
 - **What:** minimal `exactIn` swap wrapper for the chosen Mantle router with
   `minOut` + `deadline`; configured paths USDC↔USDY, USDC↔AUSD.
 - **Goal:** trustless swaps with on-chain slippage protection.
 - **Test:** fork test: USDC→USDY→USDC respects `minOut`; slippage within guardrail.
 
-### 2.2 — USDY valuation via `RWADynamicOracle` · _PR-2a_ · `[x] DONE`
+### 2.2 — USDY valuation via `RWADynamicOracle` · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5)
 - **What:** read USDY NAV for valuation; staleness check (timestamp/round).
 - **Goal:** vault values USDY by oracle NAV; detects stale oracle.
 - **Test:** fork test: USDY holdings valued at oracle price; simulated stale oracle
   flips the staleness flag.
 
-### 2.3 — `UsdyAdapter` · _PR-2a_ · `[x] DONE`
+### 2.3 — `UsdyAdapter` · _PR-2a_ · `[x] DONE` · [PR #5](https://github.com/0xMaxyz/miu/pull/5)
 - **What:** allocate = swap USDC→USDY (`minOut`); withdraw = swap USDY→USDC
   (`minOut`); `totalAssets` via oracle; `maxWithdrawable` via liquidity cap;
   blocklist-aware.

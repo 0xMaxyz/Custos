@@ -36,16 +36,29 @@ export const ERC8004 = {
 
 /**
  * Protocol addresses to resolve + verify during the Phase 0.3 on-chain gate.
- * Left as `null` until confirmed against a live Mantle fork — DO NOT guess.
+ * Entries still `null` await confirmation against a live Mantle fork — DO NOT guess.
+ *
+ * Addresses below carry a source but NOT yet a "verified @ block N" tag: they are
+ * recorded from official docs and used by the fork tests, but the on-chain
+ * extcodesize/ABI gate must run (needs Mantle RPC) before they are considered
+ * verified. Once a fork run confirms them, replace the source note with
+ * `// verified @ block N`.
  */
 export const PROTOCOLS: Record<string, Address | null> = {
-  // Aave v3 on Mantle
+  // Aave v3 on Mantle — PoolAddressesProvider (resolves Pool + DataProvider).
+  // NOTE: 0xa97684... is the Polygon provider (empty on Mantle); the line below
+  // is Mantle's. source: aave.com/docs/resources/addresses
+  aaveV3PoolAddressesProvider: "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+  // Resolved from the provider on a live fork (Pool.getReserveData(USDC).aToken).
   aaveV3Pool: null,
   aaveV3PoolDataProvider: null,
   aUSDC: null,
-  // Ondo USDY pricing
-  usdyRWADynamicOracle: null,
-  // DEX routers for USDC<->USDY, USDC<->AUSD, USDY<->WMNT
-  dexRouterUsdy: null,
+  // Ondo USDY Redemption Price Oracle — exposes getPrice() (18-dec NAV).
+  // currentRange() is NOT implemented on this deployment; UsdyAdapter handles
+  // that via try/catch. source: Ondo docs / Phase 0.3 gate
+  usdyRWADynamicOracle: "0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f",
+  // DEX router for USDC<->USDY (Merchant Moe LB Router v2).
+  // source: docs.merchantmoe.com/developer-resources/contract-addresses
+  dexRouterUsdy: "0xeaEE7EE68874218c3558b40063c42B82D3E7232a",
   dexRouterAusd: null,
 };

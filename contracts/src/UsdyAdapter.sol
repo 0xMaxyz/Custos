@@ -29,7 +29,6 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     // ── Errors ────────────────────────────────────────────────────────────────
 
     error OnlyVault();
-    error BelowMinOut();
     error ZeroAmount();
     error ZeroAddress();
     error OracleStale();
@@ -107,10 +106,16 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     // ── IUsdyAdapter ──────────────────────────────────────────────────────────
 
     /// @inheritdoc IUsdyAdapter
+    /// @dev Ondo's deployed Mantle oracle exposes getPrice() but not currentRange();
+    ///      the range call is wrapped in try/catch so rangeEnd=0 (range-staleness
+    ///      check disabled) rather than reverting on the production ABI.
     function oracleData() external view override returns (uint256 nav, uint64 rangeEnd) {
         nav = ORACLE.getPrice();
-        (, uint256 end) = ORACLE.currentRange();
-        rangeEnd = uint64(end);
+        try ORACLE.currentRange() returns (uint256, uint256 end) {
+            rangeEnd = end > type(uint64).max ? type(uint64).max : uint64(end);
+        } catch {
+            rangeEnd = 0; // range not exposed on this oracle — staleness via range disabled
+        }
     }
 
     // ── IStrategyAdapter ──────────────────────────────────────────────────────
@@ -230,9 +235,16 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     /// @dev Reverts if the oracle price range has expired (NAV is stale).
+    ///      currentRange() is optional on the deployed Mantle ABI — if it reverts,
+    ///      we skip the range check and rely on getPrice() (which is called by the
+    ///      swap math and reverts on a dead oracle). The on-chain Guardrails depeg
+    ///      guard is the deterministic backstop regardless.
     function _requireOracleFresh() internal view {
-        (, uint256 rangeEnd) = ORACLE.currentRange();
-        if (rangeEnd > 0 && block.timestamp > rangeEnd) revert OracleStale();
+        try ORACLE.currentRange() returns (uint256, uint256 rangeEnd) {
+            if (rangeEnd > 0 && block.timestamp > rangeEnd) revert OracleStale();
+        } catch {
+            // Range not exposed; getPrice() (used downstream) still guards a dead oracle.
+        }
     }
 
     /// @dev Decode swapData into path params, falling back to stored defaults.

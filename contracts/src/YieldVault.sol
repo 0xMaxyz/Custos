@@ -43,6 +43,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     error DeRiskConditionNotMet();
     error InvalidToBucket();
     error NotAllocatorOrGuardian();
+    error AdapterStillHasAssets();
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -242,7 +243,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         IStrategyAdapter adapter = adapters[bucket];
         if (address(adapter) == address(0)) revert NothingToWithdraw();
         // Require that the adapter holds nothing before removal.
-        require(adapter.totalAssets() == 0, "YieldVault: adapter still holds assets");
+        if (adapter.totalAssets() != 0) revert AdapterStillHasAssets();
         delete adapters[bucket];
         emit StrategyRemoved(bucket);
     }
@@ -380,8 +381,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             if (available == 0) continue;
 
             uint256 toWithdraw = available < remaining ? available : remaining;
-            // minOut=0 is safe for the 1:1 Aave leg. Phase 2 (USDY/DEX adapters)
-            // must derive a floor from guardrails.config().maxSlippageBps here.
+            // minOut=0 is safe here: the Aave leg is 1:1, and UsdyAdapter.withdraw
+            // self-enforces minOut = max(minOutUsdc, usdcAmount) — it always returns
+            // at least the requested USDC or reverts. The DEX slippage floor lives
+            // inside the adapter (derived from its MAX_SLIPPAGE_BPS), not here.
             adapter.withdraw(toWithdraw, 0, address(this), "");
             remaining = remaining > toWithdraw ? remaining - toWithdraw : 0;
         }
@@ -449,8 +452,8 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             uint256 delta = ((uint256(preWeights[i]) - targetWeights[i]) * tvl) / 10_000;
             if (delta == 0) continue;
             bytes memory sd = swapData.length > i ? swapData[i] : bytes("");
-            // minOut=0 safe for 1:1 Aave; Phase 2 DEX adapters must enforce a
-            // maxSlippageBps-derived floor here.
+            // minOut=0 safe: Aave is 1:1 and UsdyAdapter.withdraw self-enforces
+            // minOut = max(minOutUsdc, usdcAmount) using its own MAX_SLIPPAGE_BPS.
             adapter.withdraw(delta, 0, address(this), sd);
         }
 

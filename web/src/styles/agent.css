@@ -1,0 +1,26 @@
+/* Agent page (§5.3) styles. */
+.agent-cols { grid-template-columns: 1.3fr 1fr; align-items: start; }
+@media (max-width: 900px) { .agent-cols { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .track { grid-template-columns: 1fr 1fr !important; } }
+
+.agent-nft { width: 92px; height: 92px; border-radius: 16px; background: linear-gradient(150deg, var(--primary), color-mix(in srgb, var(--info) 70%, var(--primary))); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-md); }
+
+.watch-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px 16px; align-items: center; padding: 11px 0; }
+.watch-row + .watch-row { border-top: 1px solid var(--border); }
+.watch-thresh { grid-column: 1 / -1; font-size: 0.6875rem; color: var(--faint); font-family: var(--font-mono); margin-top: -4px; }
+
+.guardrail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--rounded-btn); overflow: hidden; }
+@media (max-width: 560px) { .guardrail-grid { grid-template-columns: repeat(2, 1fr); } }
+.guardrail { background: var(--base-100); padding: 11px 13px; }
+
+/* Ask panel */
+.ask-card { display: flex; flex-direction: column; position: sticky; top: 76px; max-height: calc(100vh - 100px); }
+@media (max-width: 900px) { .ask-card { position: static; max-height: none; } }
+.ask-body { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-height: 280px; }
+.bubble { max-width: 86%; padding: 11px 14px; border-radius: 14px; font-size: 0.875rem; line-height: 1.5; }
+.bubble.user { align-self: flex-end; background: var(--primary); color: var(--primary-content); border-bottom-right-radius: 4px; }
+.bubble.agent { align-self: flex-start; background: var(--base-200); color: var(--base-content); border-bottom-left-radius: 4px; }
+.bubble.typing { display: inline-flex; gap: 4px; padding: 14px; }
+.bubble.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); animation: pulseDot 1.1s ease-in-out infinite; }
+.bubble.typing span:nth-child(2) { animation-delay: 0.18s; }
+.bubble.typing span:nth-child(3) { animation-delay: 0.36s; }

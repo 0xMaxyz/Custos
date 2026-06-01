@@ -1,0 +1,13 @@
+{
+  "chainId": 5000,
+  "network": "mantle-mainnet",
+  "_note": "Populate after running: forge script script/Deploy.s.sol --rpc-url $MANTLE_RPC_URL --broadcast --verify",
+  "guardrails": "",
+  "vault": "",
+  "benchmark": "",
+  "aaveAdapter": "",
+  "usdyAdapter": "",
+  "agentId": null,
+  "deployer": "",
+  "deployedAt": null
+}

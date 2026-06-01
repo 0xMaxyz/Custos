@@ -88,11 +88,11 @@ describe("deposit phase machine", () => {
     expect(depositStepIndex("done")).toBe(1);
   });
 
-  it("reports busy only while a tx is in flight", () => {
+  it("reports busy while approving, approved, or depositing", () => {
     expect(isDepositBusy("approving")).toBe(true);
+    expect(isDepositBusy("approved")).toBe(true); // deposit auto-fires; button must stay disabled
     expect(isDepositBusy("depositing")).toBe(true);
     expect(isDepositBusy("form")).toBe(false);
-    expect(isDepositBusy("approved")).toBe(false);
     expect(isDepositBusy("done")).toBe(false);
   });
 

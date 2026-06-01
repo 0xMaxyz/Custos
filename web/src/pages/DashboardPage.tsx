@@ -1,19 +1,28 @@
 // Dashboard (§5.1). Matches Design/src/dashboard.jsx.
 
 import { useState } from "react";
+import { useAccount } from "wagmi";
 import { Icon } from "../components/Icons";
 import { Card, Skeleton, EmptyState, InfoTip, ConfidenceMeter, SignalBadge } from "../components/Components";
 import { AllocationChart, AllocationLegend, Sparkline, PegGauge } from "../components/Charts";
 import * as fmt from "../lib/fmt";
-import { RISK, decisions } from "../lib/data";
+import { RISK } from "../lib/data";
 import { useVaultData } from "../lib/useVaultData";
+import { useDecisions } from "../lib/useGuardianData";
 import { computeBaseline, formatDeltaPct } from "../lib/baseline";
 import type { PositionState, VaultState } from "../lib/data";
 import type { VaultData } from "../lib/useVaultData";
 import type { Route } from "../components/Shell";
 
 function AgentStatusCard({ go }: { go: (r: Route) => void }) {
-  const decision = decisions[0]!;
+  const { decisions } = useDecisions();
+  const decision = decisions[0];
+  if (!decision) return (
+    <Card className="agent-status">
+      <span className="card-title"><Icon name="shield-check" size={14} />Agent status</span>
+      <p style={{ color: "var(--muted)", margin: "10px 0 0", fontSize: "0.9375rem" }}>No decisions recorded yet — the agent is monitoring.</p>
+    </Card>
+  );
   const r = RISK[decision.riskLevel];
   return (
     <Card className="agent-status" style={{ borderColor: `color-mix(in srgb, var(--${r.role}) 35%, var(--border))` }}>
@@ -234,7 +243,8 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ connected, paused, killed, emptyPosition, go, onDeposit, onWithdraw, onConnect, loading }: DashboardPageProps) {
-  const { vault, position, baseline } = useVaultData();
+  const { address } = useAccount();
+  const { vault, position, baseline } = useVaultData(address);
 
   if (loading) {
     return (

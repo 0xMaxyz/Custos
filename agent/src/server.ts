@@ -14,6 +14,31 @@ export interface ServerOptions {
    * yet. Async because building it may require a fresh on-chain/data snapshot.
    */
   readonly getContext?: (() => Promise<ExplainContext | null>) | undefined;
+  /**
+   * Max `/ask` requests allowed per `askRateWindowMs`, across all callers. Each
+   * request costs an Anthropic call + a snapshot, so this caps API-cost abuse on
+   * the unauthenticated public endpoint. Default 30 / minute. Set 0 to disable.
+   */
+  readonly askRateLimit?: number | undefined;
+  readonly askRateWindowMs?: number | undefined;
+}
+
+/** Minimal fixed-window throttle (dependency-free). Global, not per-IP — the goal
+ *  is API-cost protection on a public endpoint, not fair-share scheduling. */
+function makeRateLimiter(limit: number, windowMs: number): () => boolean {
+  let windowStart = 0;
+  let count = 0;
+  return () => {
+    if (limit <= 0) return true; // disabled
+    const now = Date.now();
+    if (now - windowStart >= windowMs) {
+      windowStart = now;
+      count = 0;
+    }
+    if (count >= limit) return false;
+    count += 1;
+    return true;
+  };
 }
 
 interface AskBody {
@@ -49,7 +74,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // ── Conversational transparency endpoint (A3.1) ────────────────────────────
   const { explainClient, getContext } = options;
   if (explainClient && getContext) {
+    const allowRequest = makeRateLimiter(options.askRateLimit ?? 30, options.askRateWindowMs ?? 60_000);
+
     app.post<{ Body: AskBody }>("/ask", async (req, reply) => {
+      if (!allowRequest()) {
+        return reply.code(429).send({ error: "Too many questions — please slow down and try again shortly." });
+      }
+
       const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
       if (question.length === 0) {
         return reply.code(400).send({ error: "Missing 'question' (non-empty string)." });

@@ -43,7 +43,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | ----- | --------- | ----------------------------- | ------------------------------------------------------------------------------- |
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
 | PR-A2 | A2.1      | Risk radar viz                | `[ ]`                                                                            |
-| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · A3.2 `[ ]`                                                    |
+| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[ ]` |
 
 ---
 

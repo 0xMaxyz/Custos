@@ -49,6 +49,8 @@ describe("agent server — /ask (A3.1)", () => {
   function buildWith(opts: {
     explain?: ExplainClient["explain"];
     context?: () => Promise<ExplainContext | null>;
+    askRateLimit?: number;
+    askRateWindowMs?: number;
   }): FastifyInstance {
     const explainClient: ExplainClient = {
       explain: opts.explain ?? (async () => "Because USDY out-yields Aave and the peg is healthy."),
@@ -56,6 +58,8 @@ describe("agent server — /ask (A3.1)", () => {
     return buildServer({
       explainClient,
       getContext: opts.context ?? (async () => sampleContext),
+      ...(opts.askRateLimit !== undefined ? { askRateLimit: opts.askRateLimit } : {}),
+      ...(opts.askRateWindowMs !== undefined ? { askRateWindowMs: opts.askRateWindowMs } : {}),
     });
   }
 
@@ -143,6 +147,16 @@ describe("agent server — /ask (A3.1)", () => {
     await app.ready();
     const res = await app.inject({ method: "POST", url: "/ask", payload: { question: "hi" } });
     expect(res.statusCode).toBe(502);
+    await app.close();
+  });
+
+  it("rate-limits once the per-window quota is exhausted", async () => {
+    const app = buildWith({ askRateLimit: 2, askRateWindowMs: 60_000 });
+    await app.ready();
+    const ask = () => app.inject({ method: "POST", url: "/ask", payload: { question: "hi" } });
+    expect((await ask()).statusCode).toBe(200);
+    expect((await ask()).statusCode).toBe(200);
+    expect((await ask()).statusCode).toBe(429); // third request in the window
     await app.close();
   });
 

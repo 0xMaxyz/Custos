@@ -33,13 +33,22 @@ const rememberDecision = (d: Decision) => {
 };
 
 // Fresh grounding context on demand: snapshot + deterministic assessment +
-// recent decisions. Returns null if no data pipeline is available.
+// recent decisions. A short TTL cache coalesces bursts of chat messages so a
+// chatty session doesn't re-snapshot (RPC + 1delta) on every question.
+const CONTEXT_TTL_MS = 10_000;
+let contextCache: { at: number; value: ExplainContext } | undefined;
 const getContext =
   explainClient && pipeline
     ? async (): Promise<ExplainContext | null> => {
+        const now = Date.now();
+        if (contextCache && now - contextCache.at < CONTEXT_TTL_MS) {
+          return contextCache.value;
+        }
         const snapshot = await pipeline.snapshotter.snapshot();
         const assessment = assess(snapshot);
-        return buildExplainContext(snapshot, assessment, recentDecisions);
+        const value = buildExplainContext(snapshot, assessment, recentDecisions);
+        contextCache = { at: now, value };
+        return value;
       }
     : undefined;
 

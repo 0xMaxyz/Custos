@@ -45,7 +45,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[x] DONE` |
 | PR-A2 | A2.1      | Risk radar viz                | `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17)                    |
 | PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17) |
-| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[x] DONE` |
+| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21) |
 
 ---
 
@@ -631,7 +631,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   `.env.example`). 11 agent Vitest (both channels, partial configs, failure path).
   · [PR #17](https://github.com/0xMaxyz/miu/pull/17)
 
-#### A4.1 — Agent x402 micropayments · _PR-A4_ · `[x] DONE`
+#### A4.1 — Agent x402 micropayments · _PR-A4_ · `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21)
 
 - **What:** the agent pays per-call (x402, stablecoin) for premium risk/data feeds;
   the x402 receipt is pinned into the decision evidence bundle. Optionally expose
@@ -653,7 +653,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   Tests: `x402.test.ts` (10) + `server.test.ts` x402 (3) — 402→pay→200, receipt binding,
   verifier accept/reject.
 
-#### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[x] DONE`
+#### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21)
 
 - **What:** model each de-risk as an ERC-8183 escrowed Job (client/provider/
   evaluator); the **deterministic guardrail validator is the evaluator** that releases

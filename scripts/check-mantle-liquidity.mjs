@@ -22,35 +22,43 @@
 //   node scripts/check-mantle-liquidity.mjs --json           # machine-readable JSON to stdout
 //   node scripts/check-mantle-liquidity.mjs --write          # also write reports/mantle-liquidity.{json,md}
 //   node scripts/check-mantle-liquidity.mjs --min=250000     # exit 1 if RWA DEX liquidity < $250k
-//   MUSD_ADDRESS=0x... node scripts/check-mantle-liquidity.mjs   # include mUSD supply + price
+//
+// Token addresses (USDC/USDY/AUSD/WMNT/mUSD) are read from
+// packages/shared/src/tokens.ts — the single source of truth.
 //
 // Env:
 //   MANTLE_RPC_URL  (default https://rpc.mantle.xyz)
-//   MUSD_ADDRESS    (optional — mUSD is not yet in packages/shared/src/tokens.ts)
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// ── Canonical Mantle addresses ──────────────────────────────────────────────
-// Source of truth: packages/shared/src/tokens.ts (1delta curated 5000.json).
-// Inlined so this stays dependency-free. mUSD is intentionally NOT hardcoded —
-// it is not yet verified in the repo, and the project rule is "DO NOT guess"
-// addresses. Pass MUSD_ADDRESS to include it.
-const TOKENS = {
-  USDC: { address: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9", decimals: 6, peg: 1 },
-  USDY: { address: "0x5bE26527e817998A7206475496fDE1E68957c5A6", decimals: 18, peg: null }, // accrues (~$1.10+)
-  AUSD: { address: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a", decimals: 6, peg: 1 },
-  WMNT: { address: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8", decimals: 18, peg: null },
-};
+// ── Canonical Mantle addresses — sourced from packages/shared/src/tokens.ts ──
+// Parsed at runtime (not imported) so this script stays dependency-free and
+// runnable from a bare runner, while keeping tokens.ts the single source of
+// truth — no inlined addresses to drift. $1-peg expectations are layered on
+// locally (USDY accrues; WMNT floats).
+const PEGS = { USDC: 1, AUSD: 1, MUSD: 1 };
 
-const MUSD_ADDRESS = process.env.MUSD_ADDRESS?.trim() || null;
-if (MUSD_ADDRESS) {
-  // mUSD: rebasing, $1-pegged distribution form of USDY on Mantle. Confirm decimals on-chain.
-  TOKENS.MUSD = { address: MUSD_ADDRESS, decimals: 18, peg: 1 };
+function loadTokens() {
+  const file = resolve(ROOT, "packages/shared/src/tokens.ts");
+  const src = readFileSync(file, "utf8");
+  const re =
+    /(\w+):\s*\{\s*symbol:\s*"[^"]*",\s*name:\s*"[^"]*",\s*address:\s*"(0x[0-9a-fA-F]{40})",\s*decimals:\s*(\d+)/g;
+  const out = {};
+  for (let m; (m = re.exec(src)); ) {
+    const [, key, address, decimals] = m;
+    out[key] = { address, decimals: Number(decimals), peg: key in PEGS ? PEGS[key] : null };
+  }
+  if (Object.keys(out).length === 0) {
+    throw new Error(`no tokens parsed from ${file}`);
+  }
+  return out;
 }
+
+const TOKENS = loadTokens();
 
 const RPC_URL = process.env.MANTLE_RPC_URL?.trim() || "https://rpc.mantle.xyz";
 const CHAIN = "Mantle";
@@ -114,7 +122,7 @@ const toUnits = (raw, decimals) => Number(raw) / 10 ** decimals;
 async function fetchPools() {
   const { data } = await getJson("https://yields.llama.fi/pools");
   const usdy = TOKENS.USDY.address.toLowerCase();
-  const musd = MUSD_ADDRESS?.toLowerCase();
+  const musd = TOKENS.MUSD?.address.toLowerCase();
   return data
     .filter((p) => p.chain === CHAIN)
     .filter((p) => {
@@ -176,7 +184,7 @@ function buildReport({ pools, prices, supplies }) {
     generatedAt: new Date().toISOString(),
     chain: CHAIN,
     rpc: rpcHost(RPC_URL),
-    musdIncluded: Boolean(MUSD_ADDRESS),
+    musdIncluded: Boolean(TOKENS.MUSD),
     rwaDexLiquidityUsd: totalTvl,
     poolCount: (pools ?? []).length,
     pools,
@@ -195,7 +203,7 @@ function toMarkdown(r) {
       "depth; the authoritative gate is `testLiquidityGateUsdy` in " +
       "`contracts/test/Fork.t.sol`.",
   );
-  lines.push(r.musdIncluded ? "" : "> mUSD not included — set `MUSD_ADDRESS` to add its supply + price.");
+  lines.push(r.musdIncluded ? "" : "> mUSD not in tokens.ts — add it to packages/shared/src/tokens.ts for supply + price.");
   lines.push("");
   lines.push("## On-chain tokenized supply");
   lines.push("| Token | Supply | ≈ USD |");
@@ -228,7 +236,7 @@ function printHuman(r) {
   const c = { dim: "\x1b[2m", b: "\x1b[1m", g: "\x1b[32m", y: "\x1b[33m", r: "\x1b[31m", x: "\x1b[0m" };
   console.log(`${c.b}Sentinel — Mantle RWA liquidity & peg probe${c.x}  ${c.dim}${r.generatedAt}${c.x}`);
   console.log(`${c.dim}RPC: ${r.rpc}${c.x}`);
-  if (!r.musdIncluded) console.log(`${c.y}note:${c.x} mUSD not included — set MUSD_ADDRESS to add it.`);
+  if (!r.musdIncluded) console.log(`${c.y}note:${c.x} mUSD not in tokens.ts — add it to packages/shared/src/tokens.ts.`);
   console.log("");
 
   console.log(`${c.b}On-chain tokenized supply${c.x}`);

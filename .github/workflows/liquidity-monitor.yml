@@ -5,8 +5,9 @@ name: Mantle Liquidity Monitor
 # then commits the snapshot to reports/. Manual trigger + weekly schedule.
 #
 # Works with zero configuration: the script defaults to the public Mantle RPC and
-# public DeFiLlama endpoints. Optionally set repo secret MANTLE_RPC_URL and repo
-# variable MUSD_ADDRESS to use a private RPC and include mUSD.
+# public DeFiLlama endpoints, and reads token addresses from
+# packages/shared/src/tokens.ts. Optionally set repo secret MANTLE_RPC_URL for a
+# private RPC, and variable MIN_LIQUIDITY_USD to alert on thin liquidity.
 on:
   workflow_dispatch:
   schedule:
@@ -33,7 +34,6 @@ jobs:
       - name: Probe Mantle RWA liquidity
         env:
           MANTLE_RPC_URL: ${{ secrets.MANTLE_RPC_URL }}
-          MUSD_ADDRESS: ${{ vars.MUSD_ADDRESS }}
         run: node scripts/check-mantle-liquidity.mjs --write
 
       - name: Commit snapshot if changed
@@ -55,5 +55,4 @@ jobs:
         if: ${{ vars.MIN_LIQUIDITY_USD != '' }}
         env:
           MANTLE_RPC_URL: ${{ secrets.MANTLE_RPC_URL }}
-          MUSD_ADDRESS: ${{ vars.MUSD_ADDRESS }}
         run: node scripts/check-mantle-liquidity.mjs --min="${{ vars.MIN_LIQUIDITY_USD }}"

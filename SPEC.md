@@ -22,7 +22,7 @@ Concrete specifications referenced by `PLAN.md` (strategy) and `ROADMAP.md`
 |----|--------|------|-------------------|
 | 0 | `IDLE` | USDC held in vault | Yes |
 | 1 | `AAVE` | USDC supplied to Aave v3 | Yes (pool liquidity permitting) |
-| 2 | `USDY` | tokenized Treasuries (yield core) | No (DEX unwind) |
+| 2 | `USDY` | RWA yield core — **USDY or mUSD** (Ondo; convertible via Ondo Token Converter) | No (DEX unwind) |
 | 3 | `AUSD` | reserve-backed safe asset | Partial (DEX) |
 
 ### 1.2 Allocation limits (initial defaults)
@@ -69,9 +69,11 @@ is a secondary guard against a frozen oracle; tune against real cadence in Phase
 | `kill()` | irreversible-ish emergency: withdraw-only, no allocation, USDY/AUSD unwound to USDC |
 
 ### 1.6 Whitelists
-- **Tokens:** `USDC`, `USDY`, `AUSD`, `aUSDC` only.
-- **Venues:** the specific Aave v3 `Pool` + the specific DEX router(s) verified in
-  Phase 0; nothing else may be called by adapters.
+- **Tokens:** `USDC`, `USDY`, `mUSD`, `AUSD`, `aUSDC` only. USDY and mUSD are the
+  two on-chain forms of the RWA core (convertible via the Ondo Token Converter).
+- **Venues:** the specific Aave v3 `Pool` + the specific DEX router(s) + the
+  **Ondo Token Converter** (USDY↔mUSD), all verified in Phase 0; nothing else may
+  be called by adapters.
 
 ---
 

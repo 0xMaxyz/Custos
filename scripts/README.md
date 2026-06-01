@@ -16,11 +16,13 @@ node scripts/check-mantle-liquidity.mjs --write      # write reports/mantle-liqu
 node scripts/check-mantle-liquidity.mjs --min=250000 # exit 1 if RWA DEX liquidity < $250k (CI alert)
 ```
 
+Token addresses (USDC/USDY/AUSD/WMNT/mUSD) are read from
+`packages/shared/src/tokens.ts` — the single source of truth.
+
 Optional env:
 
 - `MANTLE_RPC_URL` — defaults to `https://rpc.mantle.xyz`.
-- `MUSD_ADDRESS` — mUSD is **not** yet in `packages/shared/src/tokens.ts`; pass
-  its address to include mUSD tokenized supply + price.
+- `MIN_LIQUIDITY_USD` (CI) — when set, the monitor workflow fails on thin liquidity.
 
 **Scope:** DeFiLlama pool TVL measures _breadth_, not executable USDC↔USDY swap
 depth at vault sizes. The authoritative liquidity gate is the Foundry fork test

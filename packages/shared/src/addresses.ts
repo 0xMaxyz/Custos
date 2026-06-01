@@ -45,7 +45,9 @@ export const PROTOCOLS: Record<string, Address | null> = {
   aUSDC: null,
   // Ondo USDY pricing
   usdyRWADynamicOracle: null,
-  // DEX routers for USDC<->USDY, USDC<->AUSD, USDY<->WMNT
+  // Ondo Token Converter for USDY <-> mUSD (the two on-chain forms of the RWA leg)
+  ondoTokenConverter: null,
+  // DEX routers for USDC<->USDY, USDC<->mUSD, USDC<->AUSD, USDY<->WMNT
   dexRouterUsdy: null,
   dexRouterAusd: null,
 };

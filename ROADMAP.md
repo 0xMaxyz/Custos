@@ -44,6 +44,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal |
 | PR-A2 | A2.1 | Risk radar viz |
 | PR-A3 | A3.1–A3.2 | Conversational agent + alerts |
+| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs |
 
 ---
 
@@ -72,9 +73,10 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 
 ### 0.3 — On-chain address & capability verification (GATE) · _PR-0b_
 - **What:** resolve + verify and record in `packages/shared/addresses.ts`
-  (with "verified @ block N"): USDC; USDY + `RWADynamicOracle`; AUSD; Aave v3
-  `Pool` + `PoolDataProvider` + aUSDC; DEX router(s) for USDY/USDC, USDY/WMNT,
-  AUSD pairs; ERC-8004 Identity/Reputation registries (present on Mantle?).
+  (with "verified @ block N"): USDC; USDY + `RWADynamicOracle`; **mUSD + Ondo
+  Token Converter (USDY↔mUSD)**; AUSD; Aave v3 `Pool` + `PoolDataProvider` +
+  aUSDC; DEX router(s) for USDY/USDC, mUSD/USDC, USDY/WMNT, AUSD pairs; ERC-8004
+  Identity/Reputation registries (present on Mantle?).
 - **Goal:** a committed, verified registry; explicit decision on ERC-8004
   (use 0x8004 singletons vs deploy our own).
 - **Test:** fork test asserts `extcodesize > 0` for each address and a basic call
@@ -179,13 +181,15 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Test:** fork test: USDY holdings valued at oracle price; simulated stale oracle
   flips the staleness flag.
 
-### 2.3 — `UsdyAdapter` · _PR-2a_
-- **What:** allocate = swap USDC→USDY (`minOut`); withdraw = swap USDY→USDC
+### 2.3 — `UsdyAdapter` (RWA adapter: USDY + mUSD) · _PR-2a_
+- **What:** allocate = swap USDC→USDY/mUSD (`minOut`); withdraw = swap back to USDC
   (`minOut`); `totalAssets` via oracle; `maxWithdrawable` via liquidity cap;
-  blocklist-aware.
-- **Goal:** USDY is a managed bucket the vault can enter/exit.
-- **Test:** fork test: rebalance into USDY; `totalAssets` stable; withdraw unwinds
-  USDY→USDC ≥ `minOut`.
+  blocklist-aware. **Supports both on-chain forms of the RWA core: holds USDY or
+  mUSD and converts between them via the Ondo Token Converter, routing entry/exit
+  through whichever DEX leg is deeper. No new bucket — mUSD lives in bucket 2.**
+- **Goal:** the RWA core (USDY/mUSD) is a managed bucket the vault can enter/exit.
+- **Test:** fork test: rebalance into USDY and into mUSD; USDY↔mUSD convert
+  round-trips; `totalAssets` stable; withdraw unwinds → USDC ≥ `minOut`.
 
 ### 2.4 — Depeg / oracle-deviation guard · _PR-2b_
 - **What:** on-chain guard comparing USDY DEX spot vs oracle NAV (deviation bps) +
@@ -405,6 +409,24 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **What:** Telegram/Discord webhook on de-risk events.
 - **Goal:** off-platform transparency.
 - **Test:** trigger event → message delivered.
+
+#### A4.1 — Agent x402 micropayments · _PR-A4_
+- **What:** the agent pays per-call (x402, stablecoin) for premium risk/data feeds;
+  the x402 receipt is pinned into the decision evidence bundle. Optionally expose
+  Sentinel's RWA risk score as an x402-paid endpoint other agents can call.
+- **Goal:** verifiable "the agent paid for the evidence it acted on", plus a revenue
+  surface that justifies running a Sentinel agent.
+- **Test:** Vitest mocked x402 flow; a decision links a valid x402 receipt; the
+  paid endpoint returns 402 then 200 after payment.
+
+#### A4.2 — ERC-8183 verifiable jobs · _PR-A4_
+- **What:** model each de-risk as an ERC-8183 escrowed Job (client/provider/
+  evaluator); the **deterministic guardrail validator is the evaluator** that
+  releases the Job only if guardrails pass; the outcome feeds ERC-8004 reputation.
+- **Goal:** the LLM-proposes → validator-checks → guardrail-backstops pipeline
+  encoded as a published standard; the agent accrues a verifiable risk-call record.
+- **Test:** fork/unit: a passing de-risk Job settles + writes reputation; a
+  guardrail-violating Job is rejected by the evaluator.
 
 **Phase 5b exit:** whatever shipped.
 

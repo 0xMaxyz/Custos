@@ -7,17 +7,17 @@
  */
 
 export interface AlertConfig {
-  telegramBotToken?: string;
-  telegramChatId?: string;
-  discordWebhookUrl?: string;
+  telegramBotToken?: string | undefined;
+  telegramChatId?: string | undefined;
+  discordWebhookUrl?: string | undefined;
 }
 
 export interface DeRiskAlert {
   riskLevel: string;
   flags: string[];
   rationale: string;
-  txHash?: string;
-  decisionId?: string;
+  txHash?: string | undefined;
+  decisionId?: string | undefined;
   asOf: string;
 }
 

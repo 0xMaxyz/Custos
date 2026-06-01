@@ -59,9 +59,9 @@ describe("recoverPaymentSigner / signatureVerifyingVerifier", () => {
 });
 
 describe("onChainSettlingVerifier", () => {
-  function mockChain(hash: `0x${string}` = `0x${"fe".repeat(32)}`) {
+  function mockChain(status: "success" | "reverted" = "success", hash: `0x${string}` = `0x${"fe".repeat(32)}`) {
     const writeContract = vi.fn(async () => hash);
-    const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
+    const waitForTransactionReceipt = vi.fn(async () => ({ status }));
     return {
       walletClient: { writeContract, chain: { id: 5000 }, account: { address: account.address } } as never,
       publicClient: { waitForTransactionReceipt } as never,
@@ -85,6 +85,14 @@ describe("onChainSettlingVerifier", () => {
     expect((call.args[0] as string).toLowerCase()).toBe(account.address.toLowerCase()); // from
     expect(call.args[1]).toBe(REQ.payTo); // to
     expect(call.args[2]).toBe(10_000n); // value
+  });
+
+  it("fails closed when the settlement tx reverts on-chain (no 200)", async () => {
+    const { walletClient, publicClient, writeContract } = mockChain("reverted");
+    const verify = onChainSettlingVerifier({ walletClient, publicClient, asset: REQ.asset, nowSec: () => AT });
+    const r = await verify(await validPayment(), REQ);
+    expect(r).toBeNull(); // a mined-but-reverted transferWithAuthorization must not unlock
+    expect(writeContract).toHaveBeenCalledOnce(); // it did submit; the revert is what fails closed
   });
 
   it("does NOT submit settlement for an invalid signature", async () => {

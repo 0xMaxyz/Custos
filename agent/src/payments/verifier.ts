@@ -131,10 +131,13 @@ export function onChainSettlingVerifier(deps: OnChainSettleDeps): PaymentVerifie
         chain: deps.walletClient.chain,
         account: deps.walletClient.account ?? null,
       });
-      await deps.publicClient.waitForTransactionReceipt({ hash });
+      const rcpt = await deps.publicClient.waitForTransactionReceipt({ hash });
+      // Fail closed: a reverted settlement (used nonce, insufficient balance, …) must
+      // NOT unlock the resource even though the tx was mined.
+      if (rcpt.status !== "success") return null;
       return receipt(payment, requirements, hash);
     } catch {
-      return null; // settlement failed (already used nonce, insufficient balance, …)
+      return null; // submission threw (RPC error, rejected, …)
     }
   };
 }

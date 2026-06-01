@@ -13,8 +13,10 @@ import {
 /**
  * x402-paid endpoint config (ROADMAP A4.1). When provided, `GET /risk-score`
  * becomes a 402-gated resource: callers must present a valid `X-PAYMENT` header.
- * `requirements(url)` builds the per-request payment terms; `verify` settles the
- * inbound payment (facilitator-backed in prod, shape-only in dev).
+ * `requirements(url)` builds the per-request payment terms; `verify` validates the
+ * inbound payment. The running agent wires a signature-verifying verifier (recovers
+ * the EIP-712 signer), optionally settling on-chain (`X402_SETTLE_ONCHAIN`); the
+ * shape-only verifier is for tests only.
  */
 export interface X402Options {
   readonly requirements: (resourceUrl: string) => PaymentRequirements;

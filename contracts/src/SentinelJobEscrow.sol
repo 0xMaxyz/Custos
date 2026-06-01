@@ -63,7 +63,7 @@ contract SentinelJobEscrow is IERC8183, ReentrancyGuard {
         string calldata description,
         address hook
     ) external override returns (uint256 jobId) {
-        if (evaluator == address(0)) revert ZeroAddress();
+        if (provider == address(0) || evaluator == address(0)) revert ZeroAddress();
         if (expiredAt <= block.timestamp) revert BadExpiry();
 
         jobId = ++lastJobId;

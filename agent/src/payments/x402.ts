@@ -208,13 +208,13 @@ export async function createPayment(args: {
 
 // ── client: pay-and-fetch ─────────────────────────────────────────────────────
 
-interface FetchLikeResponse {
+export interface FetchLikeResponse {
   readonly status: number;
   readonly headers: { get(name: string): string | null };
   json(): Promise<unknown>;
   text(): Promise<string>;
 }
-type FetchLike = (
+export type FetchLike = (
   url: string,
   init?: { headers?: Record<string, string> },
 ) => Promise<FetchLikeResponse>;

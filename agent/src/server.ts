@@ -88,7 +88,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // this header keeps local cross-port dev working without a new dependency.
   app.addHook("onSend", async (req, reply, payload) => {
     reply.header("access-control-allow-origin", "*");
-    reply.header("access-control-allow-headers", "content-type");
+    // `x-payment` lets cross-origin agents pay the /risk-score endpoint (A4.1);
+    // `x-payment-response` is exposed so they can read the settlement receipt.
+    reply.header("access-control-allow-headers", "content-type, x-payment");
+    reply.header("access-control-expose-headers", "x-payment-response");
     reply.header("access-control-allow-methods", "GET, POST, OPTIONS");
     return payload;
   });

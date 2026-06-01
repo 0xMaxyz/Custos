@@ -9,7 +9,8 @@ import { validateProposal, applyVerdict, type ChainContext } from "../risk/valid
 import { runSignalLayer } from "../llm/signals.js";
 import { AnthropicClient } from "../llm/anthropic.js";
 import { buildEvidenceFetcher } from "../llm/evidence.js";
-import { pinRationale, type RationaleBundle } from "./ipfs.js";
+import { pinRationale, type RationaleBundle, type PaidEvidenceReceipt } from "./ipfs.js";
+import type { PaidEvidenceFetcher } from "../payments/evidence.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
 import type { WeightsBps, RiskSignal, Decision } from "../types.js";
@@ -20,6 +21,13 @@ export interface ExecutorOptions {
   readonly config: AgentConfig;
   readonly clients: ChainClients;
   readonly snapshotter: Snapshotter;
+  /**
+   * Optional x402 paid-evidence fetcher (A4.1). When set, each cycle pays for the
+   * premium feed and pins the settlement receipt into the decision bundle.
+   */
+  readonly paidEvidence?: PaidEvidenceFetcher | undefined;
+  /** Injectable IPFS pin (defaults to {@link pinRationale}); used by tests. */
+  readonly pin?: typeof pinRationale | undefined;
 }
 
 /**
@@ -56,6 +64,8 @@ export class Executor {
   private readonly public: PublicClient;
   private readonly vault: `0x${string}`;
   private readonly snapshotter: Snapshotter;
+  private readonly paidEvidence: PaidEvidenceFetcher | undefined;
+  private readonly pin: typeof pinRationale;
 
   constructor(opts: ExecutorOptions) {
     if (!opts.clients.walletClient)
@@ -68,6 +78,8 @@ export class Executor {
     this.public = opts.clients.publicClient;
     this.vault = getAddress(opts.config.vaultAddress);
     this.snapshotter = opts.snapshotter;
+    this.paidEvidence = opts.paidEvidence;
+    this.pin = opts.pin ?? pinRationale;
   }
 
   async runCycle(): Promise<CycleResult> {
@@ -89,6 +101,15 @@ export class Executor {
         .catch(() => null);
     }
 
+    // 3b. Paid evidence (A4.1): pay for a premium feed via x402 and pin its receipt
+    //     into the decision bundle. Additive + fail-open — never blocks the cycle.
+    let payments: PaidEvidenceReceipt[] = [];
+    if (this.paidEvidence) {
+      const paid = await this.paidEvidence().catch(() => ({ evidence: [], payments: [] }));
+      if (paid.evidence.length > 0) evidence = [...evidence, ...paid.evidence];
+      payments = paid.payments;
+    }
+
     // 4. Route to deRisk or rebalance.
     //
     //    ALLOCATOR path: `deRisk()` on-chain requires `evaluateUsdyRisk` → `forceDeRisk`
@@ -102,7 +123,7 @@ export class Executor {
     //    achieves the same USDY→0 outcome through the regular rebalance path (which has
     //    no guard precondition for ALLOCATOR).
     if (assessment.forceDeRisk) {
-      return this._sendDeRisk(snapshot, assessment, verdict, evidence);
+      return this._sendDeRisk(snapshot, assessment, verdict, evidence, payments);
     }
 
     // 5. Merge verdict with deterministic assessment.
@@ -145,7 +166,7 @@ export class Executor {
       return { submitted: false, reason: "No allocation change needed" };
     }
 
-    return this._sendRebalance(snapshot, assessment, effectiveVerdict, evidence, finalWeights);
+    return this._sendRebalance(snapshot, assessment, effectiveVerdict, evidence, finalWeights, payments);
   }
 
   private async _sendRebalance(
@@ -154,6 +175,7 @@ export class Executor {
     verdict: Awaited<ReturnType<typeof runSignalLayer>>,
     evidence: EvidenceItem[],
     weights: WeightsBps,
+    payments: PaidEvidenceReceipt[] = [],
   ): Promise<CycleResult> {
     const bundle: RationaleBundle = {
       rationale: verdict?.rationale ?? buildDeterministicRationale(assessment),
@@ -162,9 +184,10 @@ export class Executor {
       candidateWeightsBps: weights,
       riskLevel: assessment.riskLevel,
       asOf: snapshot.asOf,
+      ...(payments.length > 0 ? { payments } : {}),
     };
 
-    const { uri, rationaleHash } = await pinRationale(bundle, this.config);
+    const { uri, rationaleHash } = await this.pin(bundle, this.config);
     const weightsArray = toWeightsArray(weights);
     const swapData = await this._buildSwapData(snapshot, weights);
 
@@ -196,6 +219,7 @@ export class Executor {
     assessment: ReturnType<typeof assess>,
     verdict: Awaited<ReturnType<typeof runSignalLayer>>,
     evidence: EvidenceItem[],
+    payments: PaidEvidenceReceipt[] = [],
   ): Promise<CycleResult> {
     const flags = assessment.flags.join(", ");
     const bundle: RationaleBundle = {
@@ -205,10 +229,11 @@ export class Executor {
       candidateWeightsBps: assessment.candidateWeightsBps,
       riskLevel: "DERISK",
       asOf: snapshot.asOf,
+      ...(payments.length > 0 ? { payments } : {}),
     };
 
     // Pin the evidence bundle and use the URI as the on-chain reason/decisionURI field.
-    const { uri, rationaleHash } = await pinRationale(bundle, this.config);
+    const { uri, rationaleHash } = await this.pin(bundle, this.config);
 
     // For a full de-risk we sell all USDY. Build swapData with USDY→USDC calldata.
     const zeroWeights: WeightsBps = {

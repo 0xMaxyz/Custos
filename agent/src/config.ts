@@ -59,12 +59,24 @@ const configSchema = z.object({
   x402TokenName: z.string().min(1).default("USD Coin"),
   x402TokenVersion: z.string().min(1).default("2"),
   x402TimeoutSeconds: z.coerce.number().int().positive().default(120),
+  // Optional premium feed the agent PAYS for via x402; its settlement receipt is
+  // pinned into the decision evidence bundle.
+  x402PremiumFeedUrl: z.string().url().optional(),
 
   // ── Service ──
   agentPort: z.coerce.number().int().positive().default(8080),
   agentLogLevel: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+}).superRefine((cfg, ctx) => {
+  // The x402 paid endpoint needs an asset (EIP-712 verifyingContract) to settle in.
+  if (cfg.x402PayTo && !cfg.x402Asset) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["x402Asset"],
+      message: "X402_ASSET is required when X402_PAY_TO is set",
+    });
+  }
 });
 
 export type AgentConfig = z.infer<typeof configSchema>;
@@ -106,6 +118,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     x402TokenName: pick("X402_TOKEN_NAME"),
     x402TokenVersion: pick("X402_TOKEN_VERSION"),
     x402TimeoutSeconds: pick("X402_TIMEOUT_SECONDS"),
+    x402PremiumFeedUrl: pick("X402_PREMIUM_FEED_URL"),
     agentPort: pick("AGENT_PORT"),
     agentLogLevel: pick("AGENT_LOG_LEVEL"),
   };

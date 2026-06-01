@@ -549,11 +549,13 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   assessment + recent decisions → compact grounding, bigints pre-formatted) and
   `AnthropicExplainer` (grounded Q&A, controls no funds, answers only from context).
   `POST /ask` in `server.ts` (injectable explainer + async `getContext`; 400 empty/long
-  question, 503 no-state, 502 LLM error, permissive CORS). `index.ts` wires the
-  explainer + a fresh snapshot-backed context + a recent-decisions ring buffer
-  (`CycleResult.decision` now carries rationale/signals). Web `AgentPage` AskPanel calls
-  the live endpoint via `lib/askAgent.ts` when `VITE_AGENT_API_URL` is set, fixture
-  answers otherwise. 15 new agent Vitest + 3 web Vitest; all suites green.
+  question, 503 no-state, 502 LLM error, 429 rate limit, permissive CORS; default
+  30/min, `askRateLimit`/`askRateWindowMs`, 0 disables). `index.ts` wires the explainer,
+  a 10s TTL snapshot-backed `getContext`, and a recent-decisions ring buffer
+  (`CycleResult.decision` carries rationale/signals; executor tests lock rebalance +
+  de-risk). Web `AgentPage` AskPanel calls the live endpoint via `lib/askAgent.ts` when
+  `VITE_AGENT_API_URL` is set, fixture answers otherwise. 16 new agent Vitest + 3 web
+  Vitest (138 agent, 67 web); all suites green. · [PR #16](https://github.com/0xMaxyz/miu/pull/16)
 
 #### A3.2 — Alerts · _PR-A3_
 

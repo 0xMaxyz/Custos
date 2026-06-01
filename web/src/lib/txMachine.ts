@@ -97,7 +97,9 @@ export function depositStepIndex(phase: DepositPhase): 0 | 1 {
 
 /** True while a deposit tx is in flight (UI should lock inputs + close). */
 export function isDepositBusy(phase: DepositPhase): boolean {
-  return phase === "approving" || phase === "depositing";
+  // "approved" is treated as busy: deposit auto-fires via useEffect once the
+  // approve receipt lands; the button must stay disabled to prevent a duplicate approve.
+  return phase === "approving" || phase === "approved" || phase === "depositing";
 }
 
 /**

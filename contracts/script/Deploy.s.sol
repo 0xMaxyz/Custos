@@ -142,7 +142,7 @@ contract Deploy is Script {
                 usdy,
                 usdyOracle,
                 address(vault),
-                50  // 0.5% max slippage
+                50  // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
             );
             console2.log("UsdyAdapter:", address(usdyAdapter));
 

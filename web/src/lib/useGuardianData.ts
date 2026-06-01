@@ -36,13 +36,18 @@ const IDENTITY_ABI = [
 // Minimal Decision shape built from on-chain data. Fields that require
 // off-chain resolution (signals, evidence, outcome, txHash) start as empty
 // defaults and can be enriched later when the decisionURI bundle is fetched.
+// blockTimestamp: pass log.blockNumber * 1 as a stable ordering key; the
+// accurate wall-clock time comes from the decisionURI bundle (future work).
 function buildLiveDecision(args: {
   id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
+  blockNumber?: bigint;
 }): Decision {
+  // Use a stable placeholder — actual timestamp from bundle fetch (Phase 5b).
+  const timestamp = new Date().toISOString();
   return {
     id:              Number(args.id),
     kind:            args.kind as 0 | 1,
-    timestamp:       new Date().toISOString(),
+    timestamp,
     riskLevel:       "NORMAL",
     confidence:      0,
     preWeightsBps:   { IDLE: 0, AAVE: 0, USDY: 0, AUSD: 0 },
@@ -98,7 +103,7 @@ export function useDecisions(): GuardianFeed {
         const nId = Number(args.id);
         if (seenIds.current.has(nId)) continue;
         seenIds.current.add(nId);
-        next.push(buildLiveDecision(args));
+        next.push(buildLiveDecision({ ...args, blockNumber: log.blockNumber ?? undefined }));
       }
       setLiveDecisions(next);
     }).catch(() => {
@@ -123,7 +128,7 @@ export function useDecisions(): GuardianFeed {
           const nId = Number(id);
           if (seenIds.current.has(nId)) continue;
           seenIds.current.add(nId);
-          next.unshift(buildLiveDecision({ id, kind, rationaleHash, decisionURI }));
+          next.unshift(buildLiveDecision({ id, kind, rationaleHash, decisionURI, blockNumber: log.blockNumber ?? undefined }));
         }
         return next;
       });

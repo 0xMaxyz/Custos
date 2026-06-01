@@ -14,6 +14,9 @@ library Addresses {
     address internal constant MAINNET_USDC = 0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9;
     address internal constant MAINNET_USDY = 0x5bE26527e817998A7206475496fDE1E68957c5A6;
     address internal constant MAINNET_AUSD = 0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a;
+    /// Ondo mUSD — rebasing $1 form of USDY + the wrap/unwrap "Ondo Token Converter".
+    /// Verified on-chain: usdy()==MAINNET_USDY, oracle()==MAINNET_USDY_ORACLE, 18 dec.
+    address internal constant MAINNET_MUSD = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
 
     /// Ondo USDY Redemption Price Oracle — getPrice() returns 18-dec NAV.
     address internal constant MAINNET_USDY_ORACLE   = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;

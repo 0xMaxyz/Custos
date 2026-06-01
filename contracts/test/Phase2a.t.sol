@@ -120,6 +120,7 @@ contract Phase2aTest is Test {
             address(router),
             address(usdc),
             address(usdy),
+            address(0),   // mUSD leg disabled here; exercised in Phase2d.t.sol
             address(oracle),
             address(vault),
             50    // maxSlippageBps (0.5%)

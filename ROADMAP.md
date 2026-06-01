@@ -27,6 +27,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-1b | 1.5–1.6 | Aave adapter + rebalance/withdraw                                            |
 | PR-2a | 2.1–2.3 | DEX lib + USDY valuation + UsdyAdapter                                       |
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline**   | `[x] DONE` |
+| PR-2d | 2.7     | RWA core **mUSD leg** (USDY↔mUSD via Ondo wrap/unwrap converter)             | `[x] DONE` |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7) |
 | PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  | `[x] DONE` · [PR #9](https://github.com/0xMaxyz/miu/pull/9) |
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    | `[x] DONE` · [PR #10](https://github.com/0xMaxyz/miu/pull/10) |
@@ -248,7 +249,7 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Test:** Forge: events emitted with expected fields; passive-baseline delta
   computed correctly on de-risk; `updateOutcome` access-gated and stored.
 
-### 2.7 — mUSD leg for `UsdyAdapter` (RWA core: USDY + mUSD) · _PR-2d_ · `[ ]`
+### 2.7 — mUSD leg for `UsdyAdapter` (RWA core: USDY + mUSD) · _PR-2d_ · `[x] DONE`
 
 - **What:** extend the existing `UsdyAdapter` to also hold/route the **mUSD** form of
   the RWA core and convert USDY↔mUSD via the **Ondo Token Converter**, using whichever
@@ -258,6 +259,25 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Goal:** the RWA core can be entered/exited as USDY *or* mUSD interchangeably.
 - **Test:** fork test: enter via mUSD; USDY↔mUSD convert round-trips; `totalAssets`
   stable across the conversion; exit unwinds → USDC ≥ `minOut`.
+- **VERIFIED on-chain (Mantle 5000, no guessing):** the "Ondo Token Converter" is the
+  **mUSD token contract itself** (`0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3`, 18 dec),
+  which hosts `wrap(uint256)` USDY→mUSD and `unwrap(uint256)` mUSD→USDY — there is no
+  separate converter. `mUSD.usdy()` == USDY, `mUSD.oracle()` == the RWADynamicOracle.
+  A live `deal`-funded USDY→mUSD→USDY round-trip on a Mantle fork is value-neutral
+  (100 USDY → 113.49 mUSD at NAV 1.13494 → 100.0 USDY). Source: Ondo Mantle
+  integration guidelines + addresses page.
+- **Built:** `interfaces/IMusd.sol` (wrap/unwrap + usdy/oracle getters, documents the
+  on-chain verification). `UsdyAdapter` gains an optional pinned `MUSD` immutable
+  (`address(0)` = USDY-only): `totalAssets()` now values USDY at oracle NAV **+ mUSD at
+  $1 face** (conserved across a conversion); `convertToMusd`/`convertToUsdy` (vault-only,
+  oracle-derived balance-delta minOut, target only the pinned mUSD — never arbitrary
+  calldata); `emergencyWithdrawAll`/`withdraw` are input-agnostic so the same exit path
+  unwinds USDY **or** mUSD → USDC. `YieldVault.convertRwaLeg(bool,uint,uint)` is the
+  ALLOCATOR passthrough — exposure-neutral (no weight change), so it intentionally
+  skips `validateRebalance`. Deploy script wires mainnet `MAINNET_MUSD` / testnet
+  `TESTNET_MUSD`. `packages/shared` `ondoTokenConverter` = mUSD address (+ invariant
+  test). Tests: `Phase2d.t.sol` (18 offline) + `ForkPhase2d.t.sol` (3 fork);
+  full suite 142 offline + Phase2 fork green.
 
 **Exit:** a USDY→safe rotation emits a verifiable on-chain decision with evidence; passive-USDY baseline delta is recorded.
 

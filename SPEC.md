@@ -74,7 +74,11 @@ is a secondary guard against a frozen oracle; tune against real cadence in Phase
   two on-chain forms of the RWA core (convertible via the Ondo Token Converter).
 - **Venues:** the specific Aave v3 `Pool` + the specific DEX router(s) + the
   **Ondo Token Converter** (USDY↔mUSD), all verified in Phase 0; nothing else may
-  be called by adapters.
+  be called by adapters. **Verified:** the "Ondo Token Converter" is the **mUSD token
+  contract itself** (`0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3` on Mantle, 18 dec) —
+  it hosts `wrap(uint256)` (USDY→mUSD) and `unwrap(uint256)` (mUSD→USDY); there is no
+  separate converter. `UsdyAdapter` pins it as an immutable and only ever calls
+  `wrap`/`unwrap` on it (never arbitrary calldata). See `ForkPhase2d.t.sol`.
 
 ---
 
@@ -113,6 +117,37 @@ interface IStrategyAdapter {
         returns (uint256 withdrawnUsdc);
 }
 ```
+
+**USDY ↔ mUSD converter leg (RWA core, task 2.7).** The RWA bucket (2) is held as USDY
+and/or its rebasing $1 form **mUSD**. `UsdyAdapter` extends `IStrategyAdapter` with
+`IUsdyAdapter` and pins the mUSD contract as an immutable `MUSD` (`address(0)` = USDY-
+only). Conversion is **oracle-priced and value-neutral** (no DEX, no slippage beyond
+rounding), so `totalAssets()` values USDY at oracle NAV + mUSD at $1 face and is
+conserved across a conversion. Verified on-chain (`ForkPhase2d.t.sol`).
+
+```solidity
+// The "Ondo Token Converter" is the mUSD token itself (wrap/unwrap host).
+interface IMusd {
+    function wrap(uint256 usdyAmount) external;   // USDY -> mUSD (caller approves USDY to mUSD)
+    function unwrap(uint256 musdAmount) external;  // mUSD -> USDY (burns caller's mUSD)
+    function usdy() external view returns (address);
+    function oracle() external view returns (address);
+}
+
+interface IUsdyAdapter /* is IStrategyAdapter */ {
+    function oracleData() external view returns (uint256 nav, uint64 rangeEnd);
+    function MUSD() external view returns (address);
+    // Vault-only. Enforce oracle-derived balance-delta minOut; target only the pinned MUSD.
+    function convertToMusd(uint256 usdyAmount, uint256 minMusdOut) external returns (uint256 musdOut);
+    function convertToUsdy(uint256 musdAmount, uint256 minUsdyOut) external returns (uint256 usdyOut);
+}
+```
+
+`YieldVault.convertRwaLeg(bool toMusd, uint256 amountIn, uint256 minOut)` (ALLOCATOR,
+`whenNotPaused`, not killed) is the production passthrough. It changes only the *form*
+the RWA bucket is held in, not its USDC value or weight, so it intentionally does NOT
+go through `Guardrails.validateRebalance` — entry/exit that changes exposure still goes
+through `rebalance`/`deRisk`.
 
 ### 2.2 `YieldVault` (ERC-4626)
 ```solidity

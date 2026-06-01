@@ -109,6 +109,17 @@ contract Deploy is Script {
         guardrails = new Guardrails(deployer);
         console2.log("Guardrails:", address(guardrails));
 
+        // On testnet, zero the add-strategy timelock so the deploy can queue AND
+        // activate adapters in a single broadcast (no time to warp on a live RPC).
+        // Mainnet keeps the 2-day default; adapters are activated later via
+        // ActivateStrategies.s.sol once the timelock elapses.
+        if (!isMainnet) {
+            Guardrails.Config memory cfg = guardrails.config();
+            cfg.addStrategyTimelock = 0;
+            guardrails.setConfig(cfg);
+            console2.log("Testnet: addStrategyTimelock set to 0");
+        }
+
         // ── 2. YieldVault ─────────────────────────────────────────────────────
         vault = new YieldVault(usdc, deployer, address(guardrails));
         console2.log("YieldVault:", address(vault));
@@ -126,7 +137,7 @@ contract Deploy is Script {
             // Queue adapter in vault bucket 1 (AAVE). Testnet: zero timelock.
             vault.addStrategy(1, address(aaveAdapter));
             if (!isMainnet) {
-                // On testnet the default timelock is 0, so activate immediately.
+                // Timelock was zeroed above for testnet, so activate immediately.
                 vault.activateStrategy(1);
             }
             console2.log("AaveV3Adapter queued in bucket 1", isMainnet ? "(awaiting timelock)" : "(activated)");

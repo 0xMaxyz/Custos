@@ -119,6 +119,7 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
      *      aggregator router calldata from the off-chain 1delta quote, paying this
      *      adapter as recipient. minAUSD out = usdcAmount × (1 − slippage) (both
      *      6-dec, 1:1 peg), enforced as a balance-delta check.
+     * @return deployedUsdcValue USDC value deployed (== usdcAmount; AUSD is 1:1).
      */
     function deposit(uint256 usdcAmount, bytes calldata swapData)
         external
@@ -146,6 +147,7 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
      * @dev `swapData` sells AUSD and pays this adapter; realized USDC is forwarded
      *      to `to`. On-chain we enforce minOut = max(minOutUsdc, usdcAmount) via
      *      balance delta, so the caller always receives at least what it asked for.
+     * @return withdrawn Actual USDC delivered to `to`.
      */
     function withdraw(uint256 usdcAmount, uint256 minOutUsdc, address to, bytes calldata swapData)
         external
@@ -165,6 +167,7 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
      * @notice Sell all AUSD and send USDC proceeds to `to`.
      * @param minOutUsdc Minimum acceptable total USDC (slippage guard for the caller).
      * @param swapData   Aggregator calldata selling the full AUSD balance to this adapter.
+     * @return withdrawn Actual USDC delivered to `to` (0 if no AUSD held).
      */
     function emergencyWithdrawAll(uint256 minOutUsdc, address to, bytes calldata swapData)
         external

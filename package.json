@@ -16,6 +16,7 @@
     "lint": "pnpm -r lint",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "check:liquidity": "node scripts/check-mantle-liquidity.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "contracts:build": "forge build --root contracts",

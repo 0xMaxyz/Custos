@@ -44,6 +44,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
 | PR-A2 | A2.1      | Risk radar viz                | `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17)                    |
 | PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17) |
+| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[ ]` planned |
 
 ---
 
@@ -246,6 +247,17 @@ the de-risk path, and the on-chain decision/benchmark ledger.
   benchmark** — the Turing Test answer on-chain.
 - **Test:** Forge: events emitted with expected fields; passive-baseline delta
   computed correctly on de-risk; `updateOutcome` access-gated and stored.
+
+### 2.7 — mUSD leg for `UsdyAdapter` (RWA core: USDY + mUSD) · _PR-2d_ · `[ ]`
+
+- **What:** extend the existing `UsdyAdapter` to also hold/route the **mUSD** form of
+  the RWA core and convert USDY↔mUSD via the **Ondo Token Converter**, using whichever
+  DEX leg is deeper. No new bucket — mUSD stays in bucket 2. (Needs the Ondo Token
+  Converter address + interface from the Ondo docs; verify on-chain in the Phase 0.3
+  gate — DO NOT guess.)
+- **Goal:** the RWA core can be entered/exited as USDY *or* mUSD interchangeably.
+- **Test:** fork test: enter via mUSD; USDY↔mUSD convert round-trips; `totalAssets`
+  stable across the conversion; exit unwinds → USDC ≥ `minOut`.
 
 **Exit:** a USDY→safe rotation emits a verifiable on-chain decision with evidence; passive-USDY baseline delta is recorded.
 
@@ -584,6 +596,26 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID` and/or `DISCORD_WEBHOOK_URL` (in
   `.env.example`). 11 agent Vitest (both channels, partial configs, failure path).
   · [PR #17](https://github.com/0xMaxyz/miu/pull/17)
+
+#### A4.1 — Agent x402 micropayments · _PR-A4_ · `[ ]`
+
+- **What:** the agent pays per-call (x402, stablecoin) for premium risk/data feeds;
+  the x402 receipt is pinned into the decision evidence bundle. Optionally expose
+  Sentinel's RWA risk score as an x402-paid endpoint other agents can call.
+- **Goal:** verifiable "the agent paid for the evidence it acted on", plus a revenue
+  surface that justifies running a Sentinel agent.
+- **Test:** Vitest mocked x402 flow; a decision links a valid x402 receipt; the paid
+  endpoint returns 402 then 200 after payment.
+
+#### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[ ]`
+
+- **What:** model each de-risk as an ERC-8183 escrowed Job (client/provider/
+  evaluator); the **deterministic guardrail validator is the evaluator** that releases
+  the Job only if guardrails pass; the outcome feeds ERC-8004 reputation.
+- **Goal:** the LLM-proposes → validator-checks → guardrail-backstops pipeline encoded
+  as a published standard; the agent accrues a verifiable risk-call record.
+- **Test:** fork/unit: a passing de-risk Job settles + writes reputation; a
+  guardrail-violating Job is rejected by the evaluator.
 
 **Phase 5b exit:** whatever shipped.
 

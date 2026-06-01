@@ -41,6 +41,12 @@ export const TOKENS = {
     address: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8",
     decimals: 18,
   },
+  MUSD: {
+    symbol: "MUSD",
+    name: "Mantle USD",
+    address: "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3",
+    decimals: 18,
+  },
 } as const satisfies Record<string, TokenInfo>;
 
 export type TokenSymbol = keyof typeof TOKENS;

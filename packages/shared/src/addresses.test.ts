@@ -20,6 +20,7 @@ describe("shared constants", () => {
     expect(TOKENS.USDC.decimals).toBe(6);
     expect(TOKENS.AUSD.decimals).toBe(6);
     expect(TOKENS.USDY.decimals).toBe(18);
+    expect(TOKENS.MUSD.decimals).toBe(18);
     for (const t of Object.values(TOKENS)) {
       expect(t.address).toMatch(ADDR_RE);
     }

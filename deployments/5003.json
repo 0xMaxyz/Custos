@@ -1,13 +1,8 @@
 {
   "chainId": 5003,
-  "network": "mantle-testnet",
-  "_note": "Populate after running: forge script script/Deploy.s.sol --rpc-url $MANTLE_TESTNET_RPC_URL --broadcast",
-  "guardrails": "",
-  "vault": "",
-  "benchmark": "",
-  "aaveAdapter": "",
-  "usdyAdapter": "",
-  "agentId": null,
-  "deployer": "",
-  "deployedAt": null
+  "guardrails": "0xc3D287D35DCb6945d93c246dbE610C9AF5106E9c",
+  "vault": "0xC2009De9C72EfAfAeeD8Ceac2960A9B6eFEeAc85",
+  "benchmark": "0xCd3EcF4d092eE73Ac4882c61b5f114588B6B122a",
+  "usdyAdapter": "0xd420Bdf2a7eab8F86DE12f06728342b7243101C9",
+  "deployer": "0x96F73ABE603902264d3EfC4a63B38a99eeDBA0dE"
 }

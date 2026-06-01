@@ -43,6 +43,11 @@ const configSchema = z.object({
   guardrailsAddress: hexString.optional(),
   benchmarkAddress: hexString.optional(),
 
+  // ── Alerts (optional; A3.2) ──
+  telegramBotToken: z.string().min(1).optional(),
+  telegramChatId: z.string().min(1).optional(),
+  discordWebhookUrl: z.string().url().optional(),
+
   // ── Service ──
   agentPort: z.coerce.number().int().positive().default(8080),
   agentLogLevel: z
@@ -79,6 +84,9 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     vaultAddress: pick("VAULT_ADDRESS"),
     guardrailsAddress: pick("GUARDRAILS_ADDRESS"),
     benchmarkAddress: pick("BENCHMARK_ADDRESS"),
+    telegramBotToken: pick("TELEGRAM_BOT_TOKEN"),
+    telegramChatId: pick("TELEGRAM_CHAT_ID"),
+    discordWebhookUrl: pick("DISCORD_WEBHOOK_URL"),
     agentPort: pick("AGENT_PORT"),
     agentLogLevel: pick("AGENT_LOG_LEVEL"),
   };

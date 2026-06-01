@@ -32,7 +32,6 @@ contract SentinelJobEscrow is IERC8183, ReentrancyGuard {
     error NotProvider();
     error NotEvaluator();
     error WrongStatus(JobStatus expected, JobStatus actual);
-    error ProviderUnset();
     error BudgetUnset();
     error NotExpired();
 
@@ -82,6 +81,7 @@ contract SentinelJobEscrow is IERC8183, ReentrancyGuard {
     /// @inheritdoc IERC8183
     /// @dev Client-only, before funding (status Open).
     function setProvider(uint256 jobId, address provider) external override {
+        if (provider == address(0)) revert ZeroAddress();
         Job storage j = _job(jobId);
         _onlyClient(j);
         _requireStatus(j, JobStatus.Open);
@@ -105,7 +105,7 @@ contract SentinelJobEscrow is IERC8183, ReentrancyGuard {
         Job storage j = _job(jobId);
         _onlyClient(j);
         _requireStatus(j, JobStatus.Open);
-        if (j.provider == address(0)) revert ProviderUnset();
+        // provider is guaranteed non-zero by createJob + setProvider.
         if (j.budget == 0) revert BudgetUnset();
 
         j.status = JobStatus.Funded;

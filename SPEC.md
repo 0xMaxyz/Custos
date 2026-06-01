@@ -368,6 +368,14 @@ Signing + settlement are injectable so the protocol is testable offline.
 The receipt is bound to the evidence it bought via `resource`; the decision bundle
 carries `payments: [{ evidenceId, receipt }]` (hashed into `rationaleHash`, pinned to IPFS).
 
+**Inbound payment verification** (`payments/verifier.ts`): `/risk-score` verifies the
+inbound `X-PAYMENT` by **recovering the EIP-712 signer** (`recoverTypedDataAddress`) and
+confirming it equals `authorization.from` (plus recipient/amount/validity bounds) — never
+just structure. With `X402_SETTLE_ONCHAIN=true` + an ALLOCATOR wallet it then **settles
+on-chain** by submitting `transferWithAuthorization` (returning the real tx hash);
+otherwise it verifies the signature and delegates settlement to a facilitator. The
+dev-only `shapeOnlyVerifier` is retained for tests, never wired into the running agent.
+
 ---
 
 ## 3. LLM prompt + risk-signal schema

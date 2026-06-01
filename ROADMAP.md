@@ -652,6 +652,15 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   the hashed/IPFS bundle. Config: optional `X402_*` (`config.ts` + `.env.example`).
   Tests: `x402.test.ts` (10) + `server.test.ts` x402 (3) — 402→pay→200, receipt binding,
   verifier accept/reject.
+- **Follow-up (production verifier):** `payments/verifier.ts` adds
+  `signatureVerifyingVerifier` (recovers the EIP-712 signer via `recoverTypedDataAddress`
+  and matches `from` — real authorization check) and `onChainSettlingVerifier` (verifies
+  then settles via `transferWithAuthorization`, returning the real tx hash; gated by
+  `X402_SETTLE_ONCHAIN` + an ALLOCATOR wallet). `index.ts` wires the strong verifier
+  (no `shapeOnlyVerifier` in the running agent). The EIP-712 message now uses canonical
+  `bigint` `uint256` fields (`eip3009TypedData`/`toEip3009Message`) so sign+recover are
+  consistent. 6 `verifier.test.ts` cases (genuine sign→recover, tamper/expiry rejection,
+  on-chain settle, no-settle-on-bad-sig).
 
 #### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21)
 

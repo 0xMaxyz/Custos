@@ -272,4 +272,19 @@ contract PhaseA4Test is Test {
         vm.expectRevert(SentinelJobEscrow.BadExpiry.selector);
         escrow.createJob(provider, address(evaluator), block.timestamp, "j", address(0));
     }
+
+    function test_CreateJobRevertsZeroProvider() public {
+        vm.prank(client);
+        vm.expectRevert(SentinelJobEscrow.ZeroAddress.selector);
+        escrow.createJob(address(0), address(evaluator), block.timestamp + 1 days, "j", address(0));
+    }
+
+    function test_SetProviderRevertsZeroAddress() public {
+        vm.prank(client);
+        uint256 jobId =
+            escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
+        vm.prank(client);
+        vm.expectRevert(SentinelJobEscrow.ZeroAddress.selector);
+        escrow.setProvider(jobId, address(0));
+    }
 }

@@ -146,7 +146,11 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
   the user's position when connected. Source: `AgentBenchmark` outcomes (§16).
 - **Allocation card:** donut or stacked bar across IDLE / AAVE / USDY / AUSD with %
   and USD; legend; "instantly withdrawable" figure (idle + Aave) called out and
-  checked against the **15% instant-liquidity floor**.
+  checked against the **15% instant-liquidity floor**. The **USDY (RWA core) slice is
+  held as USDY *and/or* mUSD** (the two on-chain forms of the same bucket, converted
+  1:1-by-NAV via the Ondo wrap/unwrap converter — task 2.7); show the form split as a
+  sublabel (e.g. "RWA core 50% — 30% mUSD · 20% USDY") since `totalAssets` is
+  conserved across a conversion. mUSD is valued at $1 face, USDY at oracle NAV.
 - **Vault stats:** TVL (vs `tvlCap` **$50k**), **blended APY** with an expandable
   breakdown (**USDY implied APY** vs **Aave supply APY** — the yield spread the agent
   weighs), **USDY peg** (oracle NAV vs DEX spot, deviation in bps against the
@@ -166,9 +170,15 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
     `postWeightsBps`).
   - **evidence/signal chips** typed by signal (**Peg · Oracle · Liquidity ·
     Attestation · News**, §15.1) with **severity** (Low/Med/High) coloring; each
-    links its source.
+    links its source. Evidence the agent **paid for via x402** (A4.1) carries a small
+    **"Paid"** badge with the settlement receipt (amount + tx) — proof "the agent paid
+    for the evidence it acted on" (§15.5).
   - **confidence** indicator (the agent's `confidence`, 0–1) and a small **"guardrails
     enforced"** mark (the action stayed within on-chain limits).
+  - **Verifiable-Job chip (ERC-8183, A4.2)** on de-risk items: the escrowed-Job status
+    (`Funded → Submitted → Completed`/`Rejected`) showing the de-risk was **settled by
+    the deterministic guardrail Evaluator** — the "guardrails are the evaluator" thesis
+    made literal; links the reputation entry it wrote (§15.4).
   - **outcome strip** once measured: realized bps, **passive-delta bps**, drawdown
     avoided — or "measuring…" while `measuredAt == 0`.
   - tx link (mantlescan), `rationaleHash`.
@@ -205,7 +215,18 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 - **Ask the agent (Should):** chat panel — "Why am I in AUSD right now?", "What
   changed today?" — answered from decision history + current snapshot. Clearly
   labeled as explanations (read-only; the agent never takes orders from chat).
-- **States:** loading, not-registered (testnet placeholder), chat empty/typing/error.
+- **Agent economics (A4 — Could):** a compact panel that makes the agent a verifiable
+  economic actor, **clearly labelled as outside the vault custody path**:
+  - **x402 (A4.1):** "buys its evidence, sells its judgment." Show premium feeds the
+    agent **paid** for (per-call x402 receipts, amount + tx) and the **paid endpoint**
+    it exposes — `GET /risk-score`, price (e.g. 0.01 USDC/call), `payTo` — that other
+    agents call (the revenue surface). Link receipts to the decisions they backed.
+  - **Verifiable jobs (A4.2):** a small ledger of de-risk **ERC-8183 Jobs** — status
+    (`Completed`/`Rejected`), the **guardrail Evaluator** verdict, bounty, and the
+    ERC-8004 reputation entry each wrote. Reinforces "LLM proposes → validator checks →
+    guardrails dispose" as an on-chain, settled record.
+- **States:** loading, not-registered (testnet placeholder), chat empty/typing/error;
+  the economics panel is hidden when x402 isn't configured / no jobs exist yet.
 
 ### 5.4 `/insights` — Risk radar (Should)
 **Purpose:** the insight layer (absorbs Option B).
@@ -249,7 +270,10 @@ ApyBreakdown (USDY vs Aave), RiskLevelChip, AgentStatusCard, **BaselineCounter**
 DecisionTimelineItem, EvidenceChip, **SignalBadge** (typed + severity), **FlagChip**,
 **ConfidenceMeter**, **OutcomeStrip**, IdentityCard, WatchlistPanel, **GuardrailsPanel**
 (the limits), **PegGauge**, **LiquidityBufferBar**, ChatPanel, LineChart +
-ChartDataTable, Stepper, AmountInput, TxStatus, Toast, Skeletons, EmptyState, ErrorState.
+ChartDataTable, Stepper, AmountInput, TxStatus, Toast, Skeletons, EmptyState, ErrorState,
+**RwaFormSplit** (USDY vs mUSD sublabel on the RWA slice), **PaidEvidenceBadge** (x402
+receipt), **JobStatusChip** (ERC-8183 Open/Funded/Submitted/Completed/Rejected/Expired),
+**AgentEconomicsPanel** (x402 spend + paid endpoint + verifiable-jobs ledger).
 
 ---
 
@@ -298,6 +322,12 @@ ChartDataTable, Stepper, AmountInput, TxStatus, Toast, Skeletons, EmptyState, Er
   proof the model is never the last line of defense.
 - **Confidence, shown not hidden:** every decision surfaces the agent's `confidence`
   (0–1) next to its risk level, so users can weight its certainty.
+- **Pays for its evidence (A4.1):** premium evidence carries a "Paid" badge with the
+  x402 receipt — the agent puts money behind the data it acts on, and sells its own
+  risk score, making it a transparent economic actor (never from the custody path).
+- **Every de-risk is a settled, verifiable job (A4.2):** the de-risk's ERC-8183 Job
+  status shows it was released by the deterministic **guardrail Evaluator** and wrote an
+  ERC-8004 reputation entry — "AI proposes, guardrails dispose" as an auditable record.
 
 ---
 
@@ -387,6 +417,27 @@ that one-directionality in copy. **Oracle wording:** USDY's oracle is *range-bas
 Say **"oracle valid until 〈date〉"** or **"range ends in 2 days"**; only a frozen/paused
 oracle or one past its range end is "stale".
 
+### 15.4 ERC-8183 Job status (A4.2 — de-risk verifiable jobs)
+Closed enum on the de-risk Job (`JobStatusChip`). Color by terminal outcome:
+
+| `status` | Meaning | Color |
+|----------|---------|-------|
+| `Open` | created, budget not yet escrowed | neutral |
+| `Funded` | budget escrowed; awaiting provider | info |
+| `Submitted` | provider submitted the de-risk deliverable | info |
+| `Completed` | **guardrail Evaluator released it** → provider paid + reputation written | success |
+| `Rejected` | de-risk not guardrail-justified → client refunded | warning |
+| `Expired` | unsettled past expiry → client refunded | neutral |
+
+The Evaluator is the deterministic guardrail check (`Guardrails.evaluateUsdyRisk`), never
+a human or the LLM — label it as such. Jobs are **outside the vault custody path**.
+
+### 15.5 x402 paid-evidence receipt (A4.1)
+Evidence the agent bought carries a `PaidEvidenceBadge` from the settlement receipt
+`{ success, transaction, network, payer, amount, resource }` (x402 "exact" scheme). Show
+amount in the asset's units (e.g. `0.01 USDC`) + a `transaction` explorer link; `resource`
+binds the receipt to the evidence item it paid for. Never imply a payment moved vault funds.
+
 ---
 
 ## 16. Data dictionary (UI element → field → unit → example → source)
@@ -455,6 +506,29 @@ Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR*
 | Decisions handled | `decisionCount` | uint | `14` | BM |
 | De-risk events | count of `kind==1` | uint | `2` | VAULT |
 
+**RWA core form split (Dashboard §5.1 allocation)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| RWA core total | bucket-2 `totalAssets()` | USDC | `$15,000` | VAULT (UsdyAdapter) |
+| └ held as USDY | USDY bal × oracle NAV | USDC | `$6,000` | VAULT |
+| └ held as mUSD | mUSD bal × $1 face | USDC | `$9,000` | VAULT |
+| Converter | `UsdyAdapter.MUSD()` (Ondo wrap/unwrap) | address | `0xab57…7cF3` | CHAIN |
+
+**Agent economics — x402 + verifiable jobs (Agent §5.3, Activity §5.2 — A4)**
+| UI element | Field | Unit | Example | Source |
+|---|---|---|---|---|
+| Paid-evidence amount | receipt `amount` | token base units | `10000` (0.01 USDC) | AGENT (x402) |
+| Paid-evidence tx | receipt `transaction` | hash | `0xab12…` | AGENT (x402) |
+| Paid-evidence resource | receipt `resource` | url | `https://…/usdy-attestation` | AGENT (x402) |
+| Risk-score price | `maxAmountRequired` @ `payTo` | base units @ addr | `10000` @ `0x…bEEF` | AGENT (x402) |
+| Job status | ERC-8183 `JobStatus` | enum | `Completed` | JOBS (SentinelJobEscrow) |
+| Job bounty | `Job.budget` | USDC | `$100.00` | JOBS |
+| Job evaluator | `Job.evaluator` | address | `0x…Eval` (guardrail-gated) | JOBS |
+| Job reputation | `appendFeedback(tag=DERISK)` | int (score) | `+610` | BM / ERC-8004 |
+
+> **JOBS** = `SentinelJobEscrow` / `SentinelDeRiskEvaluator` reads — a record layer,
+> never the vault custody path.
+
 ---
 
 ## 17. Canonical example fixtures (design & review against these)
@@ -470,6 +544,7 @@ USDY 18-dec, chain 5000). Use verbatim.
   "tokens": {
     "USDC": { "decimals": 6,  "address": "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9" },
     "USDY": { "decimals": 18, "address": "0x5bE26527e817998A7206475496fDE1E68957c5A6" },
+    "MUSD": { "decimals": 18, "address": "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3" },
     "AUSD": { "decimals": 6,  "address": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a" }
   },
   "erc8004": {
@@ -570,5 +645,30 @@ USDY 18-dec, chain 5000). Use verbatim.
   "agentURI": "ipfs://bafy…agentcard", "owner": "0xA11c…E0a",
   "identityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
   "trackRecord": { "decisions": 14, "deRiskEvents": 2, "realizedVsPassivePct": 1.8, "drawdownAvoidedUsdc": "610.00" }
+}
+```
+
+### 17.8 RWA-core form split + agent economics (A4)
+```jsonc
+{
+  "rwaCore": {                          // bucket 2 held as USDY and/or mUSD (task 2.7)
+    "totalUsdc": "15000.00",
+    "usdyUsdc": "6000.00",              // USDY bal × oracle NAV
+    "musdUsdc": "9000.00",              // mUSD bal × $1 face
+    "converter": "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3"  // UsdyAdapter.MUSD()
+  },
+  "x402": {                             // A4.1 — pays for evidence, sells its risk score
+    "paidEvidence": [
+      { "evidenceId": "e1", "resource": "https://feeds.example/usdy-attestation",
+        "receipt": { "success": true, "transaction": "0xab12…", "network": "mantle",
+                     "payer": "0xA11c…E0a", "amount": "10000", "resource": "https://feeds.example/usdy-attestation" } }
+    ],
+    "sells": { "endpoint": "/risk-score", "priceBaseUnits": "10000", "asset": "USDC", "payTo": "0x000…bEEF" }
+  },
+  "jobs": [                             // A4.2 — each de-risk as an ERC-8183 verifiable Job
+    { "jobId": 3, "status": "Completed", "budgetUsdc": "100.00",
+      "evaluator": "0xEval…", "deliverable": "0x…decisionHash",
+      "reputation": { "tag": "DERISK", "score": 610, "uri": "ipfs://bafy…evidence" } }
+  ]
 }
 ```

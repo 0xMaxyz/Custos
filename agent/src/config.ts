@@ -48,11 +48,35 @@ const configSchema = z.object({
   telegramChatId: z.string().min(1).optional(),
   discordWebhookUrl: z.string().url().optional(),
 
+  // ── x402 micropayments (optional; A4.1) ──
+  // When `x402PayTo` is set, the agent sells its RWA risk score at `GET /risk-score`
+  // for `x402PriceBaseUnits` of `x402Asset` (an EIP-3009/USDC-style token). The
+  // token name/version populate the EIP-712 domain used to verify the payment.
+  x402PayTo: hexString.optional(),
+  x402Asset: hexString.optional(),
+  x402PriceBaseUnits: z.coerce.bigint().nonnegative().default(10_000n), // 0.01 USDC (6-dec)
+  x402Network: z.string().min(1).default("mantle"),
+  x402TokenName: z.string().min(1).default("USD Coin"),
+  x402TokenVersion: z.string().min(1).default("2"),
+  x402TimeoutSeconds: z.coerce.number().int().positive().default(120),
+  // Optional premium feed the agent PAYS for via x402; its settlement receipt is
+  // pinned into the decision evidence bundle.
+  x402PremiumFeedUrl: z.string().url().optional(),
+
   // ── Service ──
   agentPort: z.coerce.number().int().positive().default(8080),
   agentLogLevel: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+}).superRefine((cfg, ctx) => {
+  // The x402 paid endpoint needs an asset (EIP-712 verifyingContract) to settle in.
+  if (cfg.x402PayTo && !cfg.x402Asset) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["x402Asset"],
+      message: "X402_ASSET is required when X402_PAY_TO is set",
+    });
+  }
 });
 
 export type AgentConfig = z.infer<typeof configSchema>;
@@ -87,6 +111,14 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     telegramBotToken: pick("TELEGRAM_BOT_TOKEN"),
     telegramChatId: pick("TELEGRAM_CHAT_ID"),
     discordWebhookUrl: pick("DISCORD_WEBHOOK_URL"),
+    x402PayTo: pick("X402_PAY_TO"),
+    x402Asset: pick("X402_ASSET"),
+    x402PriceBaseUnits: pick("X402_PRICE_BASE_UNITS"),
+    x402Network: pick("X402_NETWORK"),
+    x402TokenName: pick("X402_TOKEN_NAME"),
+    x402TokenVersion: pick("X402_TOKEN_VERSION"),
+    x402TimeoutSeconds: pick("X402_TIMEOUT_SECONDS"),
+    x402PremiumFeedUrl: pick("X402_PREMIUM_FEED_URL"),
     agentPort: pick("AGENT_PORT"),
     agentLogLevel: pick("AGENT_LOG_LEVEL"),
   };

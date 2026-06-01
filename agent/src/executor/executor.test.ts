@@ -593,3 +593,74 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(swapData[2]).toBe("0x");
   });
 });
+
+// ── Paid-evidence (x402) wiring (A4.1) ─────────────────────────────────────────
+// A decision must link a valid x402 receipt: with a paid-evidence fetcher injected,
+// the pinned bundle carries `payments` (and the bought evidence) — mocked 402→pay→200.
+
+describe("Executor paid evidence (x402) → pinned bundle.payments", () => {
+  function mockClients() {
+    const writeContract = vi.fn(async () => "0xabc123" as `0x${string}`);
+    const readContract = vi.fn(async () => 0n);
+    const waitForTransactionReceipt = vi.fn(async () => ({ logs: [] }));
+    return {
+      publicClient: { readContract, waitForTransactionReceipt } as never,
+      walletClient: { writeContract, chain: { id: 5000 }, account: { address: "0x1234" as `0x${string}` } } as never,
+    };
+  }
+
+  it("pins payments + bought evidence when a premium feed is paid (mocked 402→pay→200)", async () => {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const { buildPaidEvidenceFetcher } = await import("../payments/evidence.js");
+    const { encodeSettlement, PAYMENT_HEADER, PAYMENT_RESPONSE_HEADER } = await import("../payments/x402.js");
+
+    const REQ = {
+      scheme: "exact" as const, network: "mantle", chainId: 5000, maxAmountRequired: "10000",
+      resource: "https://feeds.example/premium", description: "d", mimeType: "application/json",
+      payTo: "0x000000000000000000000000000000000000bEEF" as `0x${string}`, maxTimeoutSeconds: 120,
+      asset: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9" as `0x${string}`, extra: { name: "USD Coin", version: "2" },
+    };
+    const receipt = {
+      success: true, transaction: `0x${"cd".repeat(32)}`, network: "mantle",
+      payer: "0x000000000000000000000000000000000000A11c" as `0x${string}`, amount: "10000", resource: REQ.resource,
+    };
+    // Minimal in-memory x402 server: 402 until X-PAYMENT presented, then 200 + receipt.
+    const fetchImpl = (async (_url: string, init?: { headers?: Record<string, string> }) => {
+      if (!init?.headers?.[PAYMENT_HEADER]) {
+        return { status: 402, headers: { get: () => null }, json: async () => ({ accepts: [REQ] }), text: async () => "" };
+      }
+      return {
+        status: 200,
+        headers: { get: (n: string) => (n === PAYMENT_RESPONSE_HEADER ? encodeSettlement(receipt) : null) },
+        json: async () => ({ summary: "Premium USDY risk feed: reserves stable." }),
+        text: async () => "",
+      };
+    }) as never;
+    const signer = (async () => `0x${"ab".repeat(65)}`) as never;
+    const paidEvidence = buildPaidEvidenceFetcher({ url: REQ.resource, from: receipt.payer, signer, fetchImpl });
+
+    const pinned: Array<{ payments?: Array<{ evidenceId: string; receipt: { success: boolean } }>; evidence: Array<{ id: string }> }> = [];
+    const pin = (async (bundle: { payments?: unknown[]; evidence: unknown[] }) => {
+      pinned.push(bundle as never);
+      return { uri: "data:application/json;base64,e30=", rationaleHash: `0x${"0".repeat(64)}` as `0x${string}` };
+    }) as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+    });
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // depeg → de-risk → pin
+    const executor = new Executor({ config, clients: mockClients() as never, snapshotter: { snapshot: vi.fn(async () => snap), invalidate: vi.fn() } as never, paidEvidence, pin });
+
+    const result = await executor.runCycle();
+    expect(result.submitted).toBe(true);
+    expect(pinned).toHaveLength(1);
+    // The decision links a valid x402 receipt for the evidence it bought.
+    expect(pinned[0]!.payments).toBeDefined();
+    expect(pinned[0]!.payments![0]!.evidenceId).toBe("x402-premium");
+    expect(pinned[0]!.payments![0]!.receipt.success).toBe(true);
+    expect(pinned[0]!.evidence.some((e) => e.id === "x402-premium")).toBe(true);
+  });
+});

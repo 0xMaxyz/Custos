@@ -42,10 +42,10 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 
 | PR    | Tasks     | Theme                         | Status                                                                          |
 | ----- | --------- | ----------------------------- | ------------------------------------------------------------------------------- |
-| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
+| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[x] DONE` |
 | PR-A2 | A2.1      | Risk radar viz                | `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17)                    |
 | PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17) |
-| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[ ]` planned |
+| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[x] DONE` |
 
 ---
 
@@ -66,7 +66,7 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 - **Test:** `forge build`, `pnpm -r typecheck`, `pnpm -r lint`, and
   `docker compose config` all succeed; CI script documented.
 
-### 0.2 — Mantle fork test harness · _PR-0b_ · `[~] IN PROGRESS`
+### 0.2 — Mantle fork test harness · _PR-0b_ · `[x] DONE`
 
 - **What:** Foundry fork profile using `MANTLE_RPC_URL` at a pinned block; base test
   utilities (token labels, `deal`-via-swap helper).
@@ -74,8 +74,13 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 - **Test:** `forge test --fork-url $MANTLE_RPC_URL --match-test testForkSanity`
   asserts `block.chainid == 5000` and reads `USDC.decimals() == 6`.
 
-### 0.3 — On-chain address & capability verification (GATE) · _PR-0b_
+### 0.3 — On-chain address & capability verification (GATE) · _PR-0b_ · `[x] DONE` (block-N stamps pending CI fork gate)
 
+- **Status:** addresses resolved + committed (`packages/shared/addresses.ts` + `Addresses.sol`);
+  `Fork.t.sol`/`ForkPhase2a`/`ForkPhase2d`/`ForkPhase4a` assert `extcodesize > 0` and a basic call
+  per interface (oracle `getPrice()`, Aave reserve data, mUSD `usdy()/oracle()`, ERC-8004 registries).
+  ERC-8004 decision made: **use the canonical 0x8004 singletons** (SPEC §2.5). Residual: the literal
+  `// verified @ block N` stamps land once the post-merge `fork-tests` job pins a block.
 - **What:** resolve + verify and record in `packages/shared/addresses.ts`
   (with "verified @ block N"): USDC; USDY + `RWADynamicOracle`; AUSD; Aave v3
   `Pool` + `PoolDataProvider` + aUSDC; DEX router(s) for USDY/USDC, USDY/WMNT,
@@ -86,8 +91,13 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
   per interface succeeds (`oracle` returns price; `Pool.getReserveData(USDC)`
   returns aToken; router quote returns > 0).
 
-### 0.4 — Liquidity & swap-quote gate · _PR-0b_
+### 0.4 — Liquidity & swap-quote gate · _PR-0b_ · `[x] DONE` (GO decision recorded; live monitor supersedes one-shot table)
 
+- **Status:** liquidity characterized (USDY ~$1.5k fragmented across Agni/iZiSwap/Butter) → **GO
+  decision = route via a pinned Odos aggregator** (not single-pool) **+ a `maxUsdyNotionalUsdc` $5k
+  absolute cap**, instead of the AUSD-primary fallback (AGENTS.md §2.1, PR-2d). Ongoing slippage/peg
+  depth is automated by `scripts/check-mantle-liquidity.mjs` + the weekly `liquidity-monitor.yml`
+  (sources `tokens.ts`), which supersedes a one-shot committed table.
 - **What:** quote USDC→USDY, USDC→AUSD, and reverse at $100 / $1k / $10k on the
   chosen router on the fork; record slippage.
 - **Goal:** documented slippage table + a GO decision (e.g. ≤0.5% at $1k) or trigger
@@ -95,8 +105,11 @@ liquidity gate fails, switch to the AUSD-primary fallback before Phase 1.
 - **Test:** fork test executes swaps, asserts `received >= minOut` for the target
   slippage, and logs the table.
 
-### 0.5 — USDY transfer-hook (blocklist) check · _PR-0b_
+### 0.5 — USDY transfer-hook (blocklist) check · _PR-0b_ · `[x] DONE`
 
+- **Status:** `ForkPhase2a.t.sol::testForkUsdyAdapterNotBlocklisted` asserts neither the vault nor the
+  adapter is on the USDY blocklist (`isBlocked(...) == false`); the live USDY→mUSD→USDY round-trip in
+  `ForkPhase2d.t.sol` further exercises a real USDY `transferFrom` (blocklist hook) from the adapter.
 - **What:** confirm a fresh contract can receive/hold/transfer USDY (not blocked);
   characterize `beforeTransfer` behavior.
 - **Goal:** confirmation the vault can custody USDY.
@@ -417,17 +430,18 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
   `ConnectButton` (connect/account/chain-switch + wrong-network guard). Vitest
   covers chain config + format/fixture logic (25 tests).
 
-### 4.4 — Dashboard (reads) · _PR-4b_ · `[~] PARTIAL` (PR #11)
+### 4.4 — Dashboard (reads) · _PR-4b_ · `[x] DONE` (testnet live reads wired in 5.1; mainnet on 5.2)
 
 - **What:** balance, share price, blended APY, allocation breakdown
   (USDY/Aave/idle/AUSD), TVL.
 - **Goal:** an accurate live view from chain.
 - **Test:** Vitest with mocked viem reads → expected figures; manual vs testnet.
-- **Status:** dashboard renders the full layout from typed fixtures behind a
-  reads-hook seam (`lib/useVaultData.ts`). **Live on-chain reads are DEFERRED**
-  until the Sentinel vault is deployed to Mantle testnet (Phase 1 dependency) —
-  there is no vault address to read yet. When deployed, swap the hook body for
-  `useReadContract` keyed off `VITE_VAULT_ADDRESS`; consumers are unchanged.
+- **Status:** dashboard renders the full layout behind a reads-hook seam
+  (`lib/useVaultData.ts`). **Live on-chain reads are now wired** against the Mantle
+  Sepolia (5003) deploy from task 5.1 (`useVaultData`/`useGuardianData` read the
+  deployed `YieldVault`/`Guardrails`/`AgentBenchmark` from `packages/shared/deployments`);
+  the fixture path remains the fallback when no deployment/RPC is configured. Mainnet
+  reads switch on automatically once 5.2 records the 5000 addresses; consumers unchanged.
 
 ### 4.5 — Deposit/withdraw flow · _PR-4c_ · `[x] DONE`
 
@@ -617,7 +631,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   `.env.example`). 11 agent Vitest (both channels, partial configs, failure path).
   · [PR #17](https://github.com/0xMaxyz/miu/pull/17)
 
-#### A4.1 — Agent x402 micropayments · _PR-A4_ · `[ ]`
+#### A4.1 — Agent x402 micropayments · _PR-A4_ · `[x] DONE`
 
 - **What:** the agent pays per-call (x402, stablecoin) for premium risk/data feeds;
   the x402 receipt is pinned into the decision evidence bundle. Optionally expose
@@ -626,8 +640,20 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   surface that justifies running a Sentinel agent.
 - **Test:** Vitest mocked x402 flow; a decision links a valid x402 receipt; the paid
   endpoint returns 402 then 200 after payment.
+- **Built:** `agent/src/payments/x402.ts` — Coinbase x402 "exact" EVM scheme (EIP-3009
+  `transferWithAuthorization` signed via EIP-712): `createPayment`/`payAndFetch` (client
+  pays on 402 and retries with a base64 `X-PAYMENT` header, returns the settlement
+  receipt), `encode/decodePaymentHeader`/`decodeSettlement`, and an injectable
+  `PaymentVerifier` (`shapeOnlyVerifier` for dev; facilitator/on-chain for prod —
+  signing + settlement are injected so the protocol is testable offline). `server.ts`
+  gains the **revenue surface** `GET /risk-score` (402 → `accepts[]`; 200 + score +
+  `X-PAYMENT-RESPONSE` once paid). The decision bundle (`executor/ipfs.ts`
+  `RationaleBundle.payments`) pins `{evidenceId, receipt}` so "paid-for evidence" is in
+  the hashed/IPFS bundle. Config: optional `X402_*` (`config.ts` + `.env.example`).
+  Tests: `x402.test.ts` (10) + `server.test.ts` x402 (3) — 402→pay→200, receipt binding,
+  verifier accept/reject.
 
-#### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[ ]`
+#### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[x] DONE`
 
 - **What:** model each de-risk as an ERC-8183 escrowed Job (client/provider/
   evaluator); the **deterministic guardrail validator is the evaluator** that releases
@@ -636,6 +662,18 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   as a published standard; the agent accrues a verifiable risk-call record.
 - **Test:** fork/unit: a passing de-risk Job settles + writes reputation; a
   guardrail-violating Job is rejected by the evaluator.
+- **Built:** `interfaces/IERC8183.sol` (draft-spec subset: `JobStatus`
+  Open/Funded/Submitted/Completed/Rejected/Expired, `Job`, `createJob/setProvider/
+  setBudget/fund/submit/complete/reject/claimRefund/getJob` + events).
+  `SentinelJobEscrow.sol` — USDC-escrowed jobs (client funds → provider submits →
+  evaluator completes=pay provider / rejects=refund client; expiry refund), **not in the
+  vault custody path** (escrows a per-job bounty, never user deposits). `SentinelDeRiskEvaluator.sol`
+  — the **Evaluator is the deterministic guardrail check**: `evaluate(...)` calls
+  `Guardrails.evaluateUsdyRisk(MarketState)` and `complete`s (+ writes
+  ERC-8004 `appendFeedback`) only when `forceDeRisk`, else `reject`s; KEEPER-gated
+  (the keeper supplies the same snapshot the vault's `deRisk` uses). Tests:
+  `PhaseA4.t.sol` (12) — justified de-risk settles + writes reputation, unjustified is
+  rejected + refunds, expiry refund, full access-control + state-machine guards.
 
 **Phase 5b exit:** whatever shipped.
 

@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildServer } from "./server.js";
 import type { ExplainClient, ExplainContext } from "./llm/explain.js";
+import { encodePaymentHeader, type PaymentPayload } from "./payments/x402.js";
 
 const sampleContext: ExplainContext = {
   asOf: "2026-06-01T00:00:00.000Z",
@@ -213,6 +214,91 @@ describe("agent server — /snapshot (A2.1)", () => {
     await app.ready();
     const res = await app.inject({ method: "GET", url: "/snapshot" });
     expect(res.headers["access-control-allow-origin"]).toBe("*");
+    await app.close();
+  });
+});
+
+describe("agent server — x402-paid /risk-score (A4.1)", () => {
+  const requirements = (resourceUrl: string) => ({
+    scheme: "exact" as const,
+    network: "mantle",
+    chainId: 5000,
+    maxAmountRequired: "10000",
+    resource: resourceUrl,
+    description: "Sentinel RWA risk score",
+    mimeType: "application/json",
+    payTo: "0x000000000000000000000000000000000000bEEF" as `0x${string}`,
+    maxTimeoutSeconds: 120,
+    asset: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9" as `0x${string}`,
+    extra: { name: "USD Coin", version: "2" },
+  });
+
+  it("is not registered when x402 is not configured", async () => {
+    const app = buildServer();
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/risk-score" });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("returns 402 with payment requirements when no X-PAYMENT is presented", async () => {
+    const app = buildServer({
+      x402: {
+        requirements,
+        verify: async () => null,
+        riskScore: async () => ({ riskScore: 41 }),
+      },
+    });
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/risk-score" });
+    expect(res.statusCode).toBe(402);
+    const body = res.json() as { accepts: Array<{ scheme: string; payTo: string }> };
+    expect(body.accepts[0]?.scheme).toBe("exact");
+    expect(body.accepts[0]?.payTo).toBe("0x000000000000000000000000000000000000bEEF");
+    await app.close();
+  });
+
+  it("returns 200 + score + settlement receipt once a valid X-PAYMENT settles", async () => {
+    const receipt = {
+      success: true,
+      transaction: `0x${"cd".repeat(32)}`,
+      network: "mantle",
+      payer: "0x000000000000000000000000000000000000A11c" as `0x${string}`,
+      amount: "10000",
+      resource: "https://x",
+    };
+    const app = buildServer({
+      x402: {
+        requirements,
+        verify: async () => receipt, // stub a successful settlement
+        riskScore: async () => ({ riskScore: 41, asOf: "2026-06-01T00:00:00Z" }),
+      },
+    });
+    await app.ready();
+    const payment: PaymentPayload = {
+      x402Version: 1,
+      scheme: "exact",
+      network: "mantle",
+      payload: {
+        signature: `0x${"ab".repeat(65)}`,
+        authorization: {
+          from: "0x000000000000000000000000000000000000A11c",
+          to: "0x000000000000000000000000000000000000bEEF",
+          value: "10000",
+          validAfter: "0",
+          validBefore: "99999999999",
+          nonce: `0x${"11".repeat(32)}`,
+        },
+      },
+    };
+    const res = await app.inject({
+      method: "GET",
+      url: "/risk-score",
+      headers: { "x-payment": encodePaymentHeader(payment) },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ riskScore: 41 });
+    expect(res.headers["x-payment-response"]).toBeTruthy();
     await app.close();
   });
 });

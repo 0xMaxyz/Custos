@@ -1,5 +1,27 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { ExplainClient, ExplainContext } from "./llm/explain.js";
+import {
+  PAYMENT_HEADER,
+  PAYMENT_RESPONSE_HEADER,
+  X402_VERSION,
+  decodePaymentHeader,
+  encodeSettlement,
+  type PaymentRequirements,
+  type PaymentVerifier,
+} from "./payments/x402.js";
+
+/**
+ * x402-paid endpoint config (ROADMAP A4.1). When provided, `GET /risk-score`
+ * becomes a 402-gated resource: callers must present a valid `X-PAYMENT` header.
+ * `requirements(url)` builds the per-request payment terms; `verify` settles the
+ * inbound payment (facilitator-backed in prod, shape-only in dev).
+ */
+export interface X402Options {
+  readonly requirements: (resourceUrl: string) => PaymentRequirements;
+  readonly verify: PaymentVerifier;
+  /** Current RWA risk score payload to sell (the resource body). */
+  readonly riskScore: () => Promise<Record<string, unknown>>;
+}
 
 /**
  * Optional server dependencies. When `explainClient` and `getContext` are
@@ -22,6 +44,11 @@ export interface ServerOptions {
    */
   readonly askRateLimit?: number | undefined;
   readonly askRateWindowMs?: number | undefined;
+  /**
+   * When set, exposes Sentinel's RWA risk score as an x402-paid endpoint
+   * (`GET /risk-score`) other agents can call (ROADMAP A4.1 revenue surface).
+   */
+  readonly x402?: X402Options | undefined;
 }
 
 /** Minimal fixed-window throttle (dependency-free). Global, not per-IP — the goal
@@ -127,6 +154,35 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         req.log.error({ err }, "explain failed");
         return reply.code(502).send({ error: "The assistant could not answer right now." });
       }
+    });
+  }
+
+  // ── x402-paid risk-score endpoint (A4.1) ───────────────────────────────────
+  // Sentinel sells its RWA risk score per-call: 402 until a valid X-PAYMENT is
+  // presented, then 200 + the score and an X-PAYMENT-RESPONSE settlement receipt.
+  const { x402 } = options;
+  if (x402) {
+    app.get("/risk-score", async (req, reply) => {
+      const resourceUrl = `${req.protocol}://${req.headers.host ?? "agent"}${req.url}`;
+      const requirements = x402.requirements(resourceUrl);
+
+      const raw = req.headers[PAYMENT_HEADER];
+      const header = Array.isArray(raw) ? raw[0] : raw;
+      const require402 = (error: string): unknown =>
+        reply.code(402).send({ x402Version: X402_VERSION, accepts: [requirements], error });
+
+      if (!header) return require402("payment required");
+
+      let receipt = null;
+      try {
+        receipt = await x402.verify(decodePaymentHeader(header), requirements);
+      } catch (err) {
+        req.log.error({ err }, "x402 verify failed");
+      }
+      if (!receipt) return require402("invalid or insufficient payment");
+
+      reply.header(PAYMENT_RESPONSE_HEADER, encodeSettlement(receipt));
+      return x402.riskScore();
     });
   }
 

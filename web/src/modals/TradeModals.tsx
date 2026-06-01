@@ -1,11 +1,20 @@
 // Deposit / Withdraw / Tx status. Matches Design/src/trade-modals.jsx.
+//
+// When VITE_VAULT_ADDRESS is set (isDeployed), drives real on-chain writes:
+//   Deposit:  USDC.approve(vault, amount) → vault.deposit(amount, receiver)
+//   Withdraw: vault.redeem(shares, receiver, owner)  (no approve needed)
+// Otherwise drives the simulated flow used in the undeployed preview.
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { parseUnits } from "viem";
 import { Icon } from "../components/Icons";
 import { Spinner } from "../components/Components";
 import { Modal } from "./Modals";
 import * as fmt from "../lib/fmt";
 import { explorer, type VaultState, type PositionState } from "../lib/data";
+import { VAULT_ADDRESS, isDeployed } from "../lib/useVaultData";
+import { ERC20_APPROVE_ABI, VAULT_ABI } from "../lib/vaultAbi";
 import {
   previewDeposit,
   depositStepIndex,
@@ -50,9 +59,9 @@ function TxResult({ kind, title, lines, tx, onClose }: { kind: "confirmed" | "fa
           <Icon name={ok ? "check" : "x"} size={30} />
         </div>
         {lines.map((l, i) => <div key={i} style={{ fontSize: i === 0 ? "1.0625rem" : "0.9375rem", fontWeight: i === 0 ? 600 : 400, color: i === 0 ? "var(--base-content)" : "var(--muted)", marginTop: i ? 4 : 0 }}>{l}</div>)}
-        <div style={{ marginTop: 16 }}>
+        {tx && <div style={{ marginTop: 16 }}>
           <a className="linklike" href={explorer + "/tx/" + tx} target="_blank" rel="noreferrer" style={{ justifyContent: "center" }}>View on Mantlescan <Icon name="external-link" size={14} /></a>
-        </div>
+        </div>}
       </div>
       <button className="btn btn-ghost btn-block" style={{ marginTop: 16 }} onClick={onClose}>Done</button>
     </Modal>
@@ -60,9 +69,17 @@ function TxResult({ kind, title, lines, tx, onClose }: { kind: "confirmed" | "fa
 }
 
 // ---------- Deposit ----------
-export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: TradeWallet; vault: VaultState; onClose: () => void; onToast: (t: ToastPayload) => void }) {
+export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
+  wallet: TradeWallet;
+  vault: VaultState;
+  usdcAddress: `0x${string}` | "";
+  onClose: () => void;
+  onToast: (t: ToastPayload) => void;
+}) {
   const [amt, setAmt] = useState("");
   const [phase, setPhase] = useState<DepositPhase>("form");
+  const [txHash, setTxHash] = useState("");
+  const { address: userAddress } = useAccount();
   const sharePrice = parseFloat(vault.sharePrice);
   const bal = parseFloat(wallet.balance ?? "0");
   const tvl = parseFloat(vault.tvlUsdc), cap = parseFloat(vault.tvlCapUsdc);
@@ -71,19 +88,50 @@ export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: Trad
   const { amount: n, sharesOut, error: err, valid } = p;
   const step = depositStepIndex(phase);
 
-  const run = () => {
-    // Drive the approve→deposit machine. setTimeout stands in for the wallet
-    // round-trips until VITE_VAULT_ADDRESS is live (then swap for wagmi writes).
+  // Wagmi write hooks (only used when isDeployed).
+  const { writeContractAsync: writeApprove } = useWriteContract();
+  const { writeContractAsync: writeDeposit  } = useWriteContract();
+  const { isSuccess: depositConfirmed } = useWaitForTransactionReceipt({
+    hash: txHash ? (txHash as `0x${string}`) : undefined,
+    query: { enabled: isDeployed && txHash.length > 2 },
+  });
+
+  useEffect(() => {
+    if (depositConfirmed && phase === "depositing") {
+      setPhase("done");
+      onToast({ kind: "success", title: "Deposit confirmed", body: `${fmt.usd(n)} deposited · ${fmt.num(sharesOut)} shares`, tx: txHash });
+    }
+  }, [depositConfirmed]);
+
+  const runLive = async () => {
+    if (!userAddress || !usdcAddress) return;
+    try {
+      const assets = parseUnits(String(n), 6);
+      setPhase("approving");
+      await writeApprove({ address: usdcAddress, abi: ERC20_APPROVE_ABI, functionName: "approve", args: [VAULT_ADDRESS, assets] });
+      setPhase("approved");
+      setPhase("depositing");
+      const hash = await writeDeposit({ address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "deposit", args: [assets, userAddress] });
+      setTxHash(hash);
+    } catch {
+      setPhase("form");
+      onToast({ kind: "error", title: "Transaction failed", body: "Check your wallet and try again." });
+    }
+  };
+
+  const runSimulated = () => {
     setPhase("approving");
     setTimeout(() => { setPhase((x) => nextDepositPhase(x)); setTimeout(() => {
       setPhase("depositing"); setTimeout(() => {
         setPhase((x) => nextDepositPhase(x));
-        onToast({ kind: "success", title: "Deposit confirmed", body: `${fmt.usd(n)} deposited · ${fmt.num(sharesOut)} shares`, tx: "0xabc9876543210fedcba9876543210fedcba9876543210fedcba98765432100abc" });
+        onToast({ kind: "success", title: "Deposit confirmed (preview)", body: `${fmt.usd(n)} deposited · ${fmt.num(sharesOut)} shares` });
       }, 1200);
     }, 900); }, 1100);
   };
 
-  if (phase === "done") return <TxResult kind="confirmed" title="Deposit confirmed" lines={[`You deposited ${fmt.usd(n)}`, `Received ${fmt.num(sharesOut)} shares`]} tx="0xabc9876543210fedcba9876543210fedcba9876543210fedcba98765432100abc" onClose={onClose} />;
+  const run = () => { if (isDeployed && usdcAddress) { void runLive(); } else { runSimulated(); } };
+
+  if (phase === "done") return <TxResult kind="confirmed" title="Deposit confirmed" lines={[`You deposited ${fmt.usd(n)}`, `Received ${fmt.num(sharesOut)} shares`]} tx={txHash} onClose={onClose} />;
 
   const busy = isDepositBusy(phase);
   return (
@@ -112,7 +160,13 @@ export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: Trad
         <Icon name="shield" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
         Funds are managed within immutable on-chain guardrails. Per-tx cap {fmt.usd(PER_TX_CAP, { cents: false })} · vault cap {fmt.usd(cap, { cents: false })}.
       </p>
-      <button className="btn btn-primary btn-block btn-lg" style={{ marginTop: 16 }} disabled={!valid || busy} onClick={run}>
+      {isDeployed && !usdcAddress && (
+        <p className="disclosure" style={{ marginTop: 8, color: "var(--warning)" }}>
+          <Icon name="alert-triangle" size={15} style={{ flexShrink: 0 }} />
+          Resolving token address… please wait a moment.
+        </p>
+      )}
+      <button className="btn btn-primary btn-block btn-lg" style={{ marginTop: 16 }} disabled={!valid || busy || (isDeployed && !usdcAddress)} onClick={run}>
         {busy ? <><Spinner /> {phase === "approving" ? "Approving…" : "Depositing…"}</> : phase === "approved" ? "Confirm deposit" : valid ? "Approve & deposit" : "Enter an amount"}
       </button>
     </Modal>
@@ -120,10 +174,17 @@ export function DepositModal({ wallet, vault, onClose, onToast }: { wallet: Trad
 }
 
 // ---------- Withdraw ----------
-export function WithdrawModal({ position, vault, onClose, onToast }: { position: PositionState; vault: VaultState; onClose: () => void; onToast: (t: ToastPayload) => void }) {
+export function WithdrawModal({ position, vault, onClose, onToast }: {
+  position: PositionState;
+  vault: VaultState;
+  onClose: () => void;
+  onToast: (t: ToastPayload) => void;
+}) {
   const [unit, setUnit] = useState<WithdrawUnit>("USDC");
   const [amt, setAmt] = useState("");
   const [phase, setPhase] = useState<WithdrawPhase>("form");
+  const [txHash, setTxHash] = useState("");
+  const { address: userAddress } = useAccount();
   const sharePrice = parseFloat(vault.sharePrice);
   const instant = parseFloat(vault.instantWithdrawableUsdc);
 
@@ -137,15 +198,43 @@ export function WithdrawModal({ position, vault, onClose, onToast }: { position:
   });
   const { usdcOut, sharesIn, max, exceedsInstant: overInstant, valid } = p;
 
-  const run = () => {
+  const { writeContractAsync: writeRedeem } = useWriteContract();
+  const { isSuccess: redeemConfirmed } = useWaitForTransactionReceipt({
+    hash: txHash ? (txHash as `0x${string}`) : undefined,
+    query: { enabled: isDeployed && txHash.length > 2 },
+  });
+
+  useEffect(() => {
+    if (redeemConfirmed && phase === "withdrawing") {
+      setPhase("done");
+      onToast({ kind: "success", title: "Withdrawal confirmed", body: `${fmt.usd(usdcOut)} sent to your wallet`, tx: txHash });
+    }
+  }, [redeemConfirmed]);
+
+  const runLive = async () => {
+    if (!userAddress) return;
+    try {
+      setPhase("withdrawing");
+      const shares = parseUnits(String(sharesIn), 6);
+      const hash = await writeRedeem({ address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "redeem", args: [shares, userAddress, userAddress] });
+      setTxHash(hash);
+    } catch {
+      setPhase("form");
+      onToast({ kind: "error", title: "Transaction failed", body: "Check your wallet and try again." });
+    }
+  };
+
+  const runSimulated = () => {
     setPhase("withdrawing");
     setTimeout(() => {
       setPhase("done");
-      onToast({ kind: "success", title: "Withdrawal confirmed", body: `${fmt.usd(usdcOut)} sent to your wallet`, tx: "0xdef1a2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcd" });
+      onToast({ kind: "success", title: "Withdrawal confirmed (preview)", body: `${fmt.usd(usdcOut)} sent to your wallet` });
     }, 1600);
   };
 
-  if (phase === "done") return <TxResult kind="confirmed" title="Withdrawal confirmed" lines={[`You withdrew ${fmt.usd(usdcOut)}`, `Burned ${fmt.num(sharesIn)} shares`]} tx="0xdef1a2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcd" onClose={onClose} />;
+  const run = () => { if (isDeployed) { void runLive(); } else { runSimulated(); } };
+
+  if (phase === "done") return <TxResult kind="confirmed" title="Withdrawal confirmed" lines={[`You withdrew ${fmt.usd(usdcOut)}`, `Burned ${fmt.num(sharesIn)} shares`]} tx={txHash} onClose={onClose} />;
   const busy = isWithdrawBusy(phase);
 
   return (

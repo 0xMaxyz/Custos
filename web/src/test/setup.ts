@@ -8,8 +8,8 @@ vi.mock("wagmi", () => ({
   useReadContract:        () => ({ data: undefined }),
   useWatchContractEvent:  () => undefined,
   usePublicClient:        () => undefined,
-  useWriteContract:       () => ({ writeContract: vi.fn(), status: "idle", error: null }),
-  useWaitForTransactionReceipt: () => ({ status: "idle", isLoading: false }),
+  useWriteContract:       () => ({ writeContractAsync: vi.fn(), writeContract: vi.fn(), status: "idle", error: null }),
+  useWaitForTransactionReceipt: () => ({ status: "idle", isLoading: false, isSuccess: false }),
   useAccount:             () => ({ address: undefined, isConnected: false }),
   useChainId:             () => 5000,
 }));

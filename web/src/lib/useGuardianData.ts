@@ -168,11 +168,15 @@ export function useIdentity(): IdentityData {
     args: agentIdBigInt !== undefined ? [agentIdBigInt] : undefined,
     query: { enabled: agentIdBigInt !== undefined },
   });
-  const isLive = agentIdBigInt !== undefined;
+  // isLive only when tokenURI has actually resolved from chain, not just when
+  // VITE_AGENT_ID is set. Track record / series remain fixture-backed until
+  // benchmark outcomes accumulate on-chain (Phase 5b).
+  const tokenURI = rawURI as string | undefined;
+  const isLive = tokenURI !== undefined && tokenURI.length > 0;
   const computedBaseline = computeBaseline(fixtureBaseline);
   const identity: IdentityRecord = {
     ...fixtureIdentity,
-    agentURI: (rawURI as string | undefined) ?? fixtureIdentity.agentURI,
+    agentURI: tokenURI ?? fixtureIdentity.agentURI,
   };
   return {
     identity,

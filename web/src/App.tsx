@@ -74,7 +74,7 @@ export default function App() {
 
   const { address, isConnected, chainId } = useAccount();
   const { openConnectModal } = useConnectModal();
-  const { vault, position, isLive: vaultLive } = useVaultData(address);
+  const { vault, position, usdcAddress, isLive: vaultLive } = useVaultData(address);
   // Demo wrong-net flag OR a genuinely unsupported chain while connected.
   const wrongNet = (flags.wrongNet || (isConnected && chainId !== undefined && !SUPPORTED_IDS.includes(chainId)));
   // When vault is live, derive emptyPosition from actual shares; fall back to dev flag.
@@ -125,7 +125,7 @@ export default function App() {
       <Footer />
       <MobileNav route={route} go={go} />
 
-      {modal?.type === "deposit" && isConnected && <DepositModal wallet={tradeWallet} vault={vault} onClose={() => setModal(null)} onToast={pushToast} />}
+      {modal?.type === "deposit" && isConnected && <DepositModal wallet={tradeWallet} vault={vault} usdcAddress={usdcAddress} onClose={() => setModal(null)} onToast={pushToast} />}
       {modal?.type === "withdraw" && <WithdrawModal position={position} vault={vault} onClose={() => setModal(null)} onToast={pushToast} />}
 
       <Toasts items={toasts} dismiss={dismiss} />

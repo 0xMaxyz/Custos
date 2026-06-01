@@ -3,29 +3,38 @@
 // Returns live on-chain reads when VITE_VAULT_ADDRESS is set; falls back to
 // typed fixtures so the dashboard renders correctly before deploy. Consumer
 // components are unchanged in either path.
+//
+// Baseline (AgentBenchmark): reads decisionCount + latest outcomeOf from the
+// benchmark contract (address from vault.benchmark()). Series arrays are
+// fixture-backed until there is enough on-chain history to reconstruct them.
 
 import { useReadContracts } from "wagmi";
 import { formatUnits }      from "viem";
-import { vault as vaultFixture, position as posFixture, baseline, type VaultState, type PositionState } from "./data";
-import { VAULT_ABI }        from "./vaultAbi";
+import { vault as vaultFixture, position as posFixture, baseline as baselineFixture, type VaultState, type PositionState } from "./data";
+import { VAULT_ABI, BENCHMARK_ABI } from "./vaultAbi";
 
-const VAULT_ADDRESS = (import.meta.env.VITE_VAULT_ADDRESS ?? "") as `0x${string}`;
-const isDeployed = VAULT_ADDRESS.length > 2;
+export const VAULT_ADDRESS = (import.meta.env.VITE_VAULT_ADDRESS ?? "") as `0x${string}`;
+export const isDeployed = VAULT_ADDRESS.length > 2;
 
 export interface VaultData {
   vault: VaultState;
   position: PositionState;
-  baseline: typeof baseline;
+  baseline: typeof baselineFixture;
+  /** Underlying ERC-20 (USDC) address — from vault.asset(); empty string before deploy. */
+  usdcAddress: `0x${string}` | "";
   /** true once reads come from chain; false while served from fixtures. */
   isLive: boolean;
 }
 
 export function useVaultData(account?: `0x${string}`): VaultData {
-  const { data } = useReadContracts({
+  // Step 1: read vault core + metadata addresses.
+  const { data: vaultData } = useReadContracts({
     contracts: [
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "totalAssets" },
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "convertToAssets", args: [1_000_000n] },
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "balanceOf", args: [account ?? "0x0000000000000000000000000000000000000000"] },
+      { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "asset" },
+      { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "benchmark" },
     ],
     query: {
       enabled: isDeployed,
@@ -33,23 +42,58 @@ export function useVaultData(account?: `0x${string}`): VaultData {
     },
   });
 
-  const tvlEntry     = data?.[0];
-  const sharePxEntry = data?.[1];
+  const tvlEntry       = vaultData?.[0];
+  const sharePxEntry   = vaultData?.[1];
+  const usdcAddrEntry  = vaultData?.[3];
+  const benchmarkEntry = vaultData?.[4];
+
+  const usdcAddress: `0x${string}` | "" =
+    usdcAddrEntry?.status === "success" ? (usdcAddrEntry.result as `0x${string}`) : "";
+
+  const benchmarkAddress: `0x${string}` | "" =
+    benchmarkEntry?.status === "success" && benchmarkEntry.result !== "0x0000000000000000000000000000000000000000"
+      ? (benchmarkEntry.result as `0x${string}`)
+      : "";
+
+  // Step 2: read benchmark decision count so we can fetch the latest outcome.
+  const { data: bmCountData } = useReadContracts({
+    contracts: benchmarkAddress
+      ? [{ address: benchmarkAddress, abi: BENCHMARK_ABI, functionName: "decisionCount" }]
+      : [],
+    query: {
+      enabled: isDeployed && benchmarkAddress.length > 2,
+      refetchInterval: isDeployed ? 30_000 : false,
+    },
+  });
+
+  const decisionCount = bmCountData?.[0]?.status === "success"
+    ? Number(bmCountData[0].result as bigint)
+    : 0;
+
+  // Step 3: read the latest outcome (id = decisionCount - 1) when available.
+  const latestOutcomeId = decisionCount > 0 ? BigInt(decisionCount - 1) : 0n;
+  const { data: outcomeData } = useReadContracts({
+    contracts: decisionCount > 0 && benchmarkAddress
+      ? [{ address: benchmarkAddress, abi: BENCHMARK_ABI, functionName: "outcomeOf", args: [latestOutcomeId] }]
+      : [],
+    query: {
+      enabled: isDeployed && decisionCount > 0 && benchmarkAddress.length > 2,
+      refetchInterval: isDeployed ? 30_000 : false,
+    },
+  });
 
   if (!isDeployed || !tvlEntry || !sharePxEntry || tvlEntry.status !== "success" || sharePxEntry.status !== "success") {
-    return { vault: vaultFixture, position: posFixture, baseline, isLive: false };
+    return { vault: vaultFixture, position: posFixture, baseline: baselineFixture, usdcAddress: "", isLive: false };
   }
 
   const tvlRaw     = tvlEntry.result as bigint;
-  const sharePxRaw = sharePxEntry.result as bigint; // assets per 1e6 shares
+  const sharePxRaw = sharePxEntry.result as bigint;
 
   const tvlUsdc    = formatUnits(tvlRaw, 6);
-  // sharePxRaw = assets per 1e6 shares (i.e. price * 1e6). Use formatUnits to
-  // keep bigint precision throughout rather than Number() lossy conversion.
   const sharePrice = formatUnits(sharePxRaw, 6);
 
   let positionShares = 0n;
-  const balEntry = data[2];
+  const balEntry = vaultData[2];
   if (account && balEntry && balEntry.status === "success") {
     positionShares = balEntry.result as bigint;
   }
@@ -70,5 +114,23 @@ export function useVaultData(account?: `0x${string}`): VaultData {
     sharePrice,
   };
 
-  return { vault: liveVault, position: livePosition, baseline, isLive: true };
+  // Build live baseline from the latest on-chain outcome when available.
+  // sentinelSeries / passiveSeries remain fixture-backed until we have enough
+  // on-chain history to reconstruct them (Phase 5b).
+  let liveBaseline = baselineFixture;
+  const rawOutcome = outcomeData?.[0];
+  if (rawOutcome?.status === "success") {
+    type RawOutcome = { realizedYieldBps: bigint; drawdownAvoidedUsdc: bigint; passiveDeltaBps: bigint; measuredAt: bigint };
+    const o = rawOutcome.result as RawOutcome;
+    liveBaseline = {
+      ...baselineFixture,
+      realizedYieldBps:   Number(o.realizedYieldBps),
+      drawdownAvoidedUsdc: formatUnits(o.drawdownAvoidedUsdc, 6),
+      passiveDeltaBps:    Number(o.passiveDeltaBps),
+      measuredAt:         new Date(Number(o.measuredAt) * 1000).toISOString(),
+      sinceDecisionId:    decisionCount > 0 ? decisionCount - 1 : 0,
+    };
+  }
+
+  return { vault: liveVault, position: livePosition, baseline: liveBaseline, usdcAddress, isLive: true };
 }

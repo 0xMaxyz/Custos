@@ -59,6 +59,10 @@ export const PROTOCOLS: Record<string, Address | null> = {
   // TODO: upgrade to "verified @ block N" once fork-tests CI job confirms
   //       extcodesize > 0 and getPrice() returns a plausible NAV.
   usdyRWADynamicOracle: "0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f",
+  // Ondo Token Converter for USDY <-> mUSD (the two on-chain forms of the RWA
+  // leg). Needed once the adapter supports the mUSD leg; resolve + verify in the
+  // Phase 0.3 gate. Left null until confirmed on-chain — DO NOT guess.
+  ondoTokenConverter: null,
   // Pinned Odos aggregator router used by UsdyAdapter for USDC<->USDY swaps.
   // extcodesize = 14721 confirmed on Mantle mainnet by cursor[bot] review.
   // TODO: record "verified @ block N" once Phase-0 fork gate runs in CI.

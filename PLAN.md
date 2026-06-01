@@ -63,7 +63,10 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 ## 4. Architecture
 
 ### 4.1 Assets & allocation buckets
-- **USDY (Ondo)** — RWA yield core (tokenized US Treasuries, ~4.5%, NAV/price-accruing).
+- **USDY / mUSD (Ondo)** — RWA yield core (tokenized US Treasuries, ~4.5%). USDY is
+  NAV/price-accruing; **mUSD** is its $1-pegged rebasing form on Mantle. The two are
+  convertible on-chain via the **Ondo Token Converter**, so the vault treats them as a
+  single bucket and routes entry/exit through whichever DEX leg is deeper.
 - **Aave v3 USDC supply** — DeFi-yield leg **and** instant withdrawal liquidity (deep, redeemable on demand).
 - **Idle USDC buffer** — instant small withdrawals.
 - **AUSD (Agora)** — flight-to-safety leg (reserve-backed: cash + T-bills + repo; on-chain proof-of-reserves).
@@ -78,7 +81,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 ### 4.3 Smart contracts (Foundry — forge/anvil/cast)
 - **`YieldVault`** — ERC-4626, asset = **USDC**. `rebalance(targetWeights, decisionURI, rationaleHash)` is the **AI-powered on-chain function**, callable **only by the ALLOCATOR role**, emitting a `Decision` event. Withdraw queue respects available liquidity.
 - **Strategy adapters (trustless, protocol-direct execution):**
-  - `UsdyAdapter` — USDC↔USDY via DEX (USDY/USDC, USDY/WMNT have millions in liquidity), on-chain `minOut`, blocklist-aware.
+  - `UsdyAdapter` (RWA adapter) — USDC↔USDY/mUSD via DEX, on-chain `minOut`, blocklist-aware; converts USDY↔mUSD via the Ondo Token Converter to enter/exit through whichever leg has liquidity.
   - `AaveV3Adapter` — supply/withdraw USDC on Aave v3 Mantle.
   - `AusdAdapter` — USDC↔AUSD via DEX (Merchant Moe), on-chain `minOut`.
 - **`Guardrails`** (immutable params): max weight per bucket, **min idle/Aave liquidity buffer**, max slippage, token/venue whitelist, max rebalance frequency, per-tx caps, **pause/kill switch**, add-strategy timelock, and a **depeg/oracle-deviation guard** that can force de-risk.
@@ -115,7 +118,8 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 ## 6. Verified Mantle reality (research, 2026-05 — re-verify on-chain before integrating)
 
 **Usable RWAs:**
-- **USDY (Ondo)** — live. **Blocklist-based** transfer hook (NOT allowlist); post-40-day-lockup tokens transfer permissionlessly and DEXs list USDY without gating buyers, so a non-blocked contract **can buy/hold via DEX without KYC**. Only **mint/redeem** needs `OndoIDRegistry` whitelist (we avoid that path). Yield-bearing; on-chain `RWADynamicOracle`; monthly attestations. **Liquidity confirmed: USDY/USDC and USDY/WMNT have millions on Mantle DEXs.** → **Primary RWA.**
+- **USDY (Ondo)** — live. **Blocklist-based** transfer hook (NOT allowlist); post-40-day-lockup tokens transfer permissionlessly and DEXs list USDY without gating buyers, so a non-blocked contract **can buy/hold via DEX without KYC**. Only **mint/redeem** needs `OndoIDRegistry` whitelist (we avoid that path). Yield-bearing; on-chain `RWADynamicOracle`; monthly attestations. **Liquidity (re-checked on-chain 2026-06): ~$28M USDY is tokenized on Mantle, but executable DEX depth is thin — tokenized TVL ≠ swap depth.** We keep USDY/mUSD as the RWA core within the demo's **$50k TVL cap** and lean on the Aave floor + idle buffer; the AUSD-primary fallback (§7 / Phase 7.4) stays armed. Monitor with `scripts/check-mantle-liquidity.mjs`. → **Primary RWA (size-aware).**
+- **mUSD (Mantle USD, Ondo)** — the $1-pegged rebasing form of USDY on Mantle (`0xab57…7cF3`, 18 dec), convertible to/from USDY via the **Ondo Token Converter**. Same Treasury exposure and risk profile as USDY — a *second on-chain form of the RWA core*, not a separate bucket. Supply ~$90k (2026-06, thin). Gives the adapter a second DEX leg for entering/exiting the RWA core.
 - **AUSD (Agora)** — live, native on Mantle (`0x00000000efe302beaa2b3e6e1b18d08d69a9012a`, 6 decimals). Reserve-backed (cash + T-bills + repo; VanEck / State Street / PwC), **on-chain proof-of-reserves (Chaos Labs)**. Permissionless to hold; DEX pairs with USDe/USDT (Merchant Moe). Stablecoin (no native holder yield). → **Safety leg + rich risk-data source.**
 
 **RWAs we ruled out:**
@@ -137,7 +141,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 
 1. **Track / shape:** AI × RWA, **Application path** — consumer AI risk-guardian real-yield account.
 2. **Deposit asset:** USDC.
-3. **Assets:** USDY (primary RWA yield) + Aave USDC (DeFi floor + liquidity) + idle USDC buffer + AUSD (safety). _Fallback: AUSD-primary if USDY liquidity degrades — not expected, liquidity confirmed._
+3. **Assets:** USDY/mUSD (primary RWA yield core — two on-chain forms, convertible via the Ondo Token Converter) + Aave USDC (DeFi floor + liquidity) + idle USDC buffer + AUSD (safety). _RWA DEX depth on Mantle is thin; we operate within the $50k TVL cap and keep the AUSD-primary fallback (§8 / Phase 7.4) armed._
 4. **Sourcing:** all RWA legs via **DEX** (USDY/AUSD), on-chain `minOut`; no KYC-gated mint in the vault path.
 5. **Agent execution:** guardrail-bounded **ALLOCATOR** hot key + kill switch.
 6. **LLM:** **Anthropic API (Claude)** via the official `@anthropic-ai/sdk`. Wrapped behind a thin `LLMClient` interface in `agent/src/llm/` so it stays mockable in tests; single provider, no fallback chain.
@@ -172,6 +176,7 @@ Ordered by hackathon impact:
 5. Compound USDe leg
 6. Per-user EIP-712 signed risk-profile mandates
 7. Multi-agent reputation leaderboard
+8. **Agent micropayments (x402) + verifiable jobs (ERC-8183)** _(high-interest)_ — the agent pays per-call (x402, stablecoin) for premium risk/data feeds, with receipts joining the on-chain evidence trail; Sentinel can also expose its RWA risk signal as an **x402-paid endpoint** — the revenue surface that justifies running a Sentinel agent. Each de-risk is modeled as an **ERC-8183** escrowed Job whose **evaluator is the deterministic guardrail validator**, feeding ERC-8004 reputation. Builds directly on the existing 8004 identity; Core (the verifiable de-risk vault) ships first.
 
 ### Won't (this hackathon)
 

@@ -5,7 +5,7 @@
 //   Withdraw: vault.redeem(shares, receiver, owner)  (no approve needed)
 // Otherwise drives the simulated flow used in the undeployed preview.
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
 import { Icon } from "../components/Icons";
@@ -78,6 +78,7 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
 }) {
   const [amt, setAmt] = useState("");
   const [phase, setPhase] = useState<DepositPhase>("form");
+  const [approveHash, setApproveHash] = useState("");
   const [txHash, setTxHash] = useState("");
   const { address: userAddress } = useAccount();
   const sharePrice = parseFloat(vault.sharePrice);
@@ -89,32 +90,57 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
   const step = depositStepIndex(phase);
 
   // Wagmi write hooks (only used when isDeployed).
+  const depositAfterApprove = useRef(false);
   const { writeContractAsync: writeApprove } = useWriteContract();
   const { writeContractAsync: writeDeposit  } = useWriteContract();
+  const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({
+    hash: approveHash ? (approveHash as `0x${string}`) : undefined,
+    query: { enabled: isDeployed && approveHash.length > 2 },
+  });
   const { isSuccess: depositConfirmed } = useWaitForTransactionReceipt({
     hash: txHash ? (txHash as `0x${string}`) : undefined,
     query: { enabled: isDeployed && txHash.length > 2 },
   });
+
+  // After approve mines, submit deposit (do not send both txs back-to-back).
+  useEffect(() => {
+    if (!approveConfirmed || phase !== "approved" || !userAddress || !isDeployed || depositAfterApprove.current) {
+      return;
+    }
+    depositAfterApprove.current = true;
+    const assets = parseUnits(String(n), 6);
+    setPhase("depositing");
+    void writeDeposit({ address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "deposit", args: [assets, userAddress] })
+      .then((hash) => setTxHash(hash))
+      .catch(() => {
+        depositAfterApprove.current = false;
+        setPhase("form");
+        setApproveHash("");
+        onToast({ kind: "error", title: "Deposit failed", body: "Approve succeeded but deposit reverted — try again." });
+      });
+  }, [approveConfirmed, phase, userAddress, isDeployed, n, writeDeposit, onToast]);
 
   useEffect(() => {
     if (depositConfirmed && phase === "depositing") {
       setPhase("done");
       onToast({ kind: "success", title: "Deposit confirmed", body: `${fmt.usd(n)} deposited · ${fmt.num(sharesOut)} shares`, tx: txHash });
     }
-  }, [depositConfirmed]);
+  }, [depositConfirmed, phase, n, sharesOut, txHash, onToast]);
 
   const runLive = async () => {
     if (!userAddress || !usdcAddress) return;
     try {
       const assets = parseUnits(String(n), 6);
+      depositAfterApprove.current = false;
+      setApproveHash("");
+      setTxHash("");
       setPhase("approving");
-      await writeApprove({ address: usdcAddress, abi: ERC20_APPROVE_ABI, functionName: "approve", args: [VAULT_ADDRESS, assets] });
+      const hash = await writeApprove({ address: usdcAddress, abi: ERC20_APPROVE_ABI, functionName: "approve", args: [VAULT_ADDRESS, assets] });
+      setApproveHash(hash);
       setPhase("approved");
-      setPhase("depositing");
-      const hash = await writeDeposit({ address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "deposit", args: [assets, userAddress] });
-      setTxHash(hash);
     } catch {
       setPhase("form");
+      setApproveHash("");
       onToast({ kind: "error", title: "Transaction failed", body: "Check your wallet and try again." });
     }
   };

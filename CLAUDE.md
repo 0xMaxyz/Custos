@@ -24,8 +24,11 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
    because the router is immutable, the adapter enforces an oracle-derived
    **balance-delta `minOut`** (router output never trusted), and output must land
    on the adapter (else 0 delta → revert). Needed because Mantle USDY liquidity is
-   split across thin pools (~$1.5k total) with no usable single-pool route. See
-   `AGENTS.md` §2.1.
+   split across thin pools (~$1.5k total) with no usable single-pool route. **mUSD
+   converter leg:** the RWA core can also be held as Ondo **mUSD**; `UsdyAdapter`
+   converts USDY↔mUSD by calling only `wrap`/`unwrap` on the pinned mUSD contract
+   (the "Ondo Token Converter" — it has no separate contract), oracle-priced and
+   value-neutral, with the same balance-delta `minOut`. See `AGENTS.md` §2.1.
 2. **Guardrails are final.** LLM proposes → deterministic validator checks →
    immutable on-chain guardrails (incl. depeg/oracle guard) backstop. The model is
    never the last line of defense. The LLM may only **tighten** risk, never loosen

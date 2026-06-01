@@ -45,6 +45,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     error InvalidToBucket();
     error NotAllocatorOrGuardian();
     error AdapterStillHasAssets();
+    error RwaAdapterNotSet();
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     event DecisionRecorded(uint256 indexed id, uint8 kind, bytes32 rationaleHash, string decisionURI);
     event Rebalanced(uint256 indexed id, uint16[4] postWeightsBps);
     event DeRisked(uint256 indexed id, uint8 toBucket, bytes32 evidenceHash);
+    event RwaLegConverted(bool indexed toMusd, uint256 amountIn, uint256 amountOut);
 
     // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -388,6 +390,43 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             Guardrails.MarketState memory s = _buildMarketState(tvl, usdyDexSpotUsdc);
             bm.recordDecision(decisionId, evidenceHash, reason, s.usdyOracleNav);
         }
+    }
+
+    /**
+     * @notice Convert the RWA core (bucket 2) between its two on-chain forms,
+     *         USDY ↔ mUSD, via the Ondo mUSD converter on the USDY adapter.
+     * @dev Only ALLOCATOR. Blocked when paused or killed. This is **exposure-neutral**
+     *      — it changes only the *form* the RWA bucket is held in, not its USDC value
+     *      or weight (USDY at oracle NAV ≡ mUSD at $1 face), so it intentionally does
+     *      NOT go through `Guardrails.validateRebalance`: there is no weight/notional
+     *      change to validate. The adapter enforces an oracle-derived balance-delta
+     *      minOut and only ever calls the pinned mUSD contract. Use this to hold the
+     *      RWA core in whichever form trades against deeper DEX liquidity; entry/exit
+     *      that changes exposure still goes through `rebalance`/`deRisk`.
+     *
+     * @param toMusd    true: wrap USDY → mUSD; false: unwrap mUSD → USDY.
+     * @param amountIn  Source-token amount (18-dec USDY or mUSD) to convert.
+     * @param minOut    Minimum acceptable output (18-dec); the adapter enforces the
+     *                  stricter of this and its own oracle-derived floor.
+     * @return amountOut Output-token amount (18-dec) received by the adapter.
+     */
+    function convertRwaLeg(bool toMusd, uint256 amountIn, uint256 minOut)
+        external
+        onlyRole(Roles.ALLOCATOR)
+        whenNotPaused
+        nonReentrant
+        returns (uint256 amountOut)
+    {
+        _requireNotKilled();
+
+        IUsdyAdapter rwa = IUsdyAdapter(address(adapters[BUCKET_USDY]));
+        if (address(rwa) == address(0)) revert RwaAdapterNotSet();
+
+        amountOut = toMusd
+            ? rwa.convertToMusd(amountIn, minOut)
+            : rwa.convertToUsdy(amountIn, minOut);
+
+        emit RwaLegConverted(toMusd, amountIn, amountOut);
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────

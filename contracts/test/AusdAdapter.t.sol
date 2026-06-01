@@ -326,7 +326,7 @@ contract AusdAdapterTest is Test {
         ERC20Mock usdy = new ERC20Mock("USDY", "USDY", 18);
         MockRWADynamicOracle oracle = new MockRWADynamicOracle(1e18, type(uint32).max);
         UsdyAdapter usdyAdapter = new UsdyAdapter(
-            address(router), address(usdc), address(usdy), address(oracle), address(vault), 50
+            address(router), address(usdc), address(usdy), address(0), address(oracle), address(vault), 50
         );
         // Router rates for USDY (18-dec) ↔ USDC (6-dec): 1:1 at NAV=1e18.
         router.setRate(address(usdc), address(usdy), 1e12, 1);

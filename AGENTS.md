@@ -46,6 +46,15 @@ product. See `PLAN.md`.
    (fail-closed). Aave/AUSD adapters still call their protocols/DEXs directly with
    on-chain `minOut`. The aggregator router address is verified on-chain (Phase-0
    gate) and pinned; changing it requires a redeploy.
+   **mUSD converter leg (USDY↔mUSD):** the RWA core (bucket 2) may be held as USDY or
+   its rebasing $1 form mUSD. `UsdyAdapter` converts between them via the **Ondo mUSD
+   contract's `wrap`/`unwrap`** — which IS the "Ondo Token Converter" (verified
+   on-chain: mUSD `0xab57…7cF3`, `usdy()`==USDY, `oracle()`==RWADynamicOracle). This
+   stays inside the boundary for the same reasons: the mUSD contract is pinned
+   immutable, only `wrap`/`unwrap` are ever called (never arbitrary calldata), and an
+   oracle-derived **balance-delta `minOut`** is enforced on the realized output. The
+   conversion is oracle-priced and value-neutral (no DEX liquidity), so it changes only
+   the *form* of the bucket, not its value or weight.
 2. **Guardrails are the final authority.** On-chain guardrails (see `SPEC.md` §1:
    max weight/bucket, min idle+Aave liquidity buffer, max slippage, token/venue
    whitelist, rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy

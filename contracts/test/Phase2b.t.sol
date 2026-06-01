@@ -82,6 +82,7 @@ contract Phase2bTest is Test {
             address(router),
             address(usdc),
             address(usdy),
+            address(0),   // mUSD leg not used by the depeg/de-risk tests here
             address(oracle),
             address(vault),
             200 // 2% maxSlippageBps

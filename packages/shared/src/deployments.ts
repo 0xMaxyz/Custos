@@ -40,7 +40,14 @@ const empty: DeploymentAddresses = {
 export const MAINNET_DEPLOYMENT: DeploymentAddresses = { ...empty };
 
 /** Testnet (chainId 5003) deployed addresses. Populate after testnet deploy. */
-export const TESTNET_DEPLOYMENT: DeploymentAddresses = { ...empty };
+export const TESTNET_DEPLOYMENT: DeploymentAddresses = {
+  guardrails: "0xc3D287D35DCb6945d93c246dbE610C9AF5106E9c",
+  vault:      "0xC2009De9C72EfAfAeeD8Ceac2960A9B6eFEeAc85",
+  benchmark:  "0xCd3EcF4d092eE73Ac4882c61b5f114588B6B122a",
+  aaveAdapter: "",
+  usdyAdapter: "0xd420Bdf2a7eab8F86DE12f06728342b7243101C9",
+  agentId: null,
+};
 
 /** Return the deployment record for a given chainId, or the empty record. */
 export function getDeployment(chainId: number): DeploymentAddresses {

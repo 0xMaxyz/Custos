@@ -33,7 +33,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-4a | 4.1–4.2 | ERC-8004 identity + agent card                                               | `[x] DONE` |
 | PR-4b | 4.3–4.4 | Web scaffold + dashboard reads                                               | `[x] DONE` · [PR #11](https://github.com/0xMaxyz/miu/pull/11) |
 | PR-4c | 4.5–4.8 | Deposit/withdraw + risk-guardian feed + **baseline counter** + identity card | `[x] DONE` (fixtures; live reads → PR-5a) · [PR #13](https://github.com/0xMaxyz/miu/pull/13) |
-| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             | `[~] IN PROGRESS` · [PR #14](https://github.com/0xMaxyz/miu/pull/14) |
+| PR-5a | 5.1–5.3 | Deploy scripts + mainnet deploy + verify + real-funds smoke test             | 5.1 `[x] DONE` · 5.2–5.3 `[ ]` pending mainnet keys · [PR #14](https://github.com/0xMaxyz/miu/pull/14) |
 | PR-6a | 6.1–6.5 | Public deploy, docs, video, submission                                       |
 | PR-7  | 7.1–7.4 | Buffer / contingency                                                         |
 
@@ -459,27 +459,26 @@ existing `use*Data` seams (consumers unchanged).
 
 **Phase goal:** deploy + verify on mainnet; prove the full loop with small real funds.
 
-### 5.1 — Deploy scripts · _PR-5a_ · `[~] PARTIAL` · [PR #14](https://github.com/0xMaxyz/miu/pull/14)
+### 5.1 — Deploy scripts · _PR-5a_ · `[x] DONE` · [PR #14](https://github.com/0xMaxyz/miu/pull/14)
 
 - **What:** `forge script` deploy (vault, adapters, guardrails, benchmark, identity),
   parameterized; save addresses to `packages/shared` + `deployments.json`.
 - **Goal:** reproducible deploy.
-- **Test:** deploy to **Mantle testnet**; assert code at addresses; run a smoke
-  rebalance.
-- **Built:** `contracts/script/Deploy.s.sol` — full deploy script (Guardrails →
-  YieldVault → AgentBenchmark → AaveV3Adapter → UsdyAdapter → roles); chainId-aware
-  (mainnet hard-codes verified addresses; testnet reads from env); `addStrategy` +
-  immediate `activateStrategy` on testnet (0 timelock), `addStrategy` only on mainnet
-  (awaits 48h timelock via `ActivateStrategies.s.sol`). `DeployMocks.s.sol` mints mock
-  USDC/USDY + `MockUsdyOracle` for Mantle Sepolia. `RegisterIdentity.s.sol` calls
-  canonical ERC-8004 `register(agentCardUri)`. `deployments/5000.json` +
-  `deployments/5003.json` templates; `packages/shared/src/deployments.ts` exports
-  `getDeployment(chainId)`. Web `useVaultData` and `useGuardianData` now read live
-  on-chain when `VITE_VAULT_ADDRESS` is set (wagmi `useReadContracts` + `useWatchContractEvent`
-  + `getLogs` history backfill); fixture fallback unchanged. `web/src/lib/vaultAbi.ts` —
-  minimal ABI. 64 web tests + 103 Solidity tests all pass.
-  **Testnet broadcast (5.1 acceptance gate) pending deployer run** (`DEPLOYER_PRIVATE_KEY` +
-  `MANTLE_TESTNET_RPC_URL` required). Once run, populate `deployments/5003.json` and mark DONE.
+- **Test:** deploy to **Mantle testnet** ✓ — contracts live on Mantle Sepolia (5003).
+- **Testnet addresses (2026-06-01):**
+  - Guardrails:     `0xc3D287D35DCb6945d93c246dbE610C9AF5106E9c`
+  - YieldVault:     `0xC2009De9C72EfAfAeeD8Ceac2960A9B6eFEeAc85`
+  - AgentBenchmark: `0xCd3EcF4d092eE73Ac4882c61b5f114588B6B122a`
+  - UsdyAdapter:    `0xd420Bdf2a7eab8F86DE12f06728342b7243101C9`
+  - USDC (mock):    `0x6969D583f2b2e68c2f6f1A2E883aeC4dA96A3297`
+  - USDY (mock):    `0x921689faCB514812F671194Db21014109354B5f6`
+  - AaveV3Adapter: skipped (no Aave pool on Mantle Sepolia)
+- **Built:** `contracts/script/Deploy.s.sol` — Guardrails → YieldVault → AgentBenchmark →
+  AaveV3Adapter → UsdyAdapter → roles; on testnet zeroes `addStrategyTimelock` before
+  queuing so `activateStrategy` succeeds in the same broadcast. `DeployMocks.s.sol`,
+  `RegisterIdentity.s.sol`, `ActivateStrategies.s.sol`. `deployments/5003.json` +
+  `packages/shared/src/deployments.ts` populated. Web `useVaultData` / `useGuardianData`
+  live reads wired; 64 web tests + 103 Solidity tests pass.
 
 ### 5.2 — Mainnet deploy + verify · _PR-5a_ · `[ ]` pending RPC + keys
 

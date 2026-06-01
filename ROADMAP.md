@@ -652,7 +652,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   the hashed/IPFS bundle. Config: optional `X402_*` (`config.ts` + `.env.example`).
   Tests: `x402.test.ts` (10) + `server.test.ts` x402 (3) — 402→pay→200, receipt binding,
   verifier accept/reject.
-- **Follow-up (production verifier):** `payments/verifier.ts` adds
+- **Follow-up (production verifier) · [PR #22](https://github.com/0xMaxyz/miu/pull/22):** `payments/verifier.ts` adds
   `signatureVerifyingVerifier` (recovers the EIP-712 signer via `recoverTypedDataAddress`
   and matches `from` — real authorization check) and `onChainSettlingVerifier` (verifies
   then settles via `transferWithAuthorization`, returning the real tx hash; gated by

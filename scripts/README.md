@@ -22,6 +22,11 @@ Optional env:
 - `MUSD_ADDRESS` — mUSD is **not** yet in `packages/shared/src/tokens.ts`; pass
   its address to include mUSD tokenized supply + price.
 
+**Scope:** DeFiLlama pool TVL measures _breadth_, not executable USDC↔USDY swap
+depth at vault sizes. The authoritative liquidity gate is the Foundry fork test
+`testLiquidityGateUsdy` (`contracts/test/Fork.t.sol`); treat this script as
+monitoring / early-warning only.
+
 Sources (all read-only, no API keys): DeFiLlama yields (pool TVL), DeFiLlama
 coins (peg), Mantle RPC (`totalSupply()` for tokenized supply).
 

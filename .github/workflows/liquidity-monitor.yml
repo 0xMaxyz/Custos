@@ -47,3 +47,13 @@ jobs:
             git commit -m "chore(report): Mantle RWA liquidity snapshot [skip ci]"
             git push
           fi
+
+      - name: Alert if liquidity below threshold
+        # Opt-in: set repo variable MIN_LIQUIDITY_USD to fail the run (red) when
+        # USDY/mUSD DEX liquidity drops below it. Runs after the commit so the
+        # snapshot is always recorded even on an alert.
+        if: ${{ vars.MIN_LIQUIDITY_USD != '' }}
+        env:
+          MANTLE_RPC_URL: ${{ secrets.MANTLE_RPC_URL }}
+          MUSD_ADDRESS: ${{ vars.MUSD_ADDRESS }}
+        run: node scripts/check-mantle-liquidity.mjs --min="${{ vars.MIN_LIQUIDITY_USD }}"

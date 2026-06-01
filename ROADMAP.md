@@ -27,7 +27,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-1b | 1.5–1.6 | Aave adapter + rebalance/withdraw                                            |
 | PR-2a | 2.1–2.3 | DEX lib + USDY valuation + UsdyAdapter                                       |
 | PR-2b | 2.4–2.6 | Depeg/oracle guard + de-risk + decision ledger + **passive-USDY baseline**   | `[x] DONE` |
-| PR-2d | 2.7     | RWA core **mUSD leg** (USDY↔mUSD via Ondo wrap/unwrap converter)             | `[x] DONE` |
+| PR-2d | 2.7     | RWA core **mUSD leg** (USDY↔mUSD via Ondo wrap/unwrap converter)             | `[x] DONE` · [PR #20](https://github.com/0xMaxyz/miu/pull/20) |
 | PR-3a | 3.1–3.3 | Agent config + ingestion + deterministic risk engine                         | `[x] DONE` · [PR #7](https://github.com/0xMaxyz/miu/pull/7) |
 | PR-3b | 3.4–3.6 | **Anthropic LLM client** + news/attestation hero path + guardrail validator  | `[x] DONE` · [PR #9](https://github.com/0xMaxyz/miu/pull/9) |
 | PR-3c | 3.7–3.8 | Executor/signer + scheduler + e2e on fork                                    | `[x] DONE` · [PR #10](https://github.com/0xMaxyz/miu/pull/10) |
@@ -249,7 +249,7 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **Test:** Forge: events emitted with expected fields; passive-baseline delta
   computed correctly on de-risk; `updateOutcome` access-gated and stored.
 
-### 2.7 — mUSD leg for `UsdyAdapter` (RWA core: USDY + mUSD) · _PR-2d_ · `[x] DONE`
+### 2.7 — mUSD leg for `UsdyAdapter` (RWA core: USDY + mUSD) · _PR-2d_ · `[x] DONE` · [PR #20](https://github.com/0xMaxyz/miu/pull/20)
 
 - **What:** extend the existing `UsdyAdapter` to also hold/route the **mUSD** form of
   the RWA core and convert USDY↔mUSD via the **Ondo Token Converter**, using whichever

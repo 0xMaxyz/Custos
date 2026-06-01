@@ -37,6 +37,7 @@ import {Guardrails}    from "../src/Guardrails.sol";
 import {YieldVault}    from "../src/YieldVault.sol";
 import {AaveV3Adapter} from "../src/AaveV3Adapter.sol";
 import {UsdyAdapter}   from "../src/UsdyAdapter.sol";
+import {AusdAdapter}   from "../src/AusdAdapter.sol";
 import {AgentBenchmark} from "../src/AgentBenchmark.sol";
 
 import {Addresses}               from "./helpers/Addresses.sol";
@@ -51,6 +52,7 @@ contract Deploy is Script {
     YieldVault    public vault;
     AaveV3Adapter public aaveAdapter;
     UsdyAdapter   public usdyAdapter;
+    AusdAdapter   public ausdAdapter;
     AgentBenchmark public benchmark;
 
     function run() external {
@@ -71,6 +73,7 @@ contract Deploy is Script {
         address usdy;
         address usdyOracle;
         address usdyRouter;
+        address ausd;
         address aavePool;
         address aUsdc;
 
@@ -79,6 +82,7 @@ contract Deploy is Script {
             usdy       = Addresses.MAINNET_USDY;
             usdyOracle = Addresses.MAINNET_USDY_ORACLE;
             usdyRouter = Addresses.MAINNET_USDY_ROUTER;
+            ausd       = Addresses.MAINNET_AUSD;
 
             // Resolve Aave pool + aUSDC from the PoolAddressesProvider.
             IPoolAddressesProvider provider =
@@ -94,6 +98,7 @@ contract Deploy is Script {
             usdy       = vm.envOr("TESTNET_USDY",        address(0));
             usdyOracle = vm.envOr("TESTNET_USDY_ORACLE", address(0));
             usdyRouter = vm.envOr("TESTNET_USDY_ROUTER", address(0));
+            ausd       = vm.envOr("TESTNET_AUSD",         address(0));
             aavePool   = vm.envOr("TESTNET_AAVE_POOL",   address(0));
             aUsdc      = vm.envOr("TESTNET_AUSDC",        address(0));
 
@@ -166,6 +171,27 @@ contract Deploy is Script {
             console2.log("UsdyAdapter SKIPPED - missing USDY/oracle/router address");
         }
 
+        // ── 5b. AusdAdapter (safety bucket; skip if no AUSD / router) ─────────
+        // AUSD swaps run through the same pinned Odos aggregator as USDY.
+        if (ausd != address(0) && usdyRouter != address(0)) {
+            ausdAdapter = new AusdAdapter(
+                usdyRouter,
+                usdc,
+                ausd,
+                address(vault),
+                50  // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
+            );
+            console2.log("AusdAdapter:", address(ausdAdapter));
+
+            vault.addStrategy(3, address(ausdAdapter));
+            if (!isMainnet) {
+                vault.activateStrategy(3);
+            }
+            console2.log("AusdAdapter queued in bucket 3", isMainnet ? "(awaiting timelock)" : "(activated)");
+        } else {
+            console2.log("AusdAdapter SKIPPED - missing AUSD/router address");
+        }
+
         // ── 6. Roles ──────────────────────────────────────────────────────────
         vault.grantRole(Roles.ALLOCATOR, allocator);
         vault.grantRole(Roles.GUARDIAN,  guardian);
@@ -187,6 +213,9 @@ contract Deploy is Script {
         }
         if (address(usdyAdapter) != address(0)) {
             console2.log('  "usdyAdapter": "%s",', address(usdyAdapter));
+        }
+        if (address(ausdAdapter) != address(0)) {
+            console2.log('  "ausdAdapter": "%s",', address(ausdAdapter));
         }
         console2.log('  "deployer": "%s"', deployer);
         console2.log("}");

@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Icon } from "../components/Icons";
 import { Card, AddressChip, StatusDot, Skeleton } from "../components/Components";
 import * as fmt from "../lib/fmt";
-import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions, askAnswers } from "../lib/data";
+import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions } from "../lib/data";
+import { askAgent } from "../lib/askAgent";
 import { useIdentity } from "../lib/useGuardianData";
 
 function IdentityCard() {
@@ -97,7 +98,7 @@ function GuardrailsPanel() {
   );
 }
 
-interface Msg { role: "user" | "agent"; text: string; }
+interface Msg { role: "user" | "agent"; text: string; asOf?: string; }
 
 function AskPanel() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -110,11 +111,12 @@ function AskPanel() {
     if (typing) return;
     setMsgs((m) => [...m, { role: "user", text: q }]);
     setTyping(true);
-    setTimeout(() => {
+    // Live path (VITE_AGENT_API_URL) hits the agent's /ask endpoint; demo path
+    // returns fixture answers. A small delay keeps the typing indicator natural.
+    void Promise.all([askAgent(q), new Promise((r) => setTimeout(r, 500))]).then(([res]) => {
       setTyping(false);
-      const a = askAnswers[q] ?? "I answer from decision history and the current snapshot. Try one of the suggested questions — I explain, but I never take orders or execute trades from chat.";
-      setMsgs((m) => [...m, { role: "agent", text: a }]);
-    }, 900);
+      setMsgs((m) => [...m, { role: "agent", text: res.answer, ...(res.asOf ? { asOf: res.asOf } : {}) }]);
+    });
   };
 
   const submit = (e: React.FormEvent) => {
@@ -139,7 +141,14 @@ function AskPanel() {
           </div>
         )}
         {msgs.map((m, i) => (
-          <div key={i} className={"bubble " + m.role}>{m.text}</div>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
+            <div className={"bubble " + m.role}>{m.text}</div>
+            {m.asOf && (
+              <div style={{ fontSize: "0.6875rem", color: "var(--faint)", margin: "2px 4px 0" }}>
+                Grounded on data from {new Date(m.asOf).toLocaleString()}
+              </div>
+            )}
+          </div>
         ))}
         {typing && <div className="bubble agent typing"><span /><span /><span /></div>}
       </div>

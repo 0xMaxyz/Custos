@@ -12,7 +12,7 @@ import { buildEvidenceFetcher } from "../llm/evidence.js";
 import { pinRationale, type RationaleBundle } from "./ipfs.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
-import type { WeightsBps, RiskSignal } from "../types.js";
+import type { WeightsBps, RiskSignal, Decision } from "../types.js";
 import type { EvidenceItem } from "../llm/types.js";
 import type { MarketSnapshot } from "../types.js";
 
@@ -32,6 +32,8 @@ export interface CycleResult {
   readonly decisionId?: bigint | undefined;
   readonly txHash?: `0x${string}` | undefined;
   readonly reason: string;
+  /** The submitted decision (rationale + signals), for the explainer / UI. */
+  readonly decision?: Decision | undefined;
 }
 
 // keccak256("DecisionRecorded(uint256,uint8,bytes32,string)") — topic0 used to
@@ -178,7 +180,15 @@ export class Executor {
     const receipt = await this.public.waitForTransactionReceipt({ hash });
     const decisionId = extractDecisionId(receipt);
 
-    return { submitted: true, kind: "rebalance", decisionId, txHash: hash, reason: "Cycle complete" };
+    const decision: Decision = {
+      kind: "REBALANCE",
+      weightsBps: weights,
+      usdyDexSpotUsdc: snapshot.usdyDexSpotUsdc,
+      riskLevel: assessment.riskLevel,
+      rationale: bundle.rationale,
+      signals: bundle.signals,
+    };
+    return { submitted: true, kind: "rebalance", decisionId, txHash: hash, reason: "Cycle complete", decision };
   }
 
   private async _sendDeRisk(
@@ -221,7 +231,14 @@ export class Executor {
     const receipt = await this.public.waitForTransactionReceipt({ hash });
     const decisionId = extractDecisionId(receipt);
 
-    return { submitted: true, kind: "derisk", decisionId, txHash: hash, reason: "De-risk executed" };
+    const decision: Decision = {
+      kind: "DERISK",
+      usdyDexSpotUsdc: snapshot.usdyDexSpotUsdc,
+      riskLevel: "DERISK",
+      rationale: bundle.rationale,
+      signals: bundle.signals,
+    };
+    return { submitted: true, kind: "derisk", decisionId, txHash: hash, reason: "De-risk executed", decision };
   }
 
   /**

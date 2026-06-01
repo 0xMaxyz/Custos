@@ -39,11 +39,11 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 
 **Addendum PRs** (only after Phase 5a exits):
 
-| PR    | Tasks     | Theme                         |
-| ----- | --------- | ----------------------------- |
-| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal |
-| PR-A2 | A2.1      | Risk radar viz                |
-| PR-A3 | A3.1–A3.2 | Conversational agent + alerts |
+| PR    | Tasks     | Theme                         | Status                                                                          |
+| ----- | --------- | ----------------------------- | ------------------------------------------------------------------------------- |
+| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
+| PR-A2 | A2.1      | Risk radar viz                | `[ ]`                                                                            |
+| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[ ]` |
 
 ---
 
@@ -503,17 +503,36 @@ existing `use*Data` seams (consumers unchanged).
 
 Work through the Addendum list from §8 in order. Stop when time runs out. Each item is independent.
 
-#### A1.1 — `AusdAdapter` · _PR-A1_
+#### A1.1 — `AusdAdapter` · _PR-A1_ · `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15)
 
 - **What:** swap USDC↔AUSD; AUSD as safety bucket in de-risk.
 - **Goal:** second safe bucket; de-risk can route to AUSD.
-- **Test:** fork test: allocate to AUSD and withdraw back.
+- **Test:** offline mock suite (`AusdAdapter.t.sol`, 21 tests) covers deposit/withdraw/
+  emergency, balance-delta minOut, access control, and the vault de-risk USDY→AUSD path;
+  `ForkPhaseA1.t.sol` covers live Mantle token/router presence + adapter construction.
+  A live USDC→AUSD swap on a fork is deferred (needs Odos signed route calldata for the
+  fork block — same caveat as `ForkPhase2a.t.sol` for USDY).
+- **Built:** `contracts/src/AusdAdapter.sol` — same pinned-Odos-aggregator pattern as
+  `UsdyAdapter` (balance-delta `minOut`, output must land on adapter), but AUSD is a
+  fiat-backed $1 stablecoin valued **1:1 face** with USDC (no NAV oracle; depeg handled
+  by the risk engine + Guardrails, per AGENTS.md §7). `YieldVault.deRisk` now routes the
+  USDC freed from unwinding USDY into the AUSD bucket when `toBucket == AUSD` (via new
+  `_unwindUsdyToAusd` helper; pre-existing idle USDC stays liquid). Deploy script wires
+  bucket 3 (`AusdAdapter`); `deployments.ts`/JSON + `.env.example` (`TESTNET_AUSD`) updated.
+  21 new unit tests; 124 offline Solidity tests pass.
 
-#### A1.2 — AUSD proof-of-reserves signal · _PR-A1_
+#### A1.2 — AUSD proof-of-reserves signal · _PR-A1_ · `[x] DONE` (built in Phases 2–4)
 
 - **What:** fetch AUSD PoR status (Chaos Labs); feed into risk engine + UI.
 - **Goal:** AUSD PoR is a live risk input.
 - **Test:** Vitest mocked; manual.
+- **Built (already landed across earlier phases):** `OneDeltaClient.getAusdBackingRatioBps()`
+  fetches the Chaos Labs PoR feed via 1delta (`/v1/mantle/ausd/por`), returning 0 = "unknown"
+  on failure. `Snapshotter` caches it into `MarketSnapshot.ausdBackingRatioBps`; the
+  deterministic risk engine raises `AUSD_POR_WARN` (→ CAUTION) when AUSD is held and backing
+  < 99.5% (`AUSD_POR_MIN_BPS`). Agora PoR attestation is an evidence feed for the LLM path.
+  UI surfaces it in `InsightsPage` (PoR ring). Covered by `oneDelta.test.ts`,
+  `engine.test.ts`, `snapshot.test.ts` (122 agent Vitest pass).
 
 #### A2.1 — Risk radar viz · _PR-A2_
 
@@ -521,11 +540,24 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **Goal:** insight layer surfaced in the UI.
 - **Test:** Vitest mocked; manual.
 
-#### A3.1 — Conversational agent · _PR-A3_
+#### A3.1 — Conversational agent · _PR-A3_ · `[x] DONE`
 
 - **What:** Fastify endpoint + UI panel ("why am I in AUSD?", "what changed?").
 - **Goal:** natural-language transparency.
 - **Test:** Vitest mocked LLM; manual.
+- **Built:** `agent/src/llm/explain.ts` — `buildExplainContext()` (pure: snapshot +
+  assessment + recent decisions → compact grounding, bigints pre-formatted) and
+  `AnthropicExplainer` (grounded Q&A, controls no funds, answers only from context).
+  `POST /ask` in `server.ts` (injectable explainer + async `getContext`; 400 empty/long
+  question, 503 no-state, 502 LLM error, 429 rate limit, permissive CORS; default
+  30/min, `askRateLimit`/`askRateWindowMs`, 0 disables). `index.ts` wires the explainer,
+  a 10s TTL snapshot-backed `getContext` (invalidated on new decisions), and a
+  recent-decisions ring buffer (`CycleResult.decision` carries rationale/signals;
+  executor tests lock rebalance + de-risk). Web `AgentPage` AskPanel calls the live
+  endpoint via `lib/askAgent.ts` when `VITE_AGENT_API_URL` is set (threads `asOf`;
+  shows grounding freshness under live answers), fixture answers otherwise. 16 new
+  agent Vitest + 4 web Vitest (138 agent, 68 web); all suites green.
+  · [PR #16](https://github.com/0xMaxyz/miu/pull/16)
 
 #### A3.2 — Alerts · _PR-A3_
 

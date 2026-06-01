@@ -63,5 +63,8 @@ export const PROTOCOLS: Record<string, Address | null> = {
   // extcodesize = 14721 confirmed on Mantle mainnet by cursor[bot] review.
   // TODO: record "verified @ block N" once Phase-0 fork gate runs in CI.
   usdyAggregatorRouter: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745",
-  dexRouterAusd: null,
+  // AUSD swaps (AusdAdapter, task A1.1) reuse the same pinned Odos aggregator as
+  // USDY — there is no separate AUSD router. Kept as an explicit alias rather than
+  // null so callers don't read it as "AUSD routing not wired".
+  dexRouterAusd: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745",
 };

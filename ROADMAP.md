@@ -39,11 +39,11 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 
 **Addendum PRs** (only after Phase 5a exits):
 
-| PR    | Tasks     | Theme                         |
-| ----- | --------- | ----------------------------- |
-| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal |
-| PR-A2 | A2.1      | Risk radar viz                |
-| PR-A3 | A3.1–A3.2 | Conversational agent + alerts |
+| PR    | Tasks     | Theme                         | Status                                                                          |
+| ----- | --------- | ----------------------------- | ------------------------------------------------------------------------------- |
+| PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
+| PR-A2 | A2.1      | Risk radar viz                | `[ ]`                                                                            |
+| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | `[ ]`                                                                            |
 
 ---
 
@@ -503,11 +503,23 @@ existing `use*Data` seams (consumers unchanged).
 
 Work through the Addendum list from §8 in order. Stop when time runs out. Each item is independent.
 
-#### A1.1 — `AusdAdapter` · _PR-A1_
+#### A1.1 — `AusdAdapter` · _PR-A1_ · `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15)
 
 - **What:** swap USDC↔AUSD; AUSD as safety bucket in de-risk.
 - **Goal:** second safe bucket; de-risk can route to AUSD.
-- **Test:** fork test: allocate to AUSD and withdraw back.
+- **Test:** offline mock suite (`AusdAdapter.t.sol`, 21 tests) covers deposit/withdraw/
+  emergency, balance-delta minOut, access control, and the vault de-risk USDY→AUSD path;
+  `ForkPhaseA1.t.sol` covers live Mantle token/router presence + adapter construction.
+  A live USDC→AUSD swap on a fork is deferred (needs Odos signed route calldata for the
+  fork block — same caveat as `ForkPhase2a.t.sol` for USDY).
+- **Built:** `contracts/src/AusdAdapter.sol` — same pinned-Odos-aggregator pattern as
+  `UsdyAdapter` (balance-delta `minOut`, output must land on adapter), but AUSD is a
+  fiat-backed $1 stablecoin valued **1:1 face** with USDC (no NAV oracle; depeg handled
+  by the risk engine + Guardrails, per AGENTS.md §7). `YieldVault.deRisk` now routes the
+  USDC freed from unwinding USDY into the AUSD bucket when `toBucket == AUSD` (via new
+  `_unwindUsdyToAusd` helper; pre-existing idle USDC stays liquid). Deploy script wires
+  bucket 3 (`AusdAdapter`); `deployments.ts`/JSON + `.env.example` (`TESTNET_AUSD`) updated.
+  21 new unit tests; 124 offline Solidity tests pass.
 
 #### A1.2 — AUSD proof-of-reserves signal · _PR-A1_
 

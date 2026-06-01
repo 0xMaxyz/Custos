@@ -23,6 +23,7 @@ export interface DeploymentAddresses {
   benchmark: string;
   aaveAdapter: string;
   usdyAdapter: string;
+  ausdAdapter: string;
   /** ERC-8004 agent token id, or null before registration. */
   agentId: number | null;
 }
@@ -33,6 +34,7 @@ const empty: DeploymentAddresses = {
   benchmark: "",
   aaveAdapter: "",
   usdyAdapter: "",
+  ausdAdapter: "",
   agentId: null,
 };
 
@@ -46,6 +48,7 @@ export const TESTNET_DEPLOYMENT: DeploymentAddresses = {
   benchmark:  "0xCd3EcF4d092eE73Ac4882c61b5f114588B6B122a",
   aaveAdapter: "",
   usdyAdapter: "0xd420Bdf2a7eab8F86DE12f06728342b7243101C9",
+  ausdAdapter: "",
   agentId: null,
 };
 

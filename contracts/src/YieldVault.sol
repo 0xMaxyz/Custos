@@ -372,14 +372,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             if (!forceDeRisk) revert DeRiskConditionNotMet();
         }
 
-        // Unwind the USDY bucket entirely.
-        IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
-        if (address(usdyAdapter) != address(0) && usdyAdapter.totalAssets() > 0) {
-            bytes memory sd = swapData.length > BUCKET_USDY ? swapData[BUCKET_USDY] : bytes("");
-            usdyAdapter.emergencyWithdrawAll(0, address(this), sd);
-            // If target is AUSD and there's an AUSD adapter, route there (Phase 2).
-            // Phase 1b: AUSD adapter not yet deployed, funds land in idle (USDC).
-        }
+        // Unwind the USDY bucket entirely, then (if target is AUSD) route the
+        // freed USDC into the AUSD safety bucket. Extracted to a helper to keep
+        // deRisk's stack within limits.
+        _unwindUsdyToAusd(toBucket, swapData);
 
         decisionId = ++decisionCount;
         emit DecisionRecorded(decisionId, 1, evidenceHash, reason);
@@ -398,6 +394,35 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     function _requireNotKilled() internal view {
         if (isKilled) revert Killed();
+    }
+
+    /**
+     * @notice Unwind the USDY bucket to USDC, then route the freed USDC into the
+     *         AUSD safety bucket when `toBucket == BUCKET_AUSD`. Pre-existing idle
+     *         USDC is left liquid; only the amount freed from USDY is routed.
+     * @dev Without an AUSD adapter or `swapData[BUCKET_AUSD]`, the freed USDC
+     *      stays idle — still a safe state, just USDC instead of AUSD.
+     */
+    function _unwindUsdyToAusd(uint8 toBucket, bytes[] calldata swapData) internal {
+        uint256 idleBefore = IERC20(asset()).balanceOf(address(this));
+
+        IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
+        if (address(usdyAdapter) != address(0) && usdyAdapter.totalAssets() > 0) {
+            bytes memory sd = swapData.length > BUCKET_USDY ? swapData[BUCKET_USDY] : bytes("");
+            usdyAdapter.emergencyWithdrawAll(0, address(this), sd);
+        }
+
+        if (toBucket != BUCKET_AUSD) return;
+
+        uint256 freed = IERC20(asset()).balanceOf(address(this)) - idleBefore;
+        if (freed == 0) return;
+
+        IStrategyAdapter ausdAdapter = adapters[BUCKET_AUSD];
+        bytes memory ausdSd = swapData.length > BUCKET_AUSD ? swapData[BUCKET_AUSD] : bytes("");
+        if (address(ausdAdapter) != address(0) && ausdSd.length > 0) {
+            IERC20(asset()).forceApprove(address(ausdAdapter), freed);
+            ausdAdapter.deposit(freed, ausdSd);
+        }
     }
 
     /**

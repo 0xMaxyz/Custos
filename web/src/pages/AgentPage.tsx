@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Icon } from "../components/Icons";
 import { Card, AddressChip, StatusDot, Skeleton } from "../components/Components";
 import * as fmt from "../lib/fmt";
-import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions, askAnswers } from "../lib/data";
+import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions } from "../lib/data";
+import { askAgent } from "../lib/askAgent";
 import { useIdentity } from "../lib/useGuardianData";
 
 function IdentityCard() {
@@ -110,11 +111,12 @@ function AskPanel() {
     if (typing) return;
     setMsgs((m) => [...m, { role: "user", text: q }]);
     setTyping(true);
-    setTimeout(() => {
+    // Live path (VITE_AGENT_API_URL) hits the agent's /ask endpoint; demo path
+    // returns fixture answers. A small delay keeps the typing indicator natural.
+    void Promise.all([askAgent(q), new Promise((r) => setTimeout(r, 500))]).then(([res]) => {
       setTyping(false);
-      const a = askAnswers[q] ?? "I answer from decision history and the current snapshot. Try one of the suggested questions — I explain, but I never take orders or execute trades from chat.";
-      setMsgs((m) => [...m, { role: "agent", text: a }]);
-    }, 900);
+      setMsgs((m) => [...m, { role: "agent", text: res.answer }]);
+    });
   };
 
   const submit = (e: React.FormEvent) => {

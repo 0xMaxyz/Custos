@@ -1,8 +1,11 @@
 import { buildServer } from "./server.js";
 import { tryLoadConfig } from "./config.js";
-import { buildPipeline } from "./pipeline.js";
+import { buildPipeline, type Pipeline } from "./pipeline.js";
 import { Executor } from "./executor/index.js";
 import { Scheduler } from "./scheduler.js";
+import { assess } from "./risk/engine.js";
+import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
+import type { Decision } from "./types.js";
 
 // Validate configuration at startup; fail fast with a readable error.
 const result = tryLoadConfig();
@@ -14,19 +17,45 @@ if (!result.ok) {
 }
 
 const config = result.config;
-const app = buildServer();
+
+// The conversational `/ask` endpoint (A3.1) needs a data snapshotter + an LLM
+// explainer. Build the explainer when an Anthropic key is present; build the
+// pipeline when we need live data for either the scheduler or the explainer.
+const explainClient = config.anthropicApiKey ? new AnthropicExplainer(config) : undefined;
+const needsPipeline = Boolean((config.allocatorPrivateKey && config.vaultAddress) || explainClient);
+const pipeline: Pipeline | undefined = needsPipeline ? buildPipeline(config) : undefined;
+
+// Most-recent-first ring buffer of submitted decisions, for "what changed?".
+const recentDecisions: Decision[] = [];
+const rememberDecision = (d: Decision) => {
+  recentDecisions.unshift(d);
+  if (recentDecisions.length > 10) recentDecisions.pop();
+};
+
+// Fresh grounding context on demand: snapshot + deterministic assessment +
+// recent decisions. Returns null if no data pipeline is available.
+const getContext =
+  explainClient && pipeline
+    ? async (): Promise<ExplainContext | null> => {
+        const snapshot = await pipeline.snapshotter.snapshot();
+        const assessment = assess(snapshot);
+        return buildExplainContext(snapshot, assessment, recentDecisions);
+      }
+    : undefined;
+
+const app = buildServer({ explainClient, getContext });
 
 // Wire the autonomous loop when execution prerequisites are configured.
 // Graceful read-only mode: if ALLOCATOR_PRIVATE_KEY or VAULT_ADDRESS are absent,
 // the scheduler is skipped and the agent serves data-only routes.
-if (config.allocatorPrivateKey && config.vaultAddress) {
-  const pipeline = buildPipeline(config);
+if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
   const executor = new Executor({ config, clients: pipeline.clients, snapshotter: pipeline.snapshotter });
   const scheduler = new Scheduler(executor, {
     onError: (e) => app.log.error({ err: e }, "scheduler cycle error"),
     onCycle: (r) => {
       if (r.submitted) {
         app.log.info({ kind: r.kind, decisionId: r.decisionId?.toString(), txHash: r.txHash }, "decision submitted");
+        if (r.decision) rememberDecision(r.decision);
       }
     },
   });

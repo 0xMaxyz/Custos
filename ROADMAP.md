@@ -43,7 +43,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | ----- | --------- | ----------------------------- | ------------------------------------------------------------------------------- |
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
 | PR-A2 | A2.1      | Risk radar viz                | `[ ]`                                                                            |
-| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | `[ ]`                                                                            |
+| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · A3.2 `[ ]`                                                    |
 
 ---
 
@@ -540,11 +540,20 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **Goal:** insight layer surfaced in the UI.
 - **Test:** Vitest mocked; manual.
 
-#### A3.1 — Conversational agent · _PR-A3_
+#### A3.1 — Conversational agent · _PR-A3_ · `[x] DONE`
 
 - **What:** Fastify endpoint + UI panel ("why am I in AUSD?", "what changed?").
 - **Goal:** natural-language transparency.
 - **Test:** Vitest mocked LLM; manual.
+- **Built:** `agent/src/llm/explain.ts` — `buildExplainContext()` (pure: snapshot +
+  assessment + recent decisions → compact grounding, bigints pre-formatted) and
+  `AnthropicExplainer` (grounded Q&A, controls no funds, answers only from context).
+  `POST /ask` in `server.ts` (injectable explainer + async `getContext`; 400 empty/long
+  question, 503 no-state, 502 LLM error, permissive CORS). `index.ts` wires the
+  explainer + a fresh snapshot-backed context + a recent-decisions ring buffer
+  (`CycleResult.decision` now carries rationale/signals). Web `AgentPage` AskPanel calls
+  the live endpoint via `lib/askAgent.ts` when `VITE_AGENT_API_URL` is set, fixture
+  answers otherwise. 15 new agent Vitest + 3 web Vitest; all suites green.
 
 #### A3.2 — Alerts · _PR-A3_
 

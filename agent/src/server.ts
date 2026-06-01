@@ -12,6 +12,7 @@ export interface ServerOptions {
   /**
    * Resolves the latest grounding context, or null when the agent has no state
    * yet. Async because building it may require a fresh on-chain/data snapshot.
+   * Exposed via `GET /snapshot` (A2.1) and `POST /ask` (A3.1).
    */
   readonly getContext?: (() => Promise<ExplainContext | null>) | undefined;
   /**
@@ -71,8 +72,27 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     service: "sentinel-agent",
   }));
 
-  // ── Conversational transparency endpoint (A3.1) ────────────────────────────
+  // ── Live snapshot endpoint (A2.1) ─────────────────────────────────────────
+  // Returns the current ExplainContext so the web risk-radar panel can display
+  // live metrics (peg deviation, oracle freshness, AUSD PoR, Aave utilization).
   const { explainClient, getContext } = options;
+  if (getContext) {
+    app.get("/snapshot", async (req, reply) => {
+      let context: ExplainContext | null;
+      try {
+        context = await getContext();
+      } catch (err) {
+        req.log.error({ err }, "context build failed for /snapshot");
+        return reply.code(503).send({ error: "Snapshot unavailable — try again shortly." });
+      }
+      if (!context) {
+        return reply.code(503).send({ error: "No snapshot yet — agent hasn't run a cycle." });
+      }
+      return context;
+    });
+  }
+
+  // ── Conversational transparency endpoint (A3.1) ────────────────────────────
   if (explainClient && getContext) {
     const allowRequest = makeRateLimiter(options.askRateLimit ?? 30, options.askRateWindowMs ?? 60_000);
 

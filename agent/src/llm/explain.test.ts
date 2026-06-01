@@ -54,6 +54,17 @@ describe("buildExplainContext", () => {
     expect(usdy).toEqual({ bucket: "USDY", bps: 5_000, pct: "50.00%" });
   });
 
+  it("exposes aaveWithdrawableUsdc and oracleRangeEnd for the risk radar", () => {
+    const ctx = buildExplainContext(snap(), assessment());
+    expect(ctx.aaveWithdrawableUsdc).toBe("21000.00");
+    expect(ctx.oracleRangeEnd).toBe(new Date((NOW + 30 * 24 * 3_600) * 1000).toISOString());
+  });
+
+  it("emits empty oracleRangeEnd when the oracle range is unsupported (0)", () => {
+    const ctx = buildExplainContext(snap({ oracleRangeEnd: 0 }), assessment());
+    expect(ctx.oracleRangeEnd).toBe("");
+  });
+
   it("computes peg deviation in bps from nav vs spot", () => {
     // |1.0832 - 1.0810| / 1.0832 ≈ 20 bps
     const ctx = buildExplainContext(snap(), assessment());

@@ -14,6 +14,8 @@ const sampleContext: ExplainContext = {
   usdyImpliedApyBps: 452,
   aaveUsdcSupplyApyBps: 380,
   aaveUtilizationBps: 7_400,
+  aaveWithdrawableUsdc: "21000.00",
+  oracleRangeEnd: "2026-07-01T00:00:00.000Z",
   totalAssetsUsdc: "30000.00",
   ausdBackingRatioBps: 10_000,
   currentWeights: [{ bucket: "USDY", bps: 5_000, pct: "50.00%" }],
@@ -164,6 +166,52 @@ describe("agent server — /ask (A3.1)", () => {
     const app = buildWith({});
     await app.ready();
     const res = await app.inject({ method: "POST", url: "/ask", payload: { question: "hi" } });
+    expect(res.headers["access-control-allow-origin"]).toBe("*");
+    await app.close();
+  });
+});
+
+describe("agent server — /snapshot (A2.1)", () => {
+  it("returns 404 when no getContext is wired", async () => {
+    const app = buildServer();
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/snapshot" });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("returns the context JSON when getContext resolves", async () => {
+    const app = buildServer({ getContext: async () => sampleContext });
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/snapshot" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as typeof sampleContext;
+    expect(body.asOf).toBe(sampleContext.asOf);
+    expect(body.pegDeviationBps).toBe(20);
+    expect(body.riskLevel).toBe("NORMAL");
+    await app.close();
+  });
+
+  it("returns 503 when context is null", async () => {
+    const app = buildServer({ getContext: async () => null });
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/snapshot" });
+    expect(res.statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("returns 503 when getContext throws", async () => {
+    const app = buildServer({ getContext: async () => { throw new Error("RPC down"); } });
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/snapshot" });
+    expect(res.statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("sets CORS headers on /snapshot", async () => {
+    const app = buildServer({ getContext: async () => sampleContext });
+    await app.ready();
+    const res = await app.inject({ method: "GET", url: "/snapshot" });
     expect(res.headers["access-control-allow-origin"]).toBe("*");
     await app.close();
   });

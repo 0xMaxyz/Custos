@@ -5,6 +5,7 @@ import { Executor } from "./executor/index.js";
 import { Scheduler } from "./scheduler.js";
 import { assess } from "./risk/engine.js";
 import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
+import { AlertNotifier } from "./alerts.js";
 import type { Decision } from "./types.js";
 
 // Validate configuration at startup; fail fast with a readable error.
@@ -40,20 +41,29 @@ const rememberDecision = (d: Decision) => {
   if (recentDecisions.length > 10) recentDecisions.pop();
   contextCache = undefined;
 };
-const getContext =
-  explainClient && pipeline
-    ? async (): Promise<ExplainContext | null> => {
-        const now = Date.now();
-        if (contextCache && now - contextCache.at < CONTEXT_TTL_MS) {
-          return contextCache.value;
-        }
-        const snapshot = await pipeline.snapshotter.snapshot();
-        const assessment = assess(snapshot);
-        const value = buildExplainContext(snapshot, assessment, recentDecisions);
-        contextCache = { at: now, value };
-        return value;
+// `getContext` only needs the data pipeline — it grounds both `/ask` (A3.1) and
+// `/snapshot` (A2.1). Wire it whenever the pipeline exists, so a vault+allocator
+// agent exposes `/snapshot` even without an Anthropic key.
+const getContext = pipeline
+  ? async (): Promise<ExplainContext | null> => {
+      const now = Date.now();
+      if (contextCache && now - contextCache.at < CONTEXT_TTL_MS) {
+        return contextCache.value;
       }
-    : undefined;
+      const snapshot = await pipeline.snapshotter.snapshot();
+      const assessment = assess(snapshot);
+      const value = buildExplainContext(snapshot, assessment, recentDecisions);
+      contextCache = { at: now, value };
+      return value;
+    }
+  : undefined;
+
+// Alert notifier (A3.2): fires on de-risk events via Telegram and/or Discord.
+const alertNotifier = new AlertNotifier({
+  telegramBotToken: config.telegramBotToken,
+  telegramChatId: config.telegramChatId,
+  discordWebhookUrl: config.discordWebhookUrl,
+});
 
 const app = buildServer({ explainClient, getContext });
 
@@ -67,7 +77,22 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
     onCycle: (r) => {
       if (r.submitted) {
         app.log.info({ kind: r.kind, decisionId: r.decisionId?.toString(), txHash: r.txHash }, "decision submitted");
+        // Capture the cycle's context BEFORE rememberDecision() invalidates the
+        // cache, so the alert carries the real risk flags and asOf timestamp.
+        const cycleContext = contextCache?.value;
         if (r.decision) rememberDecision(r.decision);
+        if (r.kind === "derisk" && r.decision && alertNotifier.isConfigured) {
+          alertNotifier
+            .notify({
+              riskLevel: r.decision.riskLevel,
+              flags: cycleContext?.flags ?? [],
+              rationale: r.decision.rationale,
+              txHash: r.txHash,
+              decisionId: r.decisionId?.toString(),
+              asOf: cycleContext?.asOf ?? new Date().toISOString(),
+            })
+            .catch((err: unknown) => app.log.warn({ err }, "alert delivery failed"));
+        }
       }
     },
   });

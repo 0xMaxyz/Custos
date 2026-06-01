@@ -115,8 +115,10 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   };
 
   // Build live baseline from the latest on-chain outcome when available.
-  // sentinelSeries / passiveSeries remain fixture-backed until we have enough
-  // on-chain history to reconstruct them (Phase 5b).
+  // When on-chain data exists, clear sentinelSeries/passiveSeries so
+  // computeBaseline() derives the headline delta from on-chain passiveDeltaBps
+  // rather than from fixture series that would yield demo numbers (+0.48%).
+  // Phase 5b will backfill the full series from benchmark history.
   let liveBaseline = baselineFixture;
   const rawOutcome = outcomeData?.[0];
   if (rawOutcome?.status === "success") {
@@ -124,11 +126,14 @@ export function useVaultData(account?: `0x${string}`): VaultData {
     const o = rawOutcome.result as RawOutcome;
     liveBaseline = {
       ...baselineFixture,
-      realizedYieldBps:   Number(o.realizedYieldBps),
+      realizedYieldBps:    Number(o.realizedYieldBps),
       drawdownAvoidedUsdc: formatUnits(o.drawdownAvoidedUsdc, 6),
-      passiveDeltaBps:    Number(o.passiveDeltaBps),
-      measuredAt:         new Date(Number(o.measuredAt) * 1000).toISOString(),
-      sinceDecisionId:    decisionCount > 0 ? decisionCount - 1 : 0,
+      passiveDeltaBps:     Number(o.passiveDeltaBps),
+      measuredAt:          new Date(Number(o.measuredAt) * 1000).toISOString(),
+      sinceDecisionId:     decisionCount > 0 ? decisionCount - 1 : 0,
+      // Clear demo series so computeBaseline falls back to on-chain passiveDeltaBps.
+      sentinelSeries: [],
+      passiveSeries:  [],
     };
   }
 

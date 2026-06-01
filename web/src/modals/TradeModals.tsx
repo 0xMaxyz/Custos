@@ -6,7 +6,7 @@
 // Otherwise drives the simulated flow used in the undeployed preview.
 
 import { useState, useEffect, type ReactNode } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { parseUnits } from "viem";
 import { Icon } from "../components/Icons";
 import { Spinner } from "../components/Components";
@@ -89,6 +89,7 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
   const step = depositStepIndex(phase);
 
   // Wagmi write hooks (only used when isDeployed).
+  const publicClient = usePublicClient();
   const { writeContractAsync: writeApprove } = useWriteContract();
   const { writeContractAsync: writeDeposit  } = useWriteContract();
   const { isSuccess: depositConfirmed } = useWaitForTransactionReceipt({
@@ -104,11 +105,14 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
   }, [depositConfirmed]);
 
   const runLive = async () => {
-    if (!userAddress || !usdcAddress) return;
+    if (!userAddress || !usdcAddress || !publicClient) return;
     try {
       const assets = parseUnits(String(n), 6);
       setPhase("approving");
-      await writeApprove({ address: usdcAddress, abi: ERC20_APPROVE_ABI, functionName: "approve", args: [VAULT_ADDRESS, assets] });
+      // Wait for approval to be mined before depositing — approve only resolves
+      // on broadcast, so racing deposit against it would revert on-chain.
+      const approveHash = await writeApprove({ address: usdcAddress, abi: ERC20_APPROVE_ABI, functionName: "approve", args: [VAULT_ADDRESS, assets] });
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
       setPhase("approved");
       setPhase("depositing");
       const hash = await writeDeposit({ address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "deposit", args: [assets, userAddress] });

@@ -521,11 +521,18 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   bucket 3 (`AusdAdapter`); `deployments.ts`/JSON + `.env.example` (`TESTNET_AUSD`) updated.
   21 new unit tests; 124 offline Solidity tests pass.
 
-#### A1.2 — AUSD proof-of-reserves signal · _PR-A1_
+#### A1.2 — AUSD proof-of-reserves signal · _PR-A1_ · `[x] DONE` (built in Phases 2–4)
 
 - **What:** fetch AUSD PoR status (Chaos Labs); feed into risk engine + UI.
 - **Goal:** AUSD PoR is a live risk input.
 - **Test:** Vitest mocked; manual.
+- **Built (already landed across earlier phases):** `OneDeltaClient.getAusdBackingRatioBps()`
+  fetches the Chaos Labs PoR feed via 1delta (`/v1/mantle/ausd/por`), returning 0 = "unknown"
+  on failure. `Snapshotter` caches it into `MarketSnapshot.ausdBackingRatioBps`; the
+  deterministic risk engine raises `AUSD_POR_WARN` (→ CAUTION) when AUSD is held and backing
+  < 99.5% (`AUSD_POR_MIN_BPS`). Agora PoR attestation is an evidence feed for the LLM path.
+  UI surfaces it in `InsightsPage` (PoR ring). Covered by `oneDelta.test.ts`,
+  `engine.test.ts`, `snapshot.test.ts` (122 agent Vitest pass).
 
 #### A2.1 — Risk radar viz · _PR-A2_
 

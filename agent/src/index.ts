@@ -5,6 +5,7 @@ import { Executor } from "./executor/index.js";
 import { Scheduler } from "./scheduler.js";
 import { assess } from "./risk/engine.js";
 import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
+import { AlertNotifier } from "./alerts.js";
 import type { Decision } from "./types.js";
 
 // Validate configuration at startup; fail fast with a readable error.
@@ -55,6 +56,13 @@ const getContext =
       }
     : undefined;
 
+// Alert notifier (A3.2): fires on de-risk events via Telegram and/or Discord.
+const alertNotifier = new AlertNotifier({
+  telegramBotToken: config.telegramBotToken,
+  telegramChatId: config.telegramChatId,
+  discordWebhookUrl: config.discordWebhookUrl,
+});
+
 const app = buildServer({ explainClient, getContext });
 
 // Wire the autonomous loop when execution prerequisites are configured.
@@ -68,6 +76,19 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
       if (r.submitted) {
         app.log.info({ kind: r.kind, decisionId: r.decisionId?.toString(), txHash: r.txHash }, "decision submitted");
         if (r.decision) rememberDecision(r.decision);
+        if (r.kind === "derisk" && r.decision && alertNotifier.isConfigured) {
+          const snapshot = contextCache?.value;
+          alertNotifier
+            .notify({
+              riskLevel: r.decision.riskLevel,
+              flags: snapshot?.flags ?? [],
+              rationale: r.decision.rationale,
+              txHash: r.txHash,
+              decisionId: r.decisionId?.toString(),
+              asOf: snapshot?.asOf ?? new Date().toISOString(),
+            })
+            .catch((err: unknown) => app.log.warn({ err }, "alert delivery failed"));
+        }
       }
     },
   });

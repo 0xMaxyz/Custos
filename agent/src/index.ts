@@ -6,6 +6,9 @@ import { Scheduler } from "./scheduler.js";
 import { assess } from "./risk/engine.js";
 import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
 import { AlertNotifier } from "./alerts.js";
+import { shapeOnlyVerifier, type Eip3009Signer, type PaymentRequirements } from "./payments/x402.js";
+import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
+import { MANTLE_MAINNET_CHAIN_ID } from "@sentinel/shared";
 import type { Decision } from "./types.js";
 
 // Validate configuration at startup; fail fast with a readable error.
@@ -65,13 +68,69 @@ const alertNotifier = new AlertNotifier({
   discordWebhookUrl: config.discordWebhookUrl,
 });
 
-const app = buildServer({ explainClient, getContext });
+// x402 paid risk-score endpoint (A4.1). Enabled when payTo + asset are configured.
+// NOTE: shapeOnlyVerifier is a DEV default — it checks structure/amount/recipient but
+// does NOT verify the EIP-712 signature or settle on-chain. Before accepting real
+// USDC, inject a facilitator-backed or on-chain transferWithAuthorization verifier.
+const x402 =
+  config.x402PayTo && config.x402Asset
+    ? {
+        requirements: (resourceUrl: string): PaymentRequirements => ({
+          scheme: "exact",
+          network: config.x402Network,
+          chainId: MANTLE_MAINNET_CHAIN_ID,
+          maxAmountRequired: config.x402PriceBaseUnits.toString(),
+          resource: resourceUrl,
+          description: "Sentinel RWA risk score",
+          mimeType: "application/json",
+          payTo: config.x402PayTo as `0x${string}`,
+          maxTimeoutSeconds: config.x402TimeoutSeconds,
+          asset: config.x402Asset as `0x${string}`,
+          extra: { name: config.x402TokenName, version: config.x402TokenVersion },
+        }),
+        verify: shapeOnlyVerifier(),
+        riskScore: async (): Promise<Record<string, unknown>> => {
+          const ctx = getContext ? await getContext() : null;
+          return ctx
+            ? {
+                riskLevel: ctx.riskLevel,
+                forceDeRisk: ctx.forceDeRisk,
+                pegDeviationBps: ctx.pegDeviationBps,
+                flags: ctx.flags,
+                asOf: ctx.asOf,
+              }
+            : { error: "no snapshot yet" };
+        },
+      }
+    : undefined;
+
+const app = buildServer({ explainClient, getContext, x402 });
 
 // Wire the autonomous loop when execution prerequisites are configured.
 // Graceful read-only mode: if ALLOCATOR_PRIVATE_KEY or VAULT_ADDRESS are absent,
 // the scheduler is skipped and the agent serves data-only routes.
 if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
-  const executor = new Executor({ config, clients: pipeline.clients, snapshotter: pipeline.snapshotter });
+  // Paid-evidence fetcher (A4.1): when a premium x402 feed is configured, the agent
+  // pays for it with the allocator account and pins the receipt into each decision.
+  let paidEvidence: PaidEvidenceFetcher | undefined;
+  const wc = pipeline.clients.walletClient;
+  if (config.x402PremiumFeedUrl && wc?.account) {
+    const account = wc.account;
+    const signer: Eip3009Signer = (def) =>
+      wc.signTypedData({ account, ...def } as unknown as Parameters<typeof wc.signTypedData>[0]);
+    paidEvidence = buildPaidEvidenceFetcher({
+      url: config.x402PremiumFeedUrl,
+      from: account.address,
+      signer,
+    });
+  }
+
+  const executor = new Executor({
+    config,
+    clients: pipeline.clients,
+    snapshotter: pipeline.snapshotter,
+    paidEvidence,
+  });
   const scheduler = new Scheduler(executor, {
     onError: (e) => app.log.error({ err: e }, "scheduler cycle error"),
     onCycle: (r) => {

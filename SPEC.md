@@ -324,6 +324,50 @@ signed score, and `feedbackURI/feedbackHash` binding the IPFS evidence.
 
 - **Agent card** (`agentURI` → IPFS JSON): `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault, benchmark }` (Sentinel-specific shape; canonical explorer interop via `services[]`/`registrations[]` is mapped at deploy time — PR-5a).
 
+### 2.6 ERC-8183 verifiable de-risk jobs (A4.2)
+
+Each de-risk is modelled as an ERC-8183 escrowed **Job** so the agent accrues a
+verifiable risk-call record. The **Evaluator is the deterministic guardrail check** —
+a Job settles to the provider only if `Guardrails.evaluateUsdyRisk` confirms the
+de-risk was forced; otherwise it is rejected and the client refunded. This is a
+record/reputation layer **outside the vault custody path** (it escrows a per-job
+bounty, never user deposits; the on-chain `Guardrails` remain the sole authority over
+vault funds). Job outcomes feed the ERC-8004 ReputationRegistry.
+
+```solidity
+// IERC8183 (subset): Open → Funded → Submitted → Completed | Rejected | Expired
+enum JobStatus { Open, Funded, Submitted, Completed, Rejected, Expired }
+function createJob(address provider, address evaluator, uint256 expiredAt, string description, address hook) external returns (uint256 jobId);
+function fund(uint256 jobId, bytes optParams) external;        // client escrows budget
+function submit(uint256 jobId, bytes32 deliverable, bytes optParams) external; // provider
+function complete(uint256 jobId, bytes32 reason, bytes optParams) external;    // evaluator → pay provider
+function reject(uint256 jobId, bytes32 reason, bytes optParams) external;       // evaluator/client → refund
+function claimRefund(uint256 jobId) external;                  // anyone, after expiry → refund client
+
+// SentinelDeRiskEvaluator (the guardrail-gated Evaluator)
+function evaluate(IERC8183 escrow, uint256 jobId, Guardrails.MarketState s, int256 outcomeScore, string feedbackUri, bytes32 reason)
+    external returns (bool completed); // KEEPER-only; complete+appendFeedback iff forceDeRisk, else reject
+```
+
+### 2.7 x402 micropayments (A4.1)
+
+The agent uses the x402 "exact" EVM scheme (EIP-3009 `transferWithAuthorization`,
+EIP-712-signed) for paid data: it **pays** per-call for premium risk feeds and pins
+the settlement receipt into the decision evidence bundle ("paid for the evidence it
+acted on"), and **charges** for its own RWA risk score at a 402-gated endpoint.
+Signing + settlement are injectable so the protocol is testable offline.
+
+```jsonc
+// 402 body: { "x402Version": 1, "accepts": [PaymentRequirements], "error": "payment required" }
+// PaymentRequirements: { scheme:"exact", network, chainId, maxAmountRequired, resource,
+//                        description, mimeType, payTo, maxTimeoutSeconds, asset, extra:{name,version} }
+// X-PAYMENT header (base64 JSON): { x402Version, scheme, network,
+//   payload: { signature, authorization:{ from,to,value,validAfter,validBefore,nonce } } }
+// X-PAYMENT-RESPONSE (base64 JSON): { success, transaction, network, payer, amount, resource }
+```
+The receipt is bound to the evidence it bought via `resource`; the decision bundle
+carries `payments: [{ evidenceId, receipt }]` (hashed into `rationaleHash`, pinned to IPFS).
+
 ---
 
 ## 3. LLM prompt + risk-signal schema

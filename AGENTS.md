@@ -55,6 +55,13 @@ product. See `PLAN.md`.
    oracle-derived **balance-delta `minOut`** is enforced on the realized output. The
    conversion is oracle-priced and value-neutral (no DEX liquidity), so it changes only
    the *form* of the bucket, not its value or weight.
+   **Addendum layers stay outside custody (A4):** x402 micropayments (the agent pays a
+   guardrail-bounded payer key for data, and sells its risk score) and the ERC-8183
+   `SentinelJobEscrow`/`SentinelDeRiskEvaluator` (each de-risk modelled as a verifiable
+   escrowed Job whose Evaluator IS the deterministic guardrail check) are
+   record/payment/reputation layers — they escrow per-job bounties and feed ERC-8004
+   reputation, and **never move vault deposits**. The on-chain `Guardrails` remain the
+   sole authority over vault funds.
 2. **Guardrails are the final authority.** On-chain guardrails (see `SPEC.md` §1:
    max weight/bucket, min idle+Aave liquidity buffer, max slippage, token/venue
    whitelist, rebalance-frequency cap, per-tx caps, pause/kill switch, add-strategy

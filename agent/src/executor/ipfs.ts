@@ -2,6 +2,17 @@ import { keccak256, toBytes } from "viem";
 import type { AgentConfig } from "../config.js";
 import type { RiskSignal, WeightsBps } from "../types.js";
 import type { EvidenceItem } from "../llm/types.js";
+import type { SettlementReceipt } from "../payments/x402.js";
+
+/**
+ * An x402 settlement receipt for a premium feed the agent paid for, bound to the
+ * evidence item it bought (`evidenceId`). Pinning these into the decision bundle
+ * makes "the agent paid for the evidence it acted on" verifiable (ROADMAP A4.1).
+ */
+export interface PaidEvidenceReceipt {
+  readonly evidenceId: string;
+  readonly receipt: SettlementReceipt;
+}
 
 /**
  * Rationale bundle assembled before signing a decision. Contains the human-readable
@@ -14,6 +25,8 @@ export interface RationaleBundle {
   readonly candidateWeightsBps: WeightsBps;
   readonly riskLevel: string;
   readonly asOf: string;
+  /** x402 receipts for any premium evidence the agent paid for (A4.1). Optional. */
+  readonly payments?: PaidEvidenceReceipt[];
 }
 
 export interface PinResult {

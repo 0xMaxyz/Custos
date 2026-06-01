@@ -308,6 +308,12 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(writeContract).toHaveBeenCalledOnce();
     const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string }])[0];
     expect(call.functionName).toBe("deRisk");
+
+    // CycleResult carries the submitted decision (used for the /ask ring buffer).
+    expect(result.decision).toBeDefined();
+    expect(result.decision?.kind).toBe("DERISK");
+    expect(result.decision?.riskLevel).toBe("DERISK");
+    expect(typeof result.decision?.rationale).toBe("string");
   });
 
   it("LLM-only deRisk (healthy peg): routes through rebalance with USDY=0, not deRisk", async () => {
@@ -343,6 +349,10 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(call.functionName).toBe("rebalance");
     const weightsArr = call.args[0] as readonly number[];
     expect(weightsArr[Bucket.USDY]).toBe(0);
+
+    // CycleResult carries the submitted rebalance decision (with final weights).
+    expect(result.decision?.kind).toBe("REBALANCE");
+    expect(result.decision?.weightsBps?.[Bucket.USDY]).toBe(0);
   });
 
   it("oracle stale: calls deRisk via deterministic forceDeRisk", async () => {

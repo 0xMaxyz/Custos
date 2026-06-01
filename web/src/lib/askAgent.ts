@@ -17,6 +17,8 @@ export interface AskResult {
   answer: string;
   /** true when the answer came from the live agent, false from fixtures. */
   live: boolean;
+  /** ISO timestamp the grounding snapshot was taken (live answers only). */
+  asOf?: string;
 }
 
 /**
@@ -44,8 +46,8 @@ export async function askAgent(question: string): Promise<AskResult> {
         live: true,
       };
     }
-    const data = (await res.json()) as { answer?: string };
-    return { answer: data.answer ?? FALLBACK, live: true };
+    const data = (await res.json()) as { answer?: string; asOf?: string };
+    return { answer: data.answer ?? FALLBACK, live: true, ...(data.asOf ? { asOf: data.asOf } : {}) };
   } catch {
     return {
       answer: "I couldn't reach the agent. Check your connection and try again.",

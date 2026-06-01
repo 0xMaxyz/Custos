@@ -98,7 +98,7 @@ function GuardrailsPanel() {
   );
 }
 
-interface Msg { role: "user" | "agent"; text: string; }
+interface Msg { role: "user" | "agent"; text: string; asOf?: string; }
 
 function AskPanel() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -115,7 +115,7 @@ function AskPanel() {
     // returns fixture answers. A small delay keeps the typing indicator natural.
     void Promise.all([askAgent(q), new Promise((r) => setTimeout(r, 500))]).then(([res]) => {
       setTyping(false);
-      setMsgs((m) => [...m, { role: "agent", text: res.answer }]);
+      setMsgs((m) => [...m, { role: "agent", text: res.answer, ...(res.asOf ? { asOf: res.asOf } : {}) }]);
     });
   };
 
@@ -141,7 +141,14 @@ function AskPanel() {
           </div>
         )}
         {msgs.map((m, i) => (
-          <div key={i} className={"bubble " + m.role}>{m.text}</div>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
+            <div className={"bubble " + m.role}>{m.text}</div>
+            {m.asOf && (
+              <div style={{ fontSize: "0.6875rem", color: "var(--faint)", margin: "2px 4px 0" }}>
+                Grounded on data from {new Date(m.asOf).toLocaleString()}
+              </div>
+            )}
+          </div>
         ))}
         {typing && <div className="bubble agent typing"><span /><span /><span /></div>}
       </div>

@@ -25,18 +25,21 @@ const explainClient = config.anthropicApiKey ? new AnthropicExplainer(config) : 
 const needsPipeline = Boolean((config.allocatorPrivateKey && config.vaultAddress) || explainClient);
 const pipeline: Pipeline | undefined = needsPipeline ? buildPipeline(config) : undefined;
 
-// Most-recent-first ring buffer of submitted decisions, for "what changed?".
-const recentDecisions: Decision[] = [];
-const rememberDecision = (d: Decision) => {
-  recentDecisions.unshift(d);
-  if (recentDecisions.length > 10) recentDecisions.pop();
-};
-
 // Fresh grounding context on demand: snapshot + deterministic assessment +
 // recent decisions. A short TTL cache coalesces bursts of chat messages so a
 // chatty session doesn't re-snapshot (RPC + 1delta) on every question.
 const CONTEXT_TTL_MS = 10_000;
 let contextCache: { at: number; value: ExplainContext } | undefined;
+
+// Most-recent-first ring buffer of submitted decisions, for "what changed?".
+// Invalidate the context cache so a just-submitted decision is reflected
+// immediately, not after the TTL.
+const recentDecisions: Decision[] = [];
+const rememberDecision = (d: Decision) => {
+  recentDecisions.unshift(d);
+  if (recentDecisions.length > 10) recentDecisions.pop();
+  contextCache = undefined;
+};
 const getContext =
   explainClient && pipeline
     ? async (): Promise<ExplainContext | null> => {

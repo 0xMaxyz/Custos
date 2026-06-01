@@ -42,6 +42,10 @@ contract ForkPhase2aTest is Test {
     // USDY: Ondo Finance — verified via 1delta curated list + Fork.t.sol
     address internal constant USDY = 0x5bE26527e817998A7206475496fDE1E68957c5A6;
 
+    // mUSD: Ondo's rebasing $1 form of USDY + the wrap/unwrap converter. Verified
+    // on-chain in ForkPhase2d.t.sol (usdy()==USDY, oracle()==RWADynamicOracle).
+    address internal constant MUSD = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
+
     // Odos V2 router on Mantle — the single pinned aggregator the adapter executes
     // against. MUST be re-verified on-chain (Phase 0.3 gate) before any deployment;
     // only used for construction here (no live swap is performed in this suite).
@@ -81,6 +85,7 @@ contract ForkPhase2aTest is Test {
             ODOS_ROUTER,
             USDC,
             USDY,
+            MUSD,
             USDY_ORACLE,
             address(vault),
             50 // maxSlippageBps

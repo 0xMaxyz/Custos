@@ -60,9 +60,14 @@ export const PROTOCOLS: Record<string, Address | null> = {
   //       extcodesize > 0 and getPrice() returns a plausible NAV.
   usdyRWADynamicOracle: "0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f",
   // Ondo Token Converter for USDY <-> mUSD (the two on-chain forms of the RWA
-  // leg). Needed once the adapter supports the mUSD leg; resolve + verify in the
-  // Phase 0.3 gate. Left null until confirmed on-chain — DO NOT guess.
-  ondoTokenConverter: null,
+  // leg). VERIFIED: the "converter" is the mUSD token contract ITSELF — it hosts
+  // wrap(uint256) (USDY->mUSD) and unwrap(uint256) (mUSD->USDY); there is no
+  // separate converter contract. So this equals TOKENS.MUSD.address.
+  // On-chain checks (Mantle 5000, ForkPhase2d.t.sol): code present; 18 decimals;
+  // mUSD.usdy() == TOKENS.USDY.address; mUSD.oracle() == usdyRWADynamicOracle;
+  // a USDY->mUSD->USDY round-trip is value-neutral at oracle NAV.
+  // TODO: stamp "verified @ block N" once the Phase-0 fork gate runs in CI.
+  ondoTokenConverter: "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3",
   // Pinned Odos aggregator router used by UsdyAdapter for USDC<->USDY swaps.
   // extcodesize = 14721 confirmed on Mantle mainnet by cursor[bot] review.
   // TODO: record "verified @ block N" once Phase-0 fork gate runs in CI.

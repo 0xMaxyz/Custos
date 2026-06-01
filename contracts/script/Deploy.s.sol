@@ -71,6 +71,7 @@ contract Deploy is Script {
         // ── Resolve token + protocol addresses ────────────────────────────────
         address usdc;
         address usdy;
+        address musd;
         address usdyOracle;
         address usdyRouter;
         address ausd;
@@ -80,6 +81,7 @@ contract Deploy is Script {
         if (isMainnet) {
             usdc       = Addresses.MAINNET_USDC;
             usdy       = Addresses.MAINNET_USDY;
+            musd       = Addresses.MAINNET_MUSD;
             usdyOracle = Addresses.MAINNET_USDY_ORACLE;
             usdyRouter = Addresses.MAINNET_USDY_ROUTER;
             ausd       = Addresses.MAINNET_AUSD;
@@ -96,6 +98,7 @@ contract Deploy is Script {
             // Testnet: read from env; deployer must supply mocks or real testnet tokens.
             usdc       = vm.envOr("TESTNET_USDC",        address(0));
             usdy       = vm.envOr("TESTNET_USDY",        address(0));
+            musd       = vm.envOr("TESTNET_MUSD",        address(0));
             usdyOracle = vm.envOr("TESTNET_USDY_ORACLE", address(0));
             usdyRouter = vm.envOr("TESTNET_USDY_ROUTER", address(0));
             ausd       = vm.envOr("TESTNET_AUSD",         address(0));
@@ -152,15 +155,20 @@ contract Deploy is Script {
 
         // ── 5. UsdyAdapter (skip if no USDY / oracle) ────────────────────────
         if (usdy != address(0) && usdyOracle != address(0) && usdyRouter != address(0)) {
+            // mUSD (the Ondo wrap/unwrap converter leg) is optional: address(0)
+            // deploys a USDY-only adapter. Mainnet always wires it; testnet only if
+            // TESTNET_MUSD is set.
             usdyAdapter = new UsdyAdapter(
                 usdyRouter,
                 usdc,
                 usdy,
+                musd,
                 usdyOracle,
                 address(vault),
                 50  // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
             );
             console2.log("UsdyAdapter:", address(usdyAdapter));
+            console2.log("  mUSD leg:", musd == address(0) ? address(0) : musd);
 
             vault.addStrategy(2, address(usdyAdapter));
             if (!isMainnet) {

@@ -13,7 +13,8 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { AgentPage } from "./pages/AgentPage";
 import { InsightsPage } from "./pages/InsightsPage";
-import { vault, position, walletUsdcBalance } from "./lib/data";
+import { walletUsdcBalance } from "./lib/data";
+import { useVaultData } from "./lib/useVaultData";
 import { supportedChains } from "./lib/chains";
 
 const ROUTES: Route[] = ["dashboard", "activity", "agent", "insights"];
@@ -68,13 +69,16 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [loading, setLoading] = useState(true);
   const [flags, setFlags] = useState<AppFlags>({
-    paused: vault.paused, killed: vault.killed, wrongNet: false, emptyPosition: false, activityError: false,
+    paused: false, killed: false, wrongNet: false, emptyPosition: false, activityError: false,
   });
 
   const { address, isConnected, chainId } = useAccount();
   const { openConnectModal } = useConnectModal();
+  const { vault, position, isLive: vaultLive } = useVaultData(address);
   // Demo wrong-net flag OR a genuinely unsupported chain while connected.
   const wrongNet = (flags.wrongNet || (isConnected && chainId !== undefined && !SUPPORTED_IDS.includes(chainId)));
+  // When vault is live, derive emptyPosition from actual shares; fall back to dev flag.
+  const emptyPosition = vaultLive ? parseFloat(position.shares) === 0 : flags.emptyPosition;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -100,8 +104,8 @@ export default function App() {
   const tradeWallet = { connected: isConnected, address, balance: walletUsdcBalance };
 
   const pageProps = {
-    connected: isConnected, paused: flags.paused, killed: flags.killed,
-    emptyPosition: flags.emptyPosition, go, loading,
+    connected: isConnected, paused: flags.paused || vault.paused, killed: flags.killed || vault.killed,
+    emptyPosition, go, loading,
     onConnect: () => openConnectModal?.(),
     onDeposit: () => needWallet(() => setModal({ type: "deposit" })),
     onWithdraw: () => needWallet(() => setModal({ type: "withdraw" })),
@@ -111,7 +115,7 @@ export default function App() {
   return (
     <div className="app-root" data-theme={theme}>
       <Topbar route={route} go={go} theme={theme} setTheme={setThemeState} />
-      <Banners wrongNet={wrongNet} paused={flags.paused} killed={flags.killed} />
+      <Banners wrongNet={wrongNet} paused={flags.paused || vault.paused} killed={flags.killed || vault.killed} />
       <main>
         {route === "dashboard" && <DashboardPage {...pageProps} />}
         {route === "activity" && <ActivityPage loading={loading} activityError={flags.activityError} />}

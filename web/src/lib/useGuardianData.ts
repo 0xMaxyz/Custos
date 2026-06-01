@@ -10,8 +10,7 @@
 
 import { useReadContract, useWatchContractEvent, usePublicClient } from "wagmi";
 import { useRef, useState, useEffect }                              from "react";
-import { decisions as fixtureDecisions, identity, baseline, type Decision } from "./data";
-import { erc8004 }        from "./data";
+import { decisions as fixtureDecisions, identity as fixtureIdentity, baseline as fixtureBaseline, type Decision } from "./data";
 import { computeBaseline, type BaselineSummary } from "./baseline";
 import { VAULT_ABI }      from "./vaultAbi";
 
@@ -147,34 +146,37 @@ export function useDecision(id: number): Decision | undefined {
   return decisions.find((d) => d.id === id);
 }
 
+const AGENT_ID_RAW = import.meta.env.VITE_AGENT_ID ?? "";
+const agentIdBigInt = AGENT_ID_RAW ? BigInt(AGENT_ID_RAW) : undefined;
+
+const IDENTITY_REGISTRY =
+  (import.meta.env.VITE_IDENTITY_REGISTRY ?? "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432") as `0x${string}`;
+
+export type IdentityRecord = typeof fixtureIdentity;
+
 export interface IdentityData {
-  identity: typeof identity;
-  /** Derived Sentinel-vs-passive baseline summary for the counter widget. */
+  identity: IdentityRecord;
   baseline: BaselineSummary;
   isLive: boolean;
 }
 
 export function useIdentity(): IdentityData {
-  const agentId = import.meta.env.VITE_AGENT_ID
-    ? BigInt(import.meta.env.VITE_AGENT_ID as string)
-    : undefined;
-
-  const { data: tokenUri } = useReadContract({
-    address: erc8004.identity,
+  const { data: rawURI } = useReadContract({
+    address: IDENTITY_REGISTRY,
     abi: IDENTITY_ABI,
     functionName: "tokenURI",
-    args: agentId !== undefined ? [agentId] : [0n],
-    query: { enabled: isDeployed && agentId !== undefined },
+    args: agentIdBigInt !== undefined ? [agentIdBigInt] : undefined,
+    query: { enabled: agentIdBigInt !== undefined },
   });
-
-  if (!isDeployed || !tokenUri) {
-    return { identity, baseline: computeBaseline(baseline), isLive: false };
-  }
-
-  // Baseline stays on fixtures until AgentBenchmark reads land (PR-5b/addendum).
+  const isLive = agentIdBigInt !== undefined;
+  const computedBaseline = computeBaseline(fixtureBaseline);
+  const identity: IdentityRecord = {
+    ...fixtureIdentity,
+    agentURI: (rawURI as string | undefined) ?? fixtureIdentity.agentURI,
+  };
   return {
-    identity: { ...identity, agentURI: tokenUri as string },
-    baseline: computeBaseline(baseline),
-    isLive: true,
+    identity,
+    baseline: computedBaseline,
+    isLive,
   };
 }

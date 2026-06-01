@@ -57,6 +57,8 @@ export interface ExplainContext {
   readonly usdyImpliedApyBps: number;
   readonly aaveUsdcSupplyApyBps: number;
   readonly aaveUtilizationBps: number;
+  readonly aaveWithdrawableUsdc: string;
+  readonly oracleRangeEnd: string;
   readonly totalAssetsUsdc: string;
   readonly ausdBackingRatioBps: number;
   readonly currentWeights: WeightView[];
@@ -130,6 +132,9 @@ export function buildExplainContext(
     usdyImpliedApyBps: snapshot.usdyImpliedApyBps,
     aaveUsdcSupplyApyBps: snapshot.aaveUsdcSupplyApyBps,
     aaveUtilizationBps: snapshot.aaveUtilizationBps,
+    aaveWithdrawableUsdc: fmt6(snapshot.aaveWithdrawableUsdc),
+    // Oracle range end as ISO-8601; 0 (unsupported) → empty string.
+    oracleRangeEnd: snapshot.oracleRangeEnd > 0 ? new Date(snapshot.oracleRangeEnd * 1000).toISOString() : "",
     totalAssetsUsdc: fmt6(snapshot.totalAssetsUsdc),
     ausdBackingRatioBps: snapshot.ausdBackingRatioBps,
     currentWeights: weightViews(snapshot.currentWeightsBps),

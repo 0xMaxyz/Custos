@@ -14,6 +14,8 @@ const sampleContext: ExplainContext = {
   usdyImpliedApyBps: 452,
   aaveUsdcSupplyApyBps: 380,
   aaveUtilizationBps: 7_400,
+  aaveWithdrawableUsdc: "21000.00",
+  oracleRangeEnd: "2026-07-01T00:00:00.000Z",
   totalAssetsUsdc: "30000.00",
   ausdBackingRatioBps: 10_000,
   currentWeights: [{ bucket: "USDY", bps: 5_000, pct: "50.00%" }],

@@ -65,7 +65,9 @@ export class AlertNotifier {
     const res = await this.fetchFn(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: telegramChatId, text, parse_mode: "HTML" }),
+      // Plain-text body: no parse_mode, so special chars in rationale (& < >)
+      // never trip Telegram's HTML/Markdown parser.
+      body: JSON.stringify({ chat_id: telegramChatId, text }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "(unreadable)");

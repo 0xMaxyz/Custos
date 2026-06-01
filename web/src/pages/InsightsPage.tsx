@@ -125,7 +125,7 @@ function secondsAgo(d: Date): string {
 }
 
 export function InsightsPage({ loading: pageLoading }: { loading: boolean }) {
-  const { snapshot, loading: snapLoading, lastUpdated } = useInsightsData();
+  const { snapshot, loading: snapLoading, lastUpdated, stale } = useInsightsData();
   const loading = pageLoading || snapLoading;
 
   if (loading) {
@@ -138,9 +138,15 @@ export function InsightsPage({ loading: pageLoading }: { loading: boolean }) {
           <h1 className="page-title">Insights</h1>
           <p className="page-sub">The risk radar — the signals the agent weighs, over time. Every chart has an accessible data-table view.</p>
         </div>
-        <span className="chip role-neutral">
-          <span className="dot dot-pulse" style={{ background: snapshot.live ? "var(--success)" : "var(--info)" }} />
-          {snapshot.live && lastUpdated ? `updated ${secondsAgo(lastUpdated)}` : "demo data"}
+        <span className={`chip ${stale ? "role-warn" : "role-neutral"}`}>
+          <span className="dot dot-pulse" style={{ background: stale ? "var(--warning)" : snapshot.live ? "var(--success)" : "var(--info)" }} />
+          {stale
+            ? lastUpdated
+              ? `stale — last updated ${secondsAgo(lastUpdated)}`
+              : "agent unreachable — showing demo data"
+            : snapshot.live && lastUpdated
+              ? `updated ${secondsAgo(lastUpdated)}`
+              : "demo data"}
         </span>
       </div>
       <div className="grid ins-cols">

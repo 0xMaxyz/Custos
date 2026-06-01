@@ -42,8 +42,8 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR    | Tasks     | Theme                         | Status                                                                          |
 | ----- | --------- | ----------------------------- | ------------------------------------------------------------------------------- |
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[ ]`  |
-| PR-A2 | A2.1      | Risk radar viz                | `[ ]`                                                                            |
-| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[ ]` |
+| PR-A2 | A2.1      | Risk radar viz                | `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17)                    |
+| PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17) |
 
 ---
 
@@ -534,11 +534,22 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   UI surfaces it in `InsightsPage` (PoR ring). Covered by `oneDelta.test.ts`,
   `engine.test.ts`, `snapshot.test.ts` (122 agent Vitest pass).
 
-#### A2.1 — Risk radar viz · _PR-A2_
+#### A2.1 — Risk radar viz · _PR-A2_ · `[x] DONE`
 
 - **What:** USDY peg (NAV vs spot), oracle freshness, AUSD PoR, Aave utilization charts.
 - **Goal:** insight layer surfaced in the UI.
 - **Test:** Vitest mocked; manual.
+- **Built:** `GET /snapshot` in `agent/src/server.ts` returns the live
+  `ExplainContext` (extended with `aaveWithdrawableUsdc` + `oracleRangeEnd`);
+  `getContext` decoupled from the explainer so the route works without an
+  Anthropic key (pipeline-only). Web `lib/useInsightsData.ts` polls `/snapshot`
+  every 15s when `VITE_AGENT_API_URL` is set, falls back to fixture, and exposes
+  a `stale` flag on fetch failure. `InsightsPage` renders live peg-deviation
+  (severity-colored chip), oracle validity/days-remaining, AUSD PoR ratio+badge,
+  and Aave utilization+APY+withdrawable; charts append a live current point; a
+  freshness chip shows updated/stale/demo. 4 web Vitest (fixture fallback, live
+  mapping, empty-range, error path); all suites green.
+  · [PR #17](https://github.com/0xMaxyz/miu/pull/17)
 
 #### A3.1 — Conversational agent · _PR-A3_ · `[x] DONE`
 
@@ -559,11 +570,20 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   agent Vitest + 4 web Vitest (138 agent, 68 web); all suites green.
   · [PR #16](https://github.com/0xMaxyz/miu/pull/16)
 
-#### A3.2 — Alerts · _PR-A3_
+#### A3.2 — Alerts · _PR-A3_ · `[x] DONE`
 
 - **What:** Telegram/Discord webhook on de-risk events.
 - **Goal:** off-platform transparency.
 - **Test:** trigger event → message delivered.
+- **Built:** `agent/src/alerts.ts` — `AlertNotifier` fires Telegram and/or Discord
+  messages on de-risk decisions (injectable `fetch`; both channels optional;
+  `Promise.allSettled` so delivery failures never crash the agent; plain-text body,
+  no `parse_mode`, so `&`/`<`/`>` in rationale can't break delivery). Wired into the
+  scheduler `onCycle` in `index.ts` (only `kind === "derisk"`; captures the cycle
+  context **before** the decision-ring invalidation so flags/asOf are real). Config:
+  `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID` and/or `DISCORD_WEBHOOK_URL` (in
+  `.env.example`). 11 agent Vitest (both channels, partial configs, failure path).
+  · [PR #17](https://github.com/0xMaxyz/miu/pull/17)
 
 **Phase 5b exit:** whatever shipped.
 

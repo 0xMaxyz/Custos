@@ -39,6 +39,7 @@ contract SentinelDeRiskEvaluator is AccessControl {
     // ── Errors ─────────────────────────────────────────────────────────────────
 
     error ZeroAddress();
+    error OracleUnavailable();
 
     // ── Events ─────────────────────────────────────────────────────────────────
 
@@ -124,16 +125,29 @@ contract SentinelDeRiskEvaluator is AccessControl {
 
     /// @dev Builds the peg/oracle snapshot evaluateUsdyRisk needs: NAV + range end read
     ///      on-chain from the adapter, DEX spot from the keeper. The remaining MarketState
-    ///      fields aren't inputs to the depeg/staleness check (mirrors
-    ///      `YieldVault._buildMarketState`, which also leaves `oracleUpdatedAt` = 0).
+    ///      fields aren't inputs to the depeg/staleness check (the vault also leaves
+    ///      `oracleUpdatedAt` = 0).
+    ///
+    ///      Oracle-down policy = **fail-closed revert** (not the vault's fail-closed
+    ///      *inactive*): the evaluator's whole purpose is to verify a de-risk against the
+    ///      on-chain NAV, so if the oracle is unavailable it must refuse to make a
+    ///      settlement decision on unverifiable data rather than silently treating "no
+    ///      NAV" as "no de-risk justified" (which would reject a possibly-valid job).
+    ///      The trusted keeper re-evaluates when the oracle recovers, and the client can
+    ///      always reclaim the bounty at expiry via `claimRefund` — so no funds strand.
+    ///      (`YieldVault._buildMarketState` tolerates a dead oracle because a *rebalance*
+    ///      must still proceed on weights; here the verification IS the action.)
     function _buildMarketState(uint256 usdyDexSpotUsdc)
         internal
         view
         returns (Guardrails.MarketState memory s)
     {
-        (uint256 nav, uint64 rangeEnd) = RWA_ADAPTER.oracleData();
-        s.usdyOracleNav = nav;
-        s.oracleRangeEnd = rangeEnd;
+        try RWA_ADAPTER.oracleData() returns (uint256 nav, uint64 rangeEnd) {
+            s.usdyOracleNav = nav;
+            s.oracleRangeEnd = rangeEnd;
+        } catch {
+            revert OracleUnavailable();
+        }
         s.usdyDexSpot = usdyDexSpotUsdc;
     }
 }

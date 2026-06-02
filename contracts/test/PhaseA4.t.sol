@@ -173,6 +173,30 @@ contract PhaseA4Test is Test {
         assertFalse(evaluator.wouldComplete(HEALTHY_SPOT));
     }
 
+    /// The NAV is read on-chain from the pinned adapter — the keeper can't fake it.
+    /// Same keeper spot (0.98) is a DEPEG at NAV $1 but on-peg once the real NAV is 0.98.
+    function test_NavReadOnChain_NotKeeperFakeable() public {
+        uint256 jobId = _openFundedSubmittedJob();
+        oracle.setPrice(0.98e18); // move the REAL on-chain NAV down to match the spot
+        vm.prank(keeper);
+        bool completed = evaluator.evaluate(escrow, jobId, 0.98e18, 0, "ipfs://e", "spot==nav");
+        assertFalse(completed, "spot == on-chain NAV -> 0 bps deviation -> not a depeg -> rejected");
+        assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Rejected));
+        // Contrast: at the default NAV ($1) the same 0.98 spot completes
+        // (test_DeRiskJustified_SettlesAndWritesReputation) — the decision follows NAV.
+    }
+
+    /// Oracle down → fail-closed REVERT (not a silent reject): the job stays Submitted
+    /// and is recoverable via claimRefund at expiry; the keeper re-evaluates on recovery.
+    function test_OracleDown_EvaluateRevertsFailClosed() public {
+        uint256 jobId = _openFundedSubmittedJob();
+        oracle.setShouldRevert(true);
+        vm.prank(keeper);
+        vm.expectRevert(SentinelDeRiskEvaluator.OracleUnavailable.selector);
+        evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 0, "ipfs://e", "oracle-down");
+        assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Submitted), "job not stranded-settled");
+    }
+
     // ── Expiry refund ────────────────────────────────────────────────────────────
 
     function test_ClaimRefund_AfterExpiry() public {

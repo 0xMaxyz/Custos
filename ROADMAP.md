@@ -659,8 +659,8 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   `X402_SETTLE_ONCHAIN` + an ALLOCATOR wallet). `index.ts` wires the strong verifier
   (no `shapeOnlyVerifier` in the running agent). The EIP-712 message now uses canonical
   `bigint` `uint256` fields (`eip3009TypedData`/`toEip3009Message`) so sign+recover are
-  consistent. 6 `verifier.test.ts` cases (genuine sign→recover, tamper/expiry rejection,
-  on-chain settle, no-settle-on-bad-sig).
+  consistent. 7 `verifier.test.ts` cases (genuine sign→recover, tamper/expiry rejection,
+  on-chain settle, fail-closed on a reverted settlement, no-settle-on-bad-sig).
 
 #### A4.2 — ERC-8183 verifiable jobs · _PR-A4_ · `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21)
 

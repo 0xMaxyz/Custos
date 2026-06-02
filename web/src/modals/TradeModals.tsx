@@ -1,9 +1,11 @@
 // Deposit / Withdraw / Tx status. Matches Design/src/trade-modals.jsx.
 //
-// When VITE_VAULT_ADDRESS is set (isDeployed), drives real on-chain writes:
+// The vault is resolved for the connected chain via resolveDeployment() (the
+// committed @custos/shared address, or a VITE_VAULT_ADDRESS override). When a
+// vault resolves (isDeployed), drives real on-chain writes:
 //   Deposit:  USDC.approve(vault, amount) → vault.deposit(amount, receiver)
 //   Withdraw: vault.redeem(shares, receiver, owner)  (no approve needed)
-// Otherwise drives the simulated flow used in the undeployed preview.
+// Otherwise (no deploy for the chain, or VITE_DEMO_MODE) drives the simulated flow.
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from "wagmi";

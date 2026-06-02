@@ -1,9 +1,11 @@
 // Risk-guardian + identity data seams (ROADMAP 4.6 / 4.8 / 5.1).
 //
-// When VITE_VAULT_ADDRESS is set, backfills historical DecisionRecorded events
-// via getLogs (from vault deployment block) then watches for new ones.
-// Reads the agent identity from the ERC-8004 canonical registry when VITE_AGENT_ID
-// is set. Fixture fallback when undeployed; consumers are unchanged.
+// The vault is resolved for the active chain via resolveDeployment() (the
+// committed @custos/shared address, or a VITE_VAULT_ADDRESS override). When it
+// resolves, backfills historical DecisionRecorded events via getLogs (from vault
+// deployment block) then watches for new ones. Reads the agent identity from the
+// ERC-8004 canonical registry when VITE_AGENT_ID is set. Fixture fallback only
+// when no vault is deployed for the chain (or VITE_DEMO_MODE); consumers unchanged.
 //
 // Deployed but no events yet → isLive:true, decisions:[] (empty live feed,
 // not the demo fixture data).

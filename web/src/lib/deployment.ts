@@ -34,6 +34,9 @@ const EMPTY: ResolvedDeployment = { vault: "", benchmark: "", aaveAdapter: "", u
 export function resolveDeployment(chainId: number | undefined): ResolvedDeployment {
   if (DEMO_MODE || chainId === undefined) return EMPTY;
   const d = getDeployment(chainId);
+  // Note: a VITE_VAULT_ADDRESS override is chain-agnostic — it's returned on any
+  // connected chain. It's a dev convenience; keep your wallet on the chain the
+  // override belongs to, or reads/writes will target a vault that isn't there.
   const vault = isAddr(ENV_VAULT) ? ENV_VAULT : isAddr(d.vault) ? d.vault : "";
   if (!vault) return EMPTY; // no vault for this chain -> fixtures
   return {

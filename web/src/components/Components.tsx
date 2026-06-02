@@ -233,17 +233,20 @@ export function RwaFormSplit({ usdyUsdc, musdUsdc }: { usdyUsdc: string; musdUsd
   const usdy = parseFloat(usdyUsdc), musd = parseFloat(musdUsdc), total = usdy + musd;
   if (!(total > 0)) return null;
   const usdyPct = Math.round((usdy / total) * 100);
+  const musdPct = 100 - usdyPct;
   return (
     <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", fontSize: "0.75rem", color: "var(--muted)" }}
       title="The RWA core (bucket 2) is held as USDY and/or its rebasing $1 form mUSD — convertible 1:1 by NAV via the Ondo wrap/unwrap converter. totalAssets is conserved across a conversion.">
       <span style={{ fontWeight: 600, color: "var(--base-content)" }}>RWA core form</span>
       <span style={{ display: "inline-flex", height: 6, width: 110, borderRadius: 99, overflow: "hidden", background: "var(--base-300)" }} aria-hidden="true">
         <span style={{ width: usdyPct + "%", background: "var(--primary)" }} />
-        <span style={{ width: 100 - usdyPct + "%", background: "color-mix(in srgb, var(--primary) 42%, var(--base-300))" }} />
+        <span style={{ width: musdPct + "%", background: "color-mix(in srgb, var(--primary) 42%, var(--base-300))" }} />
       </span>
-      <span className="mono">USDY {fmt.usd(usdy, { cents: false })}</span>
+      <span className="mono">USDY {usdyPct}%</span>
+      <span style={{ color: "var(--faint)", fontWeight: 500 }}>{fmt.usd(usdy, { cents: false })}</span>
       <span style={{ color: "var(--faint)" }}>·</span>
-      <span className="mono">mUSD {fmt.usd(musd, { cents: false })}</span>
+      <span className="mono">mUSD {musdPct}%</span>
+      <span style={{ color: "var(--faint)", fontWeight: 500 }}>{fmt.usd(musd, { cents: false })}</span>
     </div>
   );
 }

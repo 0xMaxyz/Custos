@@ -45,7 +45,7 @@ verify). Read `PLAN.md` (strategy) and `AGENTS.md` (rules) first.
 | PR-A1 | A1.1–A1.2 | AusdAdapter + AUSD PoR signal | A1.1 `[x] DONE` · [PR #15](https://github.com/0xMaxyz/miu/pull/15) · A1.2 `[x] DONE` |
 | PR-A2 | A2.1      | Risk radar viz                | `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17)                    |
 | PR-A3 | A3.1–A3.2 | Conversational agent + alerts | A3.1 `[x] DONE` · [PR #16](https://github.com/0xMaxyz/miu/pull/16) · A3.2 `[x] DONE` · [PR #17](https://github.com/0xMaxyz/miu/pull/17) |
-| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21) |
+| PR-A4 | A4.1–A4.2 | Agent x402 micropayments + ERC-8183 jobs | `[x] DONE` · [PR #21](https://github.com/0xMaxyz/miu/pull/21) · [PR #22](https://github.com/0xMaxyz/miu/pull/22) · [PR #25](https://github.com/0xMaxyz/miu/pull/25) |
 
 ---
 
@@ -747,11 +747,22 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **Goal:** a complete submission draft.
 - **Test:** `PLAN.md` §11 checklist fully ticked; second reviewer pass.
 
-### 6.5 — Community/marketing assets · _PR-6a_
+### 6.5 — Community/marketing assets · _PR-6a_ · `[x] DONE` · [PR #26](https://github.com/0xMaxyz/miu/pull/26)
 
 - **What:** X thread, short clip, screenshots for Community Voting.
 - **Goal:** shareable assets ready.
-- **Test:** links live; thread renders.
+- **Test:** copy/script + shot lists ready and self-consistent (no invented facts;
+  addresses/claims trace to the README). Acceptance is **draft/copy-ready**: live URLs
+  (`[PUBLIC_URL]`/`[MAINNET_CONTRACT]`/`[VIDEO_URL]`) and the screenshot PNGs are filled
+  in when 6.1 + 5.2 + 6.3 land — they need the public deploy / mainnet verify / recording.
+- **Built:** `MARKETING.md` — 8-tweet launch thread (copy-pasteable, with screenshot
+  notes per tweet), community-cut clip shot list (30–60 s vertical, 9:16, timestamps
+  + captions), screenshot capture guide (8 screens with file names + alt text),
+  DoraHacks Community Voting blurb. Fill in `[PUBLIC_URL]`, `[MAINNET_CONTRACT]`, and
+  `[VIDEO_URL]` once 6.1 + 5.2 + 6.3 are complete. **Screenshot PNGs are capture-pending**
+  (they need the live deploy + a seeded Demo-states view, per 6.1/6.3); the guide names
+  each file + its alt text so they drop straight in. All on-chain facts + addresses
+  drawn from the README / deployed addresses; no invented content.
 
 **Exit:** feature-frozen, submission-ready package.
 

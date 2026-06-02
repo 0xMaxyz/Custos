@@ -1,4 +1,4 @@
-# Sentinel reverse proxy. Replace :80 with your domain for automatic TLS.
+# Custos reverse proxy. Replace :80 with your domain for automatic TLS.
 :80 {
 	# Agent API
 	handle_path /api/* {

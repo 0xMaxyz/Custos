@@ -8,12 +8,12 @@ import { IReputationRegistry } from "./interfaces/IERC8004.sol";
 import { IIdentityRegistry } from "./interfaces/IERC8004.sol";
 
 /**
- * @title SentinelReputationRegistry
+ * @title CustosReputationRegistry
  * @notice Minimal ERC-8004 ReputationRegistry equivalent — an append-only,
  *         access-gated log of structured outcome signals for a registered agent.
  *         Deployed only when the canonical 0x8004 singleton is absent.
  *
- * Sentinel publishes each decision's realized outcome here (e.g. the passive-USDY
+ * Custos publishes each decision's realized outcome here (e.g. the passive-USDY
  * baseline delta) so the agent's track record is permanent and verifiable. Writes
  * are gated to the REPORTER role (granted to the keeper/vault that computes
  * outcomes); reads are open. Feedback is never mutated or deleted — only appended.
@@ -21,7 +21,7 @@ import { IIdentityRegistry } from "./interfaces/IERC8004.sol";
  * The target `agentId` must exist in the linked IdentityRegistry, so feedback can
  * never accrue to a phantom identity.
  */
-contract SentinelReputationRegistry is IReputationRegistry, AccessControl {
+contract CustosReputationRegistry is IReputationRegistry, AccessControl {
     // ── Roles ─────────────────────────────────────────────────────────────────
 
     /// @notice May append feedback. Granted to the outcome-reporting keeper.

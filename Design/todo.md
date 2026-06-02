@@ -1,7 +1,7 @@
-# Sentinel — Frontend Build TODO
+# Custos — Frontend Build TODO
 
 High-fidelity, interactive HTML prototype generated from `uploads/pasted-1780233108591.txt`
-(the Sentinel UI/UX plan). Stack in the spec is React + Vite + Tailwind + daisyUI; this
+(the Custos UI/UX plan). Stack in the spec is React + Vite + Tailwind + daisyUI; this
 prototype mirrors the design with React (inline JSX) + hand-built token CSS so screens can
 be designed/reviewed against the canonical fixtures (§17) before contracts land.
 
@@ -14,7 +14,7 @@ Render **real data, not invented numbers** — every value comes from §15–§1
 - [x] todo.md (this file)
 
 ## 1. Foundation — tokens, type, data
-- [x] `theme.css` — two daisyUI-equivalent themes (`sentinel-light` / `sentinel-dark`) as
+- [x] `theme.css` — two daisyUI-equivalent themes (`custos-light` / `custos-dark`) as
       CSS custom properties on `[data-theme]`; primary violet, slate neutrals, status colors,
       `--rounded-box` 0.75rem / `--rounded-btn` 0.5rem (§2.1–2.4)
 - [x] Inter (UI) + JetBrains Mono (numbers/addresses, tabular-nums) (§2.3)
@@ -41,7 +41,7 @@ Render **real data, not invented numbers** — every value comes from §15–§1
 ## 4. Dashboard `/` (§5.1, §14.2)
 - [x] Hero strip (disconnected: connect CTA; connected: position summary)
 - [x] Agent status card (prominent trust anchor) → link to Activity
-- [x] Baseline counter — Sentinel vs passive USDY holder (the Turing-test number)
+- [x] Baseline counter — Custos vs passive USDY holder (the Turing-test number)
 - [x] Your position (deposited/current value, shares, all-time yield, blended APY) + Deposit/Withdraw
 - [x] Allocation donut across IDLE/AAVE/USDY/AUSD + instantly-withdrawable + 15% floor check
 - [x] Vault stats: TVL vs cap, blended APY breakdown, USDY peg, oracle status (range-based)

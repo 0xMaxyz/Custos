@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import { Test } from "forge-std/Test.sol";
 
-import { SentinelIdentityRegistry } from "../src/SentinelIdentityRegistry.sol";
-import { SentinelReputationRegistry } from "../src/SentinelReputationRegistry.sol";
+import { CustosIdentityRegistry } from "../src/CustosIdentityRegistry.sol";
+import { CustosReputationRegistry } from "../src/CustosReputationRegistry.sol";
 import { IERC721Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 
@@ -17,8 +17,8 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
  *   - feedback is append-only and readable
  */
 contract Phase4aTest is Test {
-    SentinelIdentityRegistry identity;
-    SentinelReputationRegistry reputation;
+    CustosIdentityRegistry identity;
+    CustosReputationRegistry reputation;
 
     address admin = makeAddr("admin");
     address agent = makeAddr("agent"); // owns the identity NFT
@@ -29,8 +29,8 @@ contract Phase4aTest is Test {
     string constant CARD_URI2 = "ipfs://QmAgentCardV2";
 
     function setUp() public {
-        identity = new SentinelIdentityRegistry();
-        reputation = new SentinelReputationRegistry(address(identity), admin);
+        identity = new CustosIdentityRegistry();
+        reputation = new CustosReputationRegistry(address(identity), admin);
 
         bytes32 reporterRole = reputation.REPORTER();
         vm.prank(admin);
@@ -69,7 +69,7 @@ contract Phase4aTest is Test {
 
         vm.prank(stranger);
         vm.expectRevert(
-            abi.encodeWithSelector(SentinelIdentityRegistry.NotAgentOwner.selector, id, stranger)
+            abi.encodeWithSelector(CustosIdentityRegistry.NotAgentOwner.selector, id, stranger)
         );
         identity.setAgentURI(id, CARD_URI2);
     }
@@ -91,7 +91,7 @@ contract Phase4aTest is Test {
         reputation.appendFeedback(id, keccak256("DERISK"), int256(125), "ipfs://QmOutcome");
 
         assertEq(reputation.feedbackCount(id), 1);
-        SentinelReputationRegistry.Feedback memory f = reputation.feedbackAt(id, 0);
+        CustosReputationRegistry.Feedback memory f = reputation.feedbackAt(id, 0);
         assertEq(f.reporter, reporter);
         assertEq(f.tag, keccak256("DERISK"));
         assertEq(f.score, int256(125));
@@ -130,7 +130,7 @@ contract Phase4aTest is Test {
     function test_CannotAppendFeedbackForUnknownAgent() public {
         vm.prank(reporter);
         vm.expectRevert(
-            abi.encodeWithSelector(SentinelReputationRegistry.UnknownAgent.selector, uint256(999))
+            abi.encodeWithSelector(CustosReputationRegistry.UnknownAgent.selector, uint256(999))
         );
         reputation.appendFeedback(999, keccak256("DERISK"), int256(1), "ipfs://x");
     }
@@ -140,10 +140,10 @@ contract Phase4aTest is Test {
     }
 
     function test_ReputationConstructorRejectsZeroAddresses() public {
-        vm.expectRevert(SentinelReputationRegistry.ZeroAddress.selector);
-        new SentinelReputationRegistry(address(0), admin);
+        vm.expectRevert(CustosReputationRegistry.ZeroAddress.selector);
+        new CustosReputationRegistry(address(0), admin);
 
-        vm.expectRevert(SentinelReputationRegistry.ZeroAddress.selector);
-        new SentinelReputationRegistry(address(identity), address(0));
+        vm.expectRevert(CustosReputationRegistry.ZeroAddress.selector);
+        new CustosReputationRegistry(address(identity), address(0));
     }
 }

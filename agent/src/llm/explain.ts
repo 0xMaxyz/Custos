@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 import type { AgentConfig } from "../config.js";
 import type { MarketSnapshot, RiskAssessment, Decision } from "../types.js";
 
@@ -13,7 +13,7 @@ import type { MarketSnapshot, RiskAssessment, Decision } from "../types.js";
  * the same inputs that drive the (separate) risk verdict.
  */
 
-const SYSTEM_PROMPT = `You are Sentinel's transparency assistant for an AI risk-guardian yield vault on Mantle.
+const SYSTEM_PROMPT = `You are Custos's transparency assistant for an AI risk-guardian yield vault on Mantle.
 The vault holds USDC and earns tokenized-Treasury (USDY) yield with an Aave USDC liquidity floor,
 and autonomously de-risks into AUSD/USDC when RWA risk appears (depeg, oracle staleness, issuer/regulatory shock).
 

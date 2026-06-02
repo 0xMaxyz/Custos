@@ -1,7 +1,7 @@
-/* Shared atoms (§7). Exported to window. Depends on window.Icon, window.fmt, window.SENTINEL. */
+/* Shared atoms (§7). Exported to window. Depends on window.Icon, window.fmt, window.CUSTOS. */
 (function () {
   const { useState, useEffect, useRef } = React;
-  const { SIGNAL_TYPES, SEVERITY, FLAGS, RISK, explorer } = window.SENTINEL;
+  const { SIGNAL_TYPES, SEVERITY, FLAGS, RISK, explorer } = window.CUSTOS;
   const f = window.fmt;
   const Icon = window.Icon;
 

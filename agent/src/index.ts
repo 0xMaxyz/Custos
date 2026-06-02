@@ -9,7 +9,7 @@ import { AlertNotifier } from "./alerts.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
 import { onChainSettlingVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
-import { MANTLE_MAINNET_CHAIN_ID } from "@sentinel/shared";
+import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
 import type { Decision } from "./types.js";
 
 // Validate configuration at startup; fail fast with a readable error.
@@ -90,7 +90,7 @@ const x402 =
           chainId: MANTLE_MAINNET_CHAIN_ID,
           maxAmountRequired: config.x402PriceBaseUnits.toString(),
           resource: resourceUrl,
-          description: "Sentinel RWA risk score",
+          description: "Custos RWA risk score",
           mimeType: "application/json",
           payTo: config.x402PayTo as `0x${string}`,
           maxTimeoutSeconds: config.x402TimeoutSeconds,
@@ -180,7 +180,7 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
 app
   .listen({ port: config.agentPort, host: "0.0.0.0" })
   .then((address) => {
-    app.log.info(`sentinel-agent listening on ${address}`);
+    app.log.info(`custos-agent listening on ${address}`);
   })
   .catch((err: unknown) => {
     app.log.error(err);

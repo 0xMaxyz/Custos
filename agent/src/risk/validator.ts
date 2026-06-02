@@ -7,7 +7,7 @@ import {
   MIN_INSTANT_LIQUIDITY_BPS,
   MIN_REBALANCE_INTERVAL,
   PEG_BLOCK_BPS,
-} from "@sentinel/shared";
+} from "@custos/shared";
 import { aaveLiquidityBps, pegDeviationBps } from "./engine.js";
 import type { MarketSnapshot, RiskAssessment, WeightsBps } from "../types.js";
 import type { RiskVerdict } from "../llm/types.js";

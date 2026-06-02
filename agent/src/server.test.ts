@@ -39,7 +39,7 @@ describe("agent server — /health", () => {
   it("responds ok on /health", async () => {
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: "ok", service: "sentinel-agent" });
+    expect(res.json()).toEqual({ status: "ok", service: "custos-agent" });
   });
 
   it("does not register /ask when no explainer is wired", async () => {
@@ -225,7 +225,7 @@ describe("agent server — x402-paid /risk-score (A4.1)", () => {
     chainId: 5000,
     maxAmountRequired: "10000",
     resource: resourceUrl,
-    description: "Sentinel RWA risk score",
+    description: "Custos RWA risk score",
     mimeType: "application/json",
     payTo: "0x000000000000000000000000000000000000bEEF" as `0x${string}`,
     maxTimeoutSeconds: 120,

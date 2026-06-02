@@ -7,7 +7,7 @@ pragma solidity 0.8.28;
  * Run against a live Mantle fork:
  *   forge test --fork-url $MANTLE_RPC_URL --match-contract ForkPhase4aTest -vv
  *
- * Proves the PRODUCTION registration path Sentinel uses: the canonical 0x8004
+ * Proves the PRODUCTION registration path Custos uses: the canonical 0x8004
  * IdentityRegistry + ReputationRegistry singletons on Mantle (confirmed present by
  * the Phase-0.3 gate). Specifically:
  *   - register(agentURI) mints an agent id whose tokenURI round-trips, and the
@@ -34,11 +34,11 @@ contract ForkPhase4aTest is Test {
     ICanonicalReputationRegistry reputation = ICanonicalReputationRegistry(REPUTATION);
 
     // The agent's ALLOCATOR-style key that owns the identity + gives feedback.
-    address internal agent = makeAddr("sentinelAgent");
+    address internal agent = makeAddr("custosAgent");
     address internal client = makeAddr("feedbackClient");
 
-    string internal constant CARD_URI = "ipfs://QmSentinelAgentCard";
-    string internal constant CARD_URI2 = "ipfs://QmSentinelAgentCardV2";
+    string internal constant CARD_URI = "ipfs://QmCustosAgentCard";
+    string internal constant CARD_URI2 = "ipfs://QmCustosAgentCardV2";
 
     function setUp() public {
         // Guard: only meaningful on a fork where the singletons have code.
@@ -96,7 +96,7 @@ contract ForkPhase4aTest is Test {
             decimals,
             "DERISK",
             "passiveDeltaBps",
-            "https://agent.sentinel.example",
+            "https://agent.custos.example",
             "ipfs://QmOutcome",
             keccak256("ipfs://QmOutcome")
         );

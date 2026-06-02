@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 /**
- * @title Deploy - Sentinel full deployment script (task 5.1)
+ * @title Deploy - Custos full deployment script (task 5.1)
  *
  * Deploys on Mantle mainnet (5000) or Mantle testnet (5003):
  *   Guardrails → YieldVault → AaveV3Adapter → UsdyAdapter → AgentBenchmark
@@ -62,7 +62,7 @@ contract Deploy is Script {
         address guardian    = vm.envOr("GUARDIAN_ADDRESS",  deployer);
 
         bool isMainnet = block.chainid == 5000;
-        console2.log("=== Sentinel deploy ===");
+        console2.log("=== Custos deploy ===");
         console2.log("Chain:", block.chainid, isMainnet ? "(mainnet)" : "(testnet)");
         console2.log("Deployer:", deployer);
         console2.log("Allocator:", allocator);

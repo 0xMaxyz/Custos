@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 
 import { Snapshotter, emptyWeights, type SnapshotSources } from "./snapshot.js";
 import { impliedApyBps } from "./readers.js";

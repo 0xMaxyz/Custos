@@ -5,7 +5,7 @@
  *   Snapshotter → assess → runSignalLayer → applyVerdict → validateProposal → tx
  */
 import { describe, it, expect, vi } from "vitest";
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 import type { MarketSnapshot, WeightsBps } from "../types.js";
 import type { RiskVerdict, EvidenceType } from "../llm/types.js";
 

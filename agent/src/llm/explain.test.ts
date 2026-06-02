@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 
 import { buildExplainContext } from "./explain.js";
 import type { MarketSnapshot, RiskAssessment, Decision, WeightsBps } from "../types.js";

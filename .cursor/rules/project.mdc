@@ -1,12 +1,12 @@
 ---
 description: >
-  Sentinel project rules — AI risk-guardian real-yield account on Mantle.
+  Custos project rules — AI risk-guardian real-yield account on Mantle.
   Canonical guide AGENTS.md; plan PLAN.md; execution ROADMAP.md; specs SPEC.md;
   UI UI.md. Read ALL before acting. PR review rules in pr-review.mdc.
 alwaysApply: true
 ---
 
-# Sentinel — Cursor Project Rules
+# Custos — Cursor Project Rules
 
 `AGENTS.md` is the **canonical operating guide**, `PLAN.md` the **full plan**,
 `ROADMAP.md` the **PR-sized execution breakdown** (per-phase tasks with What / Goal /
@@ -19,7 +19,7 @@ contains the full acceptance criteria, build/test commands, phase-specific gates
 and the required review output format.
 
 ## Project (one line)
-**Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
+**Custos** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
 5000). Users deposit **USDC**; an AI agent (Anthropic API / Claude) earns
 tokenized-Treasury (**USDY**) yield with an **Aave v3** USDC liquidity floor, and
 **autonomously de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle

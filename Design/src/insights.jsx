@@ -1,6 +1,6 @@
 /* Insights /insights (§5.4) — risk radar. Charts + data-table fallbacks. Exported to window. */
 (function () {
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
   const { Card, LineChart } = window;
   const ins = S.insights;
 

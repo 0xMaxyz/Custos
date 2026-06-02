@@ -25,7 +25,7 @@ export interface DeRiskAlert {
 export function formatAlert(alert: DeRiskAlert): string {
   const flagStr = alert.flags.filter((f) => f !== "NONE").join(", ") || "none";
   const lines = [
-    "🚨 Sentinel de-risk triggered",
+    "🚨 Custos de-risk triggered",
     `Risk level: ${alert.riskLevel}`,
     `Flags: ${flagStr}`,
     `Rationale: ${alert.rationale}`,

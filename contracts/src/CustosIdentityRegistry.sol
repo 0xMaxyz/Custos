@@ -9,7 +9,7 @@ import {
 import { IIdentityRegistry } from "./interfaces/IERC8004.sol";
 
 /**
- * @title SentinelIdentityRegistry
+ * @title CustosIdentityRegistry
  * @notice Minimal ERC-8004 IdentityRegistry equivalent — deployed only when the
  *         canonical 0x8004 singleton is absent on the target chain (Phase-0.3 gate).
  *
@@ -20,7 +20,7 @@ import { IIdentityRegistry } from "./interfaces/IERC8004.sol";
  * Intentionally tiny: no enumeration, no royalties, no pause. The registry is a
  * naming/identity surface, never part of the custody path.
  */
-contract SentinelIdentityRegistry is ERC721URIStorage, IIdentityRegistry {
+contract CustosIdentityRegistry is ERC721URIStorage, IIdentityRegistry {
     // ── Errors ────────────────────────────────────────────────────────────────
 
     error NotAgentOwner(uint256 agentId, address caller);
@@ -37,7 +37,7 @@ contract SentinelIdentityRegistry is ERC721URIStorage, IIdentityRegistry {
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
-    constructor() ERC721("Sentinel Agent Identity", "SENTINEL-ID") { }
+    constructor() ERC721("Custos Agent Identity", "CUSTOS-ID") { }
 
     // ── IIdentityRegistry ─────────────────────────────────────────────────────
 

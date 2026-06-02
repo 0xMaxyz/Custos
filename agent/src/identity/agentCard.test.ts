@@ -19,18 +19,18 @@ function configWith(extra: Record<string, string> = {}) {
   });
 }
 
-const baseOpts = { wallet: WALLET, apiUrl: "https://agent.sentinel.example" };
+const baseOpts = { wallet: WALLET, apiUrl: "https://agent.custos.example" };
 
 describe("buildAgentCard", () => {
   it("builds a schema-valid card from config + opts", () => {
     const card = buildAgentCard(configWith(), baseOpts);
     expect(() => agentCardSchema.parse(card)).not.toThrow();
     expect(card.schemaVersion).toBe(1);
-    expect(card.name).toBe("Sentinel");
+    expect(card.name).toBe("Custos");
     expect(card.vault).toBe(VAULT);
     expect(card.benchmark).toBe(BENCHMARK);
     expect(card.wallet).toBe(WALLET);
-    expect(card.endpoints.api).toBe("https://agent.sentinel.example");
+    expect(card.endpoints.api).toBe("https://agent.custos.example");
     expect(card.supportedTrust.length).toBeGreaterThan(0);
   });
 
@@ -47,9 +47,9 @@ describe("buildAgentCard", () => {
   it("includes the optional dashboard endpoint when provided", () => {
     const card = buildAgentCard(configWith(), {
       ...baseOpts,
-      dashboardUrl: "https://app.sentinel.example",
+      dashboardUrl: "https://app.custos.example",
     });
-    expect(card.endpoints.dashboard).toBe("https://app.sentinel.example");
+    expect(card.endpoints.dashboard).toBe("https://app.custos.example");
   });
 
   it("omits the dashboard endpoint when not provided", () => {
@@ -60,10 +60,10 @@ describe("buildAgentCard", () => {
   it("allows overriding name + description", () => {
     const card = buildAgentCard(configWith(), {
       ...baseOpts,
-      name: "Sentinel (testnet)",
+      name: "Custos (testnet)",
       description: "Test deployment.",
     });
-    expect(card.name).toBe("Sentinel (testnet)");
+    expect(card.name).toBe("Custos (testnet)");
     expect(card.description).toBe("Test deployment.");
   });
 
@@ -100,7 +100,7 @@ describe("pinAgentCard", () => {
     const decoded = Buffer.from(result.uri.split(",")[1]!, "base64").toString("utf-8");
     const parsed = agentCardSchema.parse(JSON.parse(decoded));
     expect(parsed.vault).toBe(VAULT);
-    expect(parsed.name).toBe("Sentinel");
+    expect(parsed.name).toBe("Custos");
   });
 
   it("returns an ipfs:// URI when the IPFS API returns a CID", async () => {

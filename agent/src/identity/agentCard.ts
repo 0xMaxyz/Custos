@@ -6,16 +6,16 @@ import { pinJson, type PinResult } from "../executor/ipfs.js";
 
 /**
  * ERC-8004 agent card (task 4.2). The IdentityRegistry token's `tokenURI` resolves
- * to this JSON. It describes the Sentinel agent — who it is, where to reach it, and
+ * to this JSON. It describes the Custos agent — who it is, where to reach it, and
  * the on-chain contracts that make its behaviour verifiable (vault + benchmark).
  *
  * SPEC.md §2.5 fixes the shape: { name, description, endpoints, wallet,
  * supportedTrust, vault, benchmark }.
  *
- * NOTE (canonical interop): this is the **Sentinel-specific** card shape that our
+ * NOTE (canonical interop): this is the **Custos-specific** card shape that our
  * own UI + registries consume. It is intentionally NOT the canonical erc-8004
  * best-practices registration file (which keys on `type` / `services[]` /
- * `registrations[]` and is what 8004scan-style explorers index). If/when Sentinel
+ * `registrations[]` and is what 8004scan-style explorers index). If/when Custos
  * registers its `tokenURI` against the canonical 0x8004 IdentityRegistry, emit (or
  * additionally pin) the canonical shape by mapping `endpoints` → `services[]`.
  * Tracked with the deploy wiring (PR-5a).
@@ -39,7 +39,7 @@ export const agentCardSchema = z.object({
   wallet: addressSchema,
   /** Trust models the agent supports surfacing (ERC-8004 `supportedTrust`). */
   supportedTrust: z.array(z.string()).min(1),
-  /** Sentinel YieldVault — the custody contract the agent allocates. */
+  /** Custos YieldVault — the custody contract the agent allocates. */
   vault: addressSchema,
   /** AgentBenchmark ledger — the verifiable decision/outcome track record. */
   benchmark: addressSchema,
@@ -58,7 +58,7 @@ export interface BuildAgentCardOptions {
   readonly description?: string;
 }
 
-const DEFAULT_NAME = "Sentinel";
+const DEFAULT_NAME = "Custos";
 const DEFAULT_DESCRIPTION =
   "AI risk-guardian real-yield account on Mantle. Earns tokenized-Treasury (USDY) " +
   "yield with an Aave v3 USDC liquidity floor and autonomously de-risks on-chain " +

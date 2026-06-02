@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 /**
- * @title IERC8004 — Trustless Agents registry subset (the part Sentinel uses)
+ * @title IERC8004 — Trustless Agents registry subset (the part Custos uses)
  * @notice ERC-8004 defines on-chain registries that give an autonomous agent a
  *         verifiable identity (an ERC-721 token whose `tokenURI` resolves to the
  *         agent card) plus an append-only reputation surface.
@@ -10,7 +10,7 @@ pragma solidity 0.8.28;
  * On Mantle the canonical 0x8004… singletons ARE deployed (confirmed by the
  * Phase-0.3 presence gate; see packages/shared addresses), so per SPEC §2.5 the
  * production path calls them — see `IERC8004Canonical.sol` for their real ABIs and
- * `ForkPhase4a.t.sol` for the on-chain register/feedback proof. The `Sentinel*`
+ * `ForkPhase4a.t.sol` for the on-chain register/feedback proof. The `Custos*`
  * registries in this repo implement *this* simplified interface and are the
  * FALLBACK, used only when the singletons are absent (e.g. a bare testnet).
  *
@@ -22,7 +22,7 @@ pragma solidity 0.8.28;
  *     real transaction works, as the fork test shows.)
  *   - Reputation: the canonical ReputationRegistry is a richer, permissionless,
  *     client-keyed ledger — `giveFeedback(...)` / `readFeedback` / `getSummary`,
- *     NOT this single `appendFeedback`. `SentinelReputationRegistry` is therefore a
+ *     NOT this single `appendFeedback`. `CustosReputationRegistry` is therefore a
  *     simplified, role-gated stand-in for fallback deployments only; production
  *     reputation writes go through `ICanonicalReputationRegistry.giveFeedback`.
  */
@@ -45,7 +45,7 @@ interface IIdentityRegistry {
 
 /**
  * @notice Reputation registry: an append-only, access-gated log of structured
- *         outcome/feedback signals for an agent. Sentinel uses it to publish each
+ *         outcome/feedback signals for an agent. Custos uses it to publish each
  *         decision's realized outcome (e.g. passive-baseline delta) as a permanent,
  *         verifiable track record.
  */

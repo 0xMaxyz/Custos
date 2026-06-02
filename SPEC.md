@@ -1,4 +1,4 @@
-# Sentinel — Technical Spec
+# Custos — Technical Spec
 
 Concrete specifications referenced by `PLAN.md` (strategy) and `ROADMAP.md`
 (execution). Three parts, in order:
@@ -249,7 +249,7 @@ interface IAgentBenchmark {
     struct Outcome {
         int256  realizedYieldBps;     // agent yield vs prior decision (bps)
         uint256 drawdownAvoidedUsdc;  // estimated loss avoided on de-risk events (6-dec USDC)
-        int256  passiveDeltaBps;      // Sentinel outperformance vs 100%-USDY passive holder (bps)
+        int256  passiveDeltaBps;      // Custos outperformance vs 100%-USDY passive holder (bps)
         uint64  measuredAt;           // unix timestamp of outcome measurement
     }
 
@@ -282,14 +282,14 @@ interface IAgentBenchmark {
     );
 }
 ```
-**Passive-baseline design:** `navAtDecision` stores the oracle NAV at each decision. The off-chain agent computes `passiveDeltaBps` — how many bps Sentinel outperformed a 100%-USDY passive holder — and writes it via `updateOutcome`. On-chain storage keeps the full audit trail; computation stays off-chain per "AI only where it beats an algorithm" (AGENTS.md §2.3).
+**Passive-baseline design:** `navAtDecision` stores the oracle NAV at each decision. The off-chain agent computes `passiveDeltaBps` — how many bps Custos outperformed a 100%-USDY passive holder — and writes it via `updateOutcome`. On-chain storage keeps the full audit trail; computation stays off-chain per "AI only where it beats an algorithm" (AGENTS.md §2.3).
 
 ### 2.5 ERC-8004 integration
 
 The canonical 0x8004 singletons **are deployed on Mantle** (Phase-0.3 presence gate
 confirms `extcodesize > 0`), so the **production path calls them**. Their real ABIs
 are declared in `contracts/src/interfaces/IERC8004Canonical.sol` and proven on a
-fork in `ForkPhase4a.t.sol`. The `Sentinel*` registries (implementing the simplified
+fork in `ForkPhase4a.t.sol`. The `Custos*` registries (implementing the simplified
 `IERC8004.sol` below) are the **fallback** for chains where the singletons are absent.
 
 **Identity (canonical & fallback are compatible for the subset we use):**
@@ -317,12 +317,12 @@ function getSummary(uint256 agentId, address[] clients, string tag1, string tag2
     external view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals);
 ```
 The simplified fallback `IReputationRegistry { appendFeedback(agentId, tag, score, uri) }`
-(role-gated, `SentinelReputationRegistry`) is used only when the canonical singleton
-is absent. Sentinel publishes each decision outcome (e.g. passive-baseline delta) as
+(role-gated, `CustosReputationRegistry`) is used only when the canonical singleton
+is absent. Custos publishes each decision outcome (e.g. passive-baseline delta) as
 `giveFeedback` with `tag1 = decision kind`, `tag2 = metric`, `value/valueDecimals` the
 signed score, and `feedbackURI/feedbackHash` binding the IPFS evidence.
 
-- **Agent card** (`agentURI` → IPFS JSON): `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault, benchmark }` (Sentinel-specific shape; canonical explorer interop via `services[]`/`registrations[]` is mapped at deploy time — PR-5a).
+- **Agent card** (`agentURI` → IPFS JSON): `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault, benchmark }` (Custos-specific shape; canonical explorer interop via `services[]`/`registrations[]` is mapped at deploy time — PR-5a).
 
 ### 2.6 ERC-8183 verifiable de-risk jobs (A4.2)
 
@@ -344,7 +344,7 @@ function complete(uint256 jobId, bytes32 reason, bytes optParams) external;    /
 function reject(uint256 jobId, bytes32 reason, bytes optParams) external;       // evaluator/client → refund
 function claimRefund(uint256 jobId) external;                  // anyone, after expiry → refund client
 
-// SentinelDeRiskEvaluator (the guardrail-gated Evaluator). NAV + range read on-chain
+// CustosDeRiskEvaluator (the guardrail-gated Evaluator). NAV + range read on-chain
 // from the pinned UsdyAdapter; the keeper supplies only the DEX spot (as vault.deRisk does).
 function evaluate(IERC8183 escrow, uint256 jobId, uint256 usdyDexSpotUsdc, int256 outcomeScore, string feedbackUri, bytes32 reason)
     external returns (bool completed); // KEEPER-only; complete+appendFeedback iff forceDeRisk, else reject
@@ -448,7 +448,7 @@ guardrails own all hard limits.
 ### 3.4 Prompt template (sketch)
 **System:**
 ```
-You are Sentinel's risk-guardian analyst for a tokenized-Treasury (USDY) yield vault on Mantle.
+You are Custos's risk-guardian analyst for a tokenized-Treasury (USDY) yield vault on Mantle.
 You DO NOT control funds. You output strict JSON matching the provided schema only.
 You may only TIGHTEN risk (reduce USDY weight or raise riskLevel); you may NEVER increase
 exposure or exceed deterministic.maxUsdyWeightBpsAllowed. Base every claim on the provided

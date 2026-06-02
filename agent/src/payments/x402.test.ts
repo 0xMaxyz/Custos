@@ -21,8 +21,8 @@ const REQ: PaymentRequirements = {
   network: "mantle",
   chainId: 5000,
   maxAmountRequired: "10000", // 0.01 USDC (6-dec)
-  resource: "https://agent.sentinel/risk-score",
-  description: "Sentinel RWA risk score",
+  resource: "https://agent.custos/risk-score",
+  description: "Custos RWA risk score",
   mimeType: "application/json",
   payTo: "0x000000000000000000000000000000000000bEEF",
   maxTimeoutSeconds: 60,

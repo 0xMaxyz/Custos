@@ -16,10 +16,10 @@ import { Test } from "forge-std/Test.sol";
 
 import { Roles } from "../src/Roles.sol";
 import { Guardrails } from "../src/Guardrails.sol";
-import { SentinelJobEscrow } from "../src/SentinelJobEscrow.sol";
-import { SentinelDeRiskEvaluator } from "../src/SentinelDeRiskEvaluator.sol";
-import { SentinelIdentityRegistry } from "../src/SentinelIdentityRegistry.sol";
-import { SentinelReputationRegistry } from "../src/SentinelReputationRegistry.sol";
+import { CustosJobEscrow } from "../src/CustosJobEscrow.sol";
+import { CustosDeRiskEvaluator } from "../src/CustosDeRiskEvaluator.sol";
+import { CustosIdentityRegistry } from "../src/CustosIdentityRegistry.sol";
+import { CustosReputationRegistry } from "../src/CustosReputationRegistry.sol";
 import { UsdyAdapter } from "../src/UsdyAdapter.sol";
 import { IERC8183 } from "../src/interfaces/IERC8183.sol";
 import { MockRWADynamicOracle } from "./mocks/MockRWADynamicOracle.sol";
@@ -65,10 +65,10 @@ contract PhaseA4Test is Test {
 
     ERC20Mock internal usdc;
     Guardrails internal gr;
-    SentinelIdentityRegistry internal identity;
-    SentinelReputationRegistry internal reputation;
-    SentinelJobEscrow internal escrow;
-    SentinelDeRiskEvaluator internal evaluator;
+    CustosIdentityRegistry internal identity;
+    CustosReputationRegistry internal reputation;
+    CustosJobEscrow internal escrow;
+    CustosDeRiskEvaluator internal evaluator;
     MockRWADynamicOracle internal oracle;
     UsdyAdapter internal usdyAdapter;
 
@@ -85,15 +85,15 @@ contract PhaseA4Test is Test {
 
         usdc = new ERC20Mock();
         gr = new Guardrails(admin);
-        identity = new SentinelIdentityRegistry();
-        reputation = new SentinelReputationRegistry(address(identity), admin);
+        identity = new CustosIdentityRegistry();
+        reputation = new CustosReputationRegistry(address(identity), admin);
 
         // Register the agent identity (id = 1) from an EOA (a contract recipient
         // would need onERC721Received).
         vm.prank(admin);
         agentId = identity.register("ipfs://agent-card");
 
-        escrow = new SentinelJobEscrow(address(usdc));
+        escrow = new CustosJobEscrow(address(usdc));
 
         // On-chain NAV source for the evaluator: a USDY adapter over a mock oracle
         // (NAV = $1). The keeper supplies only the DEX spot — it cannot fake the NAV.
@@ -102,7 +102,7 @@ contract PhaseA4Test is Test {
         usdyAdapter = new UsdyAdapter(
             makeAddr("aggregator"), address(usdc), address(usdy), address(0), address(oracle), makeAddr("usdyVault"), 50
         );
-        evaluator = new SentinelDeRiskEvaluator(
+        evaluator = new CustosDeRiskEvaluator(
             address(gr), address(reputation), address(usdyAdapter), agentId, admin
         );
 
@@ -147,7 +147,7 @@ contract PhaseA4Test is Test {
 
         // Reputation: one DERISK entry with the supplied outcome score.
         assertEq(reputation.feedbackCount(agentId), 1, "one reputation entry");
-        SentinelReputationRegistry.Feedback memory f = reputation.feedbackAt(agentId, 0);
+        CustosReputationRegistry.Feedback memory f = reputation.feedbackAt(agentId, 0);
         assertEq(f.tag, evaluator.DERISK_TAG());
         assertEq(f.score, int256(610));
         assertEq(f.reporter, address(evaluator));
@@ -192,7 +192,7 @@ contract PhaseA4Test is Test {
         uint256 jobId = _openFundedSubmittedJob();
         oracle.setShouldRevert(true);
         vm.prank(keeper);
-        vm.expectRevert(SentinelDeRiskEvaluator.OracleUnavailable.selector);
+        vm.expectRevert(CustosDeRiskEvaluator.OracleUnavailable.selector);
         evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 0, "ipfs://e", "oracle-down");
         assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Submitted), "job not stranded-settled");
     }
@@ -212,7 +212,7 @@ contract PhaseA4Test is Test {
 
     function test_ClaimRefund_RevertsBeforeExpiry() public {
         uint256 jobId = _openFundedSubmittedJob();
-        vm.expectRevert(SentinelJobEscrow.NotExpired.selector);
+        vm.expectRevert(CustosJobEscrow.NotExpired.selector);
         escrow.claimRefund(jobId);
     }
 
@@ -235,13 +235,13 @@ contract PhaseA4Test is Test {
             escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
 
         vm.prank(rando);
-        vm.expectRevert(SentinelJobEscrow.NotClient.selector);
+        vm.expectRevert(CustosJobEscrow.NotClient.selector);
         escrow.setBudget(jobId, BUDGET, "");
 
         vm.prank(client);
         escrow.setBudget(jobId, BUDGET, "");
         vm.prank(rando);
-        vm.expectRevert(SentinelJobEscrow.NotClient.selector);
+        vm.expectRevert(CustosJobEscrow.NotClient.selector);
         escrow.fund(jobId, "");
     }
 
@@ -257,7 +257,7 @@ contract PhaseA4Test is Test {
         vm.stopPrank();
 
         vm.prank(rando);
-        vm.expectRevert(SentinelJobEscrow.NotProvider.selector);
+        vm.expectRevert(CustosJobEscrow.NotProvider.selector);
         escrow.submit(jobId, DELIVERABLE, "");
     }
 
@@ -268,7 +268,7 @@ contract PhaseA4Test is Test {
         vm.prank(provider);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SentinelJobEscrow.WrongStatus.selector, IERC8183.JobStatus.Funded, IERC8183.JobStatus.Open
+                CustosJobEscrow.WrongStatus.selector, IERC8183.JobStatus.Funded, IERC8183.JobStatus.Open
             )
         );
         escrow.submit(jobId, DELIVERABLE, "");
@@ -278,7 +278,7 @@ contract PhaseA4Test is Test {
         uint256 jobId = _openFundedSubmittedJob();
         // Even the provider cannot self-complete; only the registered evaluator.
         vm.prank(provider);
-        vm.expectRevert(SentinelJobEscrow.NotEvaluator.selector);
+        vm.expectRevert(CustosJobEscrow.NotEvaluator.selector);
         escrow.complete(jobId, "x", "");
     }
 
@@ -291,13 +291,13 @@ contract PhaseA4Test is Test {
 
     function test_CreateJobRevertsBadExpiry() public {
         vm.prank(client);
-        vm.expectRevert(SentinelJobEscrow.BadExpiry.selector);
+        vm.expectRevert(CustosJobEscrow.BadExpiry.selector);
         escrow.createJob(provider, address(evaluator), block.timestamp, "j", address(0));
     }
 
     function test_CreateJobRevertsZeroProvider() public {
         vm.prank(client);
-        vm.expectRevert(SentinelJobEscrow.ZeroAddress.selector);
+        vm.expectRevert(CustosJobEscrow.ZeroAddress.selector);
         escrow.createJob(address(0), address(evaluator), block.timestamp + 1 days, "j", address(0));
     }
 
@@ -306,7 +306,7 @@ contract PhaseA4Test is Test {
         uint256 jobId =
             escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
         vm.prank(client);
-        vm.expectRevert(SentinelJobEscrow.ZeroAddress.selector);
+        vm.expectRevert(CustosJobEscrow.ZeroAddress.selector);
         escrow.setProvider(jobId, address(0));
     }
 }

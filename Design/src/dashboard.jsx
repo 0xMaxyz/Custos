@@ -1,7 +1,7 @@
 /* Dashboard / (§5.1). Exported to window.DashboardPage. */
 (function () {
   const { useState } = React;
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
   const { Card, StatCard, MoneyValue, RiskLevelChip, OutcomeStrip, Skeleton, EmptyState, InfoTip } = window;
   const { AllocationChart, AllocationLegend, Sparkline, PegGauge } = window;
 
@@ -45,7 +45,7 @@
     return (
       <Card className="baseline">
         <div className="card-hl">
-          <span className="card-title" style={{ margin: 0 }}><Icon name="trending-up" size={14} />Sentinel vs passive USDY holder</span>
+          <span className="card-title" style={{ margin: 0 }}><Icon name="trending-up" size={14} />Custos vs passive USDY holder</span>
           <InfoTip text="Performance versus a 100% USDY buy-and-hold, since the last benchmark, from the on-chain AgentBenchmark." />
         </div>
         <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
@@ -70,9 +70,9 @@
             </div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <Sparkline a={b.sentinelSeries} b={b.passiveSeries} width={150} height={56} />
+            <Sparkline a={b.custosSeries} b={b.passiveSeries} width={150} height={56} />
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6, fontSize: "0.6875rem", color: "var(--muted)" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 2, background: "var(--primary)" }} />Sentinel</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 2, background: "var(--primary)" }} />Custos</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 2, background: "var(--faint)" }} />Passive</span>
             </div>
           </div>

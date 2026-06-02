@@ -3,7 +3,7 @@
 
 import { defineChain } from "viem";
 import { mantle, mantleSepoliaTestnet } from "viem/chains";
-import { MANTLE_MAINNET_CHAIN_ID, MANTLE_TESTNET_CHAIN_ID } from "@sentinel/shared";
+import { MANTLE_MAINNET_CHAIN_ID, MANTLE_TESTNET_CHAIN_ID } from "@custos/shared";
 
 const MAINNET_RPC = import.meta.env.VITE_MANTLE_RPC_URL || "https://rpc.mantle.xyz";
 const TESTNET_RPC = import.meta.env.VITE_MANTLE_TESTNET_RPC_URL || "https://rpc.sepolia.mantle.xyz";
@@ -20,7 +20,7 @@ export const mantleTestnet = defineChain({
   rpcUrls: { default: { http: [TESTNET_RPC] } },
 });
 
-// Sentinel runs Mantle-only — these are the sole supported chains.
+// Custos runs Mantle-only — these are the sole supported chains.
 export const supportedChains = [mantleMainnet, mantleTestnet] as const;
 
 export const DEFAULT_CHAIN =

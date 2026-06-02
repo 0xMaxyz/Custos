@@ -8,7 +8,7 @@ import { keccak256, toBytes } from "viem";
  *   1. PAY per-call for premium risk/data feeds — the returned settlement receipt is
  *      pinned into the decision evidence bundle ("the agent paid for the evidence it
  *      acted on"); and
- *   2. CHARGE other agents for Sentinel's RWA risk score via a 402-gated endpoint
+ *   2. CHARGE other agents for Custos's RWA risk score via a 402-gated endpoint
  *      (see `server.ts` `GET /risk-score`).
  *
  * Flow (HTTP-native):

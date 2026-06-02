@@ -8,19 +8,19 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { IERC8183 } from "./interfaces/IERC8183.sol";
 
 /**
- * @title SentinelJobEscrow
+ * @title CustosJobEscrow
  * @notice ERC-8183 verifiable-job escrow (ROADMAP A4.2). Each Job escrows a budget in
  *         a single immutable settlement asset (USDC); the Client funds it, the Provider
  *         submits a deliverable, and the Evaluator attests completion (pays the provider)
  *         or rejection (refunds the client). Used to model each de-risk as a verifiable,
  *         guardrail-gated Job — the deterministic guardrail check is the Evaluator (see
- *         SentinelDeRiskEvaluator), so a de-risk only "settles" when guardrails justify it.
+ *         CustosDeRiskEvaluator), so a de-risk only "settles" when guardrails justify it.
  *
  * This contract is NOT in the vault custody path: it escrows a small per-job bounty, never
  * user deposits. The on-chain Guardrails remain the sole authority over vault funds; this
  * layer only produces a verifiable, reputation-feeding record of risk calls.
  */
-contract SentinelJobEscrow is IERC8183, ReentrancyGuard {
+contract CustosJobEscrow is IERC8183, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ── Errors ─────────────────────────────────────────────────────────────────

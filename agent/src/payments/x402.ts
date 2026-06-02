@@ -46,7 +46,7 @@ export interface PaymentRequirements {
   readonly extra: { readonly name: string; readonly version: string };
 }
 
-/** EIP-3009 `transferWithAuthorization` authorization tuple. */
+/** EIP-3009 `transferWithAuthorization` authorization tuple (JSON/header form). */
 export interface Eip3009Authorization {
   readonly from: `0x${string}`;
   readonly to: `0x${string}`;
@@ -56,6 +56,31 @@ export interface Eip3009Authorization {
   readonly validBefore: string;
   /** 32-byte hex nonce. */
   readonly nonce: `0x${string}`;
+}
+
+/**
+ * EIP-712 message form of {@link Eip3009Authorization} (uint256 fields as `bigint`).
+ * The header serializes the string form (JSON-safe); signing + verification use this
+ * canonical bigint form so the typed-data hash is unambiguous and viem-compatible.
+ */
+export interface Eip3009Message {
+  readonly from: `0x${string}`;
+  readonly to: `0x${string}`;
+  readonly value: bigint;
+  readonly validAfter: bigint;
+  readonly validBefore: bigint;
+  readonly nonce: `0x${string}`;
+}
+
+export function toEip3009Message(a: Eip3009Authorization): Eip3009Message {
+  return {
+    from: a.from,
+    to: a.to,
+    value: BigInt(a.value),
+    validAfter: BigInt(a.validAfter),
+    validBefore: BigInt(a.validBefore),
+    nonce: a.nonce,
+  };
 }
 
 /** The decoded `X-PAYMENT` header payload. */
@@ -103,7 +128,7 @@ export const TRANSFER_WITH_AUTHORIZATION_TYPES = {
  * account and tests use a deterministic stub. `domain`/`types`/`message` mirror what
  * `signTypedData` expects.
  */
-export type Eip3009Signer = (args: {
+export interface Eip3009TypedData {
   readonly domain: {
     readonly name: string;
     readonly version: string;
@@ -112,8 +137,28 @@ export type Eip3009Signer = (args: {
   };
   readonly types: typeof TRANSFER_WITH_AUTHORIZATION_TYPES;
   readonly primaryType: "TransferWithAuthorization";
-  readonly message: Eip3009Authorization;
-}) => Promise<`0x${string}`>;
+  readonly message: Eip3009Message;
+}
+
+export type Eip3009Signer = (args: Eip3009TypedData) => Promise<`0x${string}`>;
+
+/** Build the EIP-712 typed-data definition for a payment (used to sign + verify). */
+export function eip3009TypedData(
+  requirements: PaymentRequirements,
+  authorization: Eip3009Authorization,
+): Eip3009TypedData {
+  return {
+    domain: {
+      name: requirements.extra.name,
+      version: requirements.extra.version,
+      chainId: requirements.chainId,
+      verifyingContract: requirements.asset,
+    },
+    types: TRANSFER_WITH_AUTHORIZATION_TYPES,
+    primaryType: "TransferWithAuthorization",
+    message: toEip3009Message(authorization),
+  };
+}
 
 // ── encode / decode ──────────────────────────────────────────────────────────
 
@@ -187,17 +232,7 @@ export async function createPayment(args: {
     nowSec: args.nowSec,
     nonce: args.nonce,
   });
-  const signature = await signer({
-    domain: {
-      name: requirements.extra.name,
-      version: requirements.extra.version,
-      chainId: requirements.chainId,
-      verifyingContract: requirements.asset,
-    },
-    types: TRANSFER_WITH_AUTHORIZATION_TYPES,
-    primaryType: "TransferWithAuthorization",
-    message: authorization,
-  });
+  const signature = await signer(eip3009TypedData(requirements, authorization));
   return {
     x402Version: X402_VERSION,
     scheme: "exact",

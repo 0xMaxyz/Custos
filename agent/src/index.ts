@@ -6,7 +6,8 @@ import { Scheduler } from "./scheduler.js";
 import { assess } from "./risk/engine.js";
 import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
 import { AlertNotifier } from "./alerts.js";
-import { shapeOnlyVerifier, type Eip3009Signer, type PaymentRequirements } from "./payments/x402.js";
+import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
+import { onChainSettlingVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
 import { MANTLE_MAINNET_CHAIN_ID } from "@sentinel/shared";
 import type { Decision } from "./types.js";
@@ -69,9 +70,17 @@ const alertNotifier = new AlertNotifier({
 });
 
 // x402 paid risk-score endpoint (A4.1). Enabled when payTo + asset are configured.
-// NOTE: shapeOnlyVerifier is a DEV default — it checks structure/amount/recipient but
-// does NOT verify the EIP-712 signature or settle on-chain. Before accepting real
-// USDC, inject a facilitator-backed or on-chain transferWithAuthorization verifier.
+// The verifier recovers the EIP-712 signature (real authorization check). With
+// X402_SETTLE_ONCHAIN=true and an ALLOCATOR wallet, it also SETTLES on-chain via
+// transferWithAuthorization; otherwise settlement is delegated to a facilitator.
+const x402Verify =
+  config.x402SettleOnChain && pipeline?.clients.walletClient && config.x402Asset
+    ? onChainSettlingVerifier({
+        walletClient: pipeline.clients.walletClient,
+        publicClient: pipeline.clients.publicClient,
+        asset: config.x402Asset as `0x${string}`,
+      })
+    : signatureVerifyingVerifier();
 const x402 =
   config.x402PayTo && config.x402Asset
     ? {
@@ -88,7 +97,7 @@ const x402 =
           asset: config.x402Asset as `0x${string}`,
           extra: { name: config.x402TokenName, version: config.x402TokenVersion },
         }),
-        verify: shapeOnlyVerifier(),
+        verify: x402Verify,
         riskScore: async (): Promise<Record<string, unknown>> => {
           const ctx = getContext ? await getContext() : null;
           return ctx

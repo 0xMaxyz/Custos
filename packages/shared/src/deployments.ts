@@ -8,7 +8,9 @@
  *   3. Set the matching VITE_* / agent env vars.
  *
  * Runtime authority:
- *   - **Web app**: reads VITE_VAULT_ADDRESS + VITE_AGENT_ID (env at build time).
+ *   - **Web app**: resolves the vault for the active chain from this file by
+ *     default (web/src/lib/deployment.ts); VITE_VAULT_ADDRESS overrides and
+ *     VITE_DEMO_MODE=true forces fixtures. VITE_AGENT_ID gates the identity read.
  *   - **Agent**: reads VAULT_ADDRESS + BENCHMARK_ADDRESS (process.env).
  *   - **This file**: typed constants consumed by tests and the agent SDK; they
  *     mirror the JSON files and must be kept in sync after each deploy.

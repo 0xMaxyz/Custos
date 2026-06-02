@@ -16,6 +16,17 @@ export const ERC20_APPROVE_ABI = [
   },
 ] as const;
 
+// IStrategyAdapter read subset — used to value each allocation bucket live.
+export const ADAPTER_ABI = [
+  {
+    name: "totalAssets",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
 export const BENCHMARK_ABI = [
   {
     name: "decisionCount",

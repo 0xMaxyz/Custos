@@ -430,7 +430,7 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
   `ConnectButton` (connect/account/chain-switch + wrong-network guard). Vitest
   covers chain config + format/fixture logic (25 tests).
 
-### 4.4 — Dashboard (reads) · _PR-4b_ · `[x] DONE` (testnet live reads wired in 5.1; mainnet on 5.2)
+### 4.4 — Dashboard (reads) · _PR-4b_ · `[x] DONE` (testnet live reads wired in 5.1; live-by-default + live allocation in [PR #28](https://github.com/0xMaxyz/miu/pull/28); mainnet on 5.2)
 
 - **What:** balance, share price, blended APY, allocation breakdown
   (USDY/Aave/idle/AUSD), TVL.

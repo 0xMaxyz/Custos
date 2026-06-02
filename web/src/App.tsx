@@ -16,6 +16,7 @@ import { InsightsPage } from "./pages/InsightsPage";
 import { walletUsdcBalance } from "./lib/data";
 import { useVaultData } from "./lib/useVaultData";
 import { supportedChains } from "./lib/chains";
+import { resolveInitialTheme } from "./lib/theme";
 
 const ROUTES: Route[] = ["dashboard", "activity", "agent", "insights"];
 const SUPPORTED_IDS = supportedChains.map((c) => c.id) as number[];
@@ -62,7 +63,7 @@ function Toasts({ items, dismiss }: { items: Toast[]; dismiss: (id: number) => v
 
 export default function App() {
   const [theme, setThemeState] = useState(() =>
-    localStorage.getItem("custos-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "custos-dark" : "custos-light")
+    resolveInitialTheme((k) => localStorage.getItem(k), matchMedia("(prefers-color-scheme: dark)").matches)
   );
   const [route, go] = useHashRoute();
   const [modal, setModal] = useState<ModalState>(null);

@@ -13,7 +13,17 @@ export const explorer = "https://mantlescan.xyz";
 export const tokens = {
   USDC: { decimals: 6, address: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9" as `0x${string}` },
   USDY: { decimals: 18, address: "0x5bE26527e817998A7206475496fDE1E68957c5A6" as `0x${string}` },
+  MUSD: { decimals: 18, address: "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3" as `0x${string}` },
   AUSD: { decimals: 6, address: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a" as `0x${string}` },
+};
+
+// RWA core (bucket 2) form split — held as USDY and/or its rebasing $1 form mUSD,
+// converted 1:1-by-NAV via the Ondo wrap/unwrap converter (ROADMAP 2.7). totalAssets
+// is conserved across a conversion; usdyUsdc + musdUsdc = the USDY-bucket value.
+export const rwaCore = {
+  usdyUsdc: "6000.00", // USDY balance × oracle NAV
+  musdUsdc: "9000.00", // mUSD balance × $1 face
+  converter: "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3" as `0x${string}`, // UsdyAdapter.MUSD()
 };
 
 export const erc8004 = {
@@ -126,6 +136,40 @@ export interface Outcome {
   measuredAt: string;
 }
 
+// x402 settlement receipt for premium evidence the agent PAID for (ROADMAP A4.1),
+// bound to the evidence item it bought via `evidenceId`.
+export interface PaidReceipt {
+  evidenceId: string;
+  amountUsdc: string; // formatted, e.g. "0.01"
+  asset: string;      // e.g. "USDC"
+  transaction: string;
+  network: string;
+  payer: `0x${string}`;
+  resource: string;
+}
+
+// ERC-8183 verifiable-job status (ROADMAP A4.2). Color by terminal outcome.
+export type JobStatusKey = "Open" | "Funded" | "Submitted" | "Completed" | "Rejected" | "Expired";
+export const JOB_STATUS: Record<JobStatusKey, { label: string; role: string; means: string }> = {
+  Open:      { label: "Open",      role: "neutral", means: "created; budget not yet escrowed" },
+  Funded:    { label: "Funded",    role: "info",    means: "budget escrowed; awaiting provider" },
+  Submitted: { label: "Submitted", role: "info",    means: "provider submitted the de-risk deliverable" },
+  Completed: { label: "Completed", role: "success", means: "guardrail Evaluator released it → provider paid + reputation written" },
+  Rejected:  { label: "Rejected",  role: "warning", means: "de-risk not guardrail-justified → client refunded" },
+  Expired:   { label: "Expired",   role: "neutral", means: "unsettled past expiry → client refunded" },
+};
+
+// A de-risk modelled as an ERC-8183 escrowed Job whose Evaluator is the deterministic
+// guardrail check. Outside the vault custody path (a per-job bounty, never deposits).
+export interface Job {
+  jobId: number;
+  status: JobStatusKey;
+  budgetUsdc: string;
+  evaluator: `0x${string}`;
+  deliverable: string;
+  reputation?: { tag: string; score: number; uri: string };
+}
+
 export interface Decision {
   id: number;
   kind: 0 | 1;
@@ -146,6 +190,10 @@ export interface Decision {
   decisionURI: string;
   outcome: Outcome;
   txHash: string;
+  /** x402 receipts for premium evidence the agent paid for (A4.1). */
+  payments?: PaidReceipt[];
+  /** The ERC-8183 verifiable Job this de-risk settled as (A4.2). */
+  job?: Job;
 }
 
 export const decisions: Decision[] = [
@@ -169,6 +217,18 @@ export const decisions: Decision[] = [
     decisionURI: "ipfs://bafybeiderisk0a1b2c3d4e5f6g7h8i9rationalebundle",
     outcome: { realizedYieldBps: 45, passiveDeltaBps: 180, drawdownAvoidedUsdc: "610.00", measuredAt: "2026-06-11T18:00:00Z" },
     txHash: "0xdef1a2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcd",
+    payments: [
+      { evidenceId: "e2", amountUsdc: "0.01", asset: "USDC", network: "mantle",
+        payer: "0xA11c3b9D7e2F4a8c6B0d1E5f9A3c7B2d4E6f8A0E",
+        transaction: "0xab12c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f901",
+        resource: "https://feeds.example/issuer-wire" },
+    ],
+    job: {
+      jobId: 3, status: "Completed", budgetUsdc: "100.00",
+      evaluator: "0xEva1000000000000000000000000000000000001",
+      deliverable: "0x4ad1c0e9b73f2a16d8c4e5f1a9b2c7d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9",
+      reputation: { tag: "DERISK", score: 610, uri: "ipfs://bafybeideriskevidence" },
+    },
   },
   {
     id: 13, kind: 0, timestamp: "2026-06-10T12:00:00Z",
@@ -224,6 +284,27 @@ export const identity = {
   owner: "0xA11c3b9D7e2F4a8c6B0d1E5f9A3c7B2d4E6f8A0E" as `0x${string}`,
   identityRegistry: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as `0x${string}`,
   trackRecord: { decisions: 14, deRiskEvents: 2, realizedVsPassivePct: 1.8, drawdownAvoidedUsdc: "610.00" },
+};
+
+// Agent economics (ROADMAP A4) — the agent as a verifiable economic actor, always
+// OUTSIDE the vault custody path: it buys its evidence (x402) and sells its judgment,
+// and models each de-risk as an ERC-8183 verifiable Job that feeds ERC-8004 reputation.
+export const agentEconomics = {
+  sells: {
+    endpoint: "/risk-score",
+    priceUsdc: "0.01",
+    asset: "USDC",
+    payTo: "0x000000000000000000000000000000000000bEEF" as `0x${string}`,
+    callsServed: 128,
+  },
+  paidEvidence: [
+    { source: "issuer-wire", amountUsdc: "0.01", asset: "USDC", forDecision: 14,
+      transaction: "0xab12c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f901" },
+  ],
+  jobs: [
+    { jobId: 3, status: "Completed" as JobStatusKey, budgetUsdc: "100.00", forDecision: 14 as number | null, reputationScore: 610 as number | null },
+    { jobId: 2, status: "Rejected" as JobStatusKey, budgetUsdc: "100.00", forDecision: null as number | null, reputationScore: null as number | null },
+  ],
 };
 
 export const insights = {

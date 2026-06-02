@@ -683,6 +683,16 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   (the keeper supplies the same snapshot the vault's `deRisk` uses). Tests:
   `PhaseA4.t.sol` (12) — justified de-risk settles + writes reputation, unjustified is
   rejected + refunds, expiry refund, full access-control + state-machine guards.
+- **UI surfaces (web/src) for A4 + the mUSD leg (per `UI.md`) · `[x] DONE` · [PR #23](https://github.com/0xMaxyz/miu/pull/23):** `Components.tsx` adds
+  `PaidEvidenceBadge` (x402 receipt), `JobStatusChip` (ERC-8183 status), and
+  `RwaFormSplit` (USDY/mUSD allocation sublabel). Wired in: Dashboard allocation card
+  (RWA core form split), Activity decision item + detail (paid-evidence badges per
+  cited evidence + a "Verifiable job · ERC-8183" section), and a new Agent-page
+  **Agent economics** panel (sells `/risk-score`, paid evidence, the ERC-8183→ERC-8004
+  jobs ledger — all labelled "outside custody"). Fixtures + 7 `data.test.ts` cases
+  (form-split conservation, converter address, paid-receipt↔evidence linkage, job
+  status/reputation). All on the existing fixture seams; live job/x402 indexing
+  deferred with the other live reads.
 
 **Phase 5b exit:** whatever shipped.
 

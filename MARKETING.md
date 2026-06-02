@@ -172,11 +172,13 @@ the PR submission.
 
 ## 4. Alt text / accessibility copy
 
-Use these when uploading screenshots:
+Use these when uploading screenshots. **Numbers below are illustrative** — match them
+to whatever the Demo-states panel actually seeds when you capture, so the alt text never
+reads as a misleading live metric.
 
 | File | Alt text |
 |------|----------|
-| `screenshot-dashboard-dark.png` | Sentinel dashboard showing USDC position, blended APY, allocation donut (USDY 35 % / Aave 40 % / AUSD 15 % / IDLE 10 %), and baseline counter: Sentinel +18 bps vs passive USDY holder |
+| `screenshot-dashboard-dark.png` | Example: Sentinel dashboard showing USDC position, blended APY, allocation donut (USDY 35 % / Aave 40 % / AUSD 15 % / IDLE 10 %), and baseline counter: Sentinel +18 bps vs passive USDY holder |
 | `screenshot-activity-feed.png` | Sentinel Activity feed showing two decisions: a Rebalance and a De-risk event with risk-level chip, before/after allocation bars, and an evidence chip |
 | `screenshot-derisk-detail.png` | De-risk decision detail modal: AI rationale text, peg-deviation evidence chip, ERC-8183 job status chip (Completed), paid-evidence badge, before→after allocation weights |
 | `screenshot-agent-page.png` | Sentinel Agent page showing ERC-8004 identity NFT card, agent economics panel with x402 risk-score sales and ERC-8183 job ledger |

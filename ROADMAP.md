@@ -747,16 +747,21 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **Goal:** a complete submission draft.
 - **Test:** `PLAN.md` §11 checklist fully ticked; second reviewer pass.
 
-### 6.5 — Community/marketing assets · _PR-6a_ · `[x] DONE`
+### 6.5 — Community/marketing assets · _PR-6a_ · `[x] DONE` · [PR #26](https://github.com/0xMaxyz/miu/pull/26)
 
 - **What:** X thread, short clip, screenshots for Community Voting.
 - **Goal:** shareable assets ready.
-- **Test:** links live; thread renders.
+- **Test:** copy/script + shot lists ready and self-consistent (no invented facts;
+  addresses/claims trace to the README). Acceptance is **draft/copy-ready**: live URLs
+  (`[PUBLIC_URL]`/`[MAINNET_CONTRACT]`/`[VIDEO_URL]`) and the screenshot PNGs are filled
+  in when 6.1 + 5.2 + 6.3 land — they need the public deploy / mainnet verify / recording.
 - **Built:** `MARKETING.md` — 8-tweet launch thread (copy-pasteable, with screenshot
   notes per tweet), community-cut clip shot list (30–60 s vertical, 9:16, timestamps
   + captions), screenshot capture guide (8 screens with file names + alt text),
   DoraHacks Community Voting blurb. Fill in `[PUBLIC_URL]`, `[MAINNET_CONTRACT]`, and
-  `[VIDEO_URL]` once 6.1 + 5.2 + 6.3 are complete. All on-chain facts + addresses
+  `[VIDEO_URL]` once 6.1 + 5.2 + 6.3 are complete. **Screenshot PNGs are capture-pending**
+  (they need the live deploy + a seeded Demo-states view, per 6.1/6.3); the guide names
+  each file + its alt text so they drop straight in. All on-chain facts + addresses
   drawn from the README / deployed addresses; no invented content.
 
 **Exit:** feature-frozen, submission-ready package.

@@ -344,8 +344,9 @@ function complete(uint256 jobId, bytes32 reason, bytes optParams) external;    /
 function reject(uint256 jobId, bytes32 reason, bytes optParams) external;       // evaluator/client → refund
 function claimRefund(uint256 jobId) external;                  // anyone, after expiry → refund client
 
-// SentinelDeRiskEvaluator (the guardrail-gated Evaluator)
-function evaluate(IERC8183 escrow, uint256 jobId, Guardrails.MarketState s, int256 outcomeScore, string feedbackUri, bytes32 reason)
+// SentinelDeRiskEvaluator (the guardrail-gated Evaluator). NAV + range read on-chain
+// from the pinned UsdyAdapter; the keeper supplies only the DEX spot (as vault.deRisk does).
+function evaluate(IERC8183 escrow, uint256 jobId, uint256 usdyDexSpotUsdc, int256 outcomeScore, string feedbackUri, bytes32 reason)
     external returns (bool completed); // KEEPER-only; complete+appendFeedback iff forceDeRisk, else reject
 ```
 

@@ -1,4 +1,4 @@
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 import { pegDeviationBps } from "../risk/engine.js";
 import type { MarketSnapshot, RiskAssessment } from "../types.js";
 import type { EvidenceItem, LLMClient, LLMInput, RiskVerdict } from "./types.js";

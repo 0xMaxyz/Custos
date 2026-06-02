@@ -9,8 +9,8 @@ if (!rootEl) throw new Error("root element not found");
 
 // Initial theme for the RainbowKit provider; App owns live theme switching.
 const initialTheme =
-  localStorage.getItem("sentinel-theme") ||
-  (matchMedia("(prefers-color-scheme: dark)").matches ? "sentinel-dark" : "sentinel-light");
+  localStorage.getItem("custos-theme") ||
+  (matchMedia("(prefers-color-scheme: dark)").matches ? "custos-dark" : "custos-light");
 
 createRoot(rootEl).render(
   <StrictMode>

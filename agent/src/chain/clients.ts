@@ -8,7 +8,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { defineChain } from "viem";
 
-import { MANTLE_MAINNET_CHAIN_ID } from "@sentinel/shared";
+import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
 import type { AgentConfig } from "../config.js";
 
 /**

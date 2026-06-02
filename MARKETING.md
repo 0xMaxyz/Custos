@@ -1,4 +1,4 @@
-# Sentinel — Community & Marketing Assets (ROADMAP 6.5)
+# Custos — Community & Marketing Assets (ROADMAP 6.5)
 
 Draft copy for Community Voting and launch. All assets reference **real deployed
 contracts**; fill in `[PUBLIC_URL]`, `[MAINNET_CONTRACT]`, and `[VIDEO_URL]` once
@@ -35,13 +35,13 @@ contracts**; fill in `[PUBLIC_URL]`, `[MAINNET_CONTRACT]`, and `[VIDEO_URL]` onc
 >
 > By the time you notice, the damage is done.
 >
-> Sentinel watches 24/7. 2/8
+> Custos watches 24/7. 2/8
 
 ---
 
 **Tweet 3 — How it works (attach: dashboard screenshot)**
 
-> Deposit USDC. Sentinel allocates across:
+> Deposit USDC. Custos allocates across:
 >
 > 🏦 Ondo USDY — tokenized Treasury yield  
 > 🏦 Aave v3 — instant-liquidity floor  
@@ -178,17 +178,17 @@ reads as a misleading live metric.
 
 | File | Alt text |
 |------|----------|
-| `screenshot-dashboard-dark.png` | Example: Sentinel dashboard showing USDC position, blended APY, allocation donut (USDY 35 % / Aave 40 % / AUSD 15 % / IDLE 10 %), and baseline counter: Sentinel +18 bps vs passive USDY holder |
-| `screenshot-activity-feed.png` | Sentinel Activity feed showing two decisions: a Rebalance and a De-risk event with risk-level chip, before/after allocation bars, and an evidence chip |
+| `screenshot-dashboard-dark.png` | Example: Custos dashboard showing USDC position, blended APY, allocation donut (USDY 35 % / Aave 40 % / AUSD 15 % / IDLE 10 %), and baseline counter: Custos +18 bps vs passive USDY holder |
+| `screenshot-activity-feed.png` | Custos Activity feed showing two decisions: a Rebalance and a De-risk event with risk-level chip, before/after allocation bars, and an evidence chip |
 | `screenshot-derisk-detail.png` | De-risk decision detail modal: AI rationale text, peg-deviation evidence chip, ERC-8183 job status chip (Completed), paid-evidence badge, before→after allocation weights |
-| `screenshot-agent-page.png` | Sentinel Agent page showing ERC-8004 identity NFT card, agent economics panel with x402 risk-score sales and ERC-8183 job ledger |
+| `screenshot-agent-page.png` | Custos Agent page showing ERC-8004 identity NFT card, agent economics panel with x402 risk-score sales and ERC-8183 job ledger |
 | `screenshot-mantlescan-event.png` | Mantlescan transaction page showing DecisionRecorded event with decoded rationaleHash and decisionURI fields |
 
 ---
 
 ## 5. DoraHacks submission blurb (Community Voting description)
 
-> **Sentinel** is an AI risk-guardian real-yield account on Mantle. Deposit USDC; the
+> **Custos** is an AI risk-guardian real-yield account on Mantle. Deposit USDC; the
 > agent earns tokenized-Treasury (USDY) yield across four allocation buckets, and
 > **autonomously de-risks on-chain** when RWA danger appears — writing every decision
 > and its evidence under a verifiable ERC-8004 identity.

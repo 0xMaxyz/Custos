@@ -1,7 +1,7 @@
 /* Agent /agent (§5.3) — identity, watchlist, guardrails (the limits), Ask-the-agent. Exported to window. */
 (function () {
   const { useState, useRef, useEffect } = React;
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
   const { Card, AddressChip, StatusDot } = window;
 
   // ---------- Identity card ----------

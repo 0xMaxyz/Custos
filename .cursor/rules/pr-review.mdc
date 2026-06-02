@@ -1,12 +1,12 @@
 ---
 description: >
-  Sentinel PR review guide for agentic reviewers (Cursor, Claude, Codex).
+  Custos PR review guide for agentic reviewers (Cursor, Claude, Codex).
   Apply this rule when reviewing any pull request in this repository.
   Read in full before leaving any comment or verdict.
 alwaysApply: false
 ---
 
-# Sentinel — Agentic PR Review Guide
+# Custos — Agentic PR Review Guide
 
 ## 0. Before you start
 
@@ -167,11 +167,11 @@ fails any of these is **blocked** regardless of other merits.
 
 - [ ] ERC-8004 registration uses on-chain singletons if present (codesize > 0 at the
   0x8004 addresses); otherwise uses the minimal own registry deployed in Phase 3.
-- [ ] UI follows `UI.md` — sentinel-light / sentinel-dark themes; purple accent;
+- [ ] UI follows `UI.md` — custos-light / custos-dark themes; purple accent;
   no inline styles overriding theme tokens.
 - [ ] Account dashboard shows: balance, blended APY, bucket allocation, share price.
 - [ ] Risk-guardian feed shows: each decision, AI rationale, evidence link.
-- [ ] Baseline counter shows: passive USDY holder delta vs Sentinel delta in bps.
+- [ ] Baseline counter shows: passive USDY holder delta vs Custos delta in bps.
 - [ ] Deposit/withdraw flow: gas estimate shown; tx hash shown on submit.
 - [ ] Accessibility: interactive elements keyboard-focusable; no color-only
   information encoding.

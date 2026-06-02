@@ -47,7 +47,7 @@ export interface ServerOptions {
   readonly askRateLimit?: number | undefined;
   readonly askRateWindowMs?: number | undefined;
   /**
-   * When set, exposes Sentinel's RWA risk score as an x402-paid endpoint
+   * When set, exposes Custos's RWA risk score as an x402-paid endpoint
    * (`GET /risk-score`) other agents can call (ROADMAP A4.1 revenue surface).
    */
   readonly x402?: X402Options | undefined;
@@ -101,7 +101,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   app.get("/health", async () => ({
     status: "ok",
-    service: "sentinel-agent",
+    service: "custos-agent",
   }));
 
   // ── Live snapshot endpoint (A2.1) ─────────────────────────────────────────
@@ -163,7 +163,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   }
 
   // ── x402-paid risk-score endpoint (A4.1) ───────────────────────────────────
-  // Sentinel sells its RWA risk score per-call: 402 until a valid X-PAYMENT is
+  // Custos sells its RWA risk score per-call: 402 until a valid X-PAYMENT is
   // presented, then 200 + the score and an X-PAYMENT-RESPONSE settlement receipt.
   const { x402 } = options;
   if (x402) {

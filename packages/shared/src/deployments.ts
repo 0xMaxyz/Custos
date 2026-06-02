@@ -1,5 +1,5 @@
 /**
- * Sentinel deployed contract addresses.
+ * Custos deployed contract addresses.
  *
  * Canonical source of truth after each broadcast:
  *   1. Forge prints a JSON summary — copy into deployments/<chainId>.json.

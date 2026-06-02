@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/check-mantle-liquidity.mjs
 //
-// Live liquidity + peg probe for Sentinel's RWA legs on Mantle (chainId 5000).
+// Live liquidity + peg probe for Custos's RWA legs on Mantle (chainId 5000).
 //
 // Zero dependencies on purpose: runs with plain `node scripts/check-mantle-liquidity.mjs`
 // (Node >= 22 for global fetch) — no pnpm install, no build step, no workspace
@@ -10,7 +10,7 @@
 // Why it exists: Claude's execution sandbox is network-allowlisted (every
 // outbound host returns 403), so any *live* on-chain/API data has to be pulled
 // from an environment that has egress. This also doubles as an early, throwaway
-// prototype of Sentinel's "RWA liquidity thinning / depeg" risk signal.
+// prototype of Custos's "RWA liquidity thinning / depeg" risk signal.
 //
 // Sources (all read-only, no keys required):
 //   - DeFiLlama yields  -> DEX pool TVL       https://yields.llama.fi/pools
@@ -234,7 +234,7 @@ function toMarkdown(r) {
 
 function printHuman(r) {
   const c = { dim: "\x1b[2m", b: "\x1b[1m", g: "\x1b[32m", y: "\x1b[33m", r: "\x1b[31m", x: "\x1b[0m" };
-  console.log(`${c.b}Sentinel — Mantle RWA liquidity & peg probe${c.x}  ${c.dim}${r.generatedAt}${c.x}`);
+  console.log(`${c.b}Custos — Mantle RWA liquidity & peg probe${c.x}  ${c.dim}${r.generatedAt}${c.x}`);
   console.log(`${c.dim}RPC: ${r.rpc}${c.x}`);
   if (!r.musdIncluded) console.log(`${c.y}note:${c.x} mUSD not in tokens.ts — add it to packages/shared/src/tokens.ts.`);
   console.log("");

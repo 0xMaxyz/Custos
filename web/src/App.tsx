@@ -62,7 +62,7 @@ function Toasts({ items, dismiss }: { items: Toast[]; dismiss: (id: number) => v
 
 export default function App() {
   const [theme, setThemeState] = useState(() =>
-    localStorage.getItem("sentinel-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "sentinel-dark" : "sentinel-light")
+    localStorage.getItem("custos-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "custos-dark" : "custos-light")
   );
   const [route, go] = useHashRoute();
   const [modal, setModal] = useState<ModalState>(null);
@@ -82,7 +82,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("sentinel-theme", theme);
+    localStorage.setItem("custos-theme", theme);
   }, [theme]);
 
   useEffect(() => {

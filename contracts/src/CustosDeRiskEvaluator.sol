@@ -10,7 +10,7 @@ import { IUsdyAdapter } from "./interfaces/IUsdyAdapter.sol";
 import { IReputationRegistry } from "./interfaces/IERC8004.sol";
 
 /**
- * @title SentinelDeRiskEvaluator
+ * @title CustosDeRiskEvaluator
  * @notice The ERC-8183 **Evaluator** for de-risk Jobs (ROADMAP A4.2): the deterministic
  *         on-chain guardrail check decides whether a submitted de-risk Job settles. A Job
  *         is `complete`d (provider paid) only if `Guardrails.evaluateUsdyRisk` confirms the
@@ -27,7 +27,7 @@ import { IReputationRegistry } from "./interfaces/IERC8004.sol";
  * (`UsdyAdapter.oracleData()`), so the keeper cannot fake the NAV to force a settlement.
  * The guardrail evaluation of that snapshot is fully deterministic.
  */
-contract SentinelDeRiskEvaluator is AccessControl {
+contract CustosDeRiskEvaluator is AccessControl {
     // ── Roles ──────────────────────────────────────────────────────────────────
 
     /// @notice May submit a DEX spot for evaluation (the agent keeper).

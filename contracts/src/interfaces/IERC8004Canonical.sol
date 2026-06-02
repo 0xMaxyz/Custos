@@ -5,12 +5,12 @@ pragma solidity 0.8.28;
  * @title IERC8004Canonical — the REAL deployed erc-8004 registry ABIs on Mantle
  * @notice These interfaces mirror the canonical Trustless Agents singletons live on
  *         Mantle (IdentityRegistry `0x8004A169…`, ReputationRegistry `0x8004BAa…`),
- *         generated from erc-8004/erc-8004-contracts. Sentinel registers against
+ *         generated from erc-8004/erc-8004-contracts. Custos registers against
  *         and reads from THESE in production (per SPEC §2.5 "if the singletons exist,
- *         call them"). The simplified `IERC8004.sol` interface + the `Sentinel*`
+ *         call them"). The simplified `IERC8004.sol` interface + the `Custos*`
  *         registries are the fallback used only when the singletons are absent.
  *
- * Only the subset Sentinel actually calls is declared here (the registries also
+ * Only the subset Custos actually calls is declared here (the registries also
  * expose full ERC-721, UUPS-upgrade, metadata, and agent-wallet surfaces).
  */
 
@@ -35,7 +35,7 @@ interface ICanonicalIdentityRegistry {
  * @dev Unlike the simplified `IReputationRegistry` (a single `appendFeedback`), the
  *      canonical model is permissionless: anyone (`clientAddress == msg.sender`) may
  *      `giveFeedback` about an agent, feedback is indexed per (agentId, client), and
- *      `getSummary` aggregates a signed value with decimals. Sentinel publishes each
+ *      `getSummary` aggregates a signed value with decimals. Custos publishes each
  *      decision outcome (e.g. passive-baseline delta) via `giveFeedback`; `value` is
  *      the signed score, `valueDecimals` its fixed-point scale, `tag1`/`tag2` the
  *      topic (e.g. "DERISK"/"passiveDeltaBps"), and `feedbackURI`/`feedbackHash`

@@ -7,7 +7,7 @@ export const MANTLE_TESTNET_CHAIN_ID = 5003 as const;
  * ERC-8004 Trustless Agents registries — verified present on Mantle.
  * Source: https://github.com/erc-8004/erc-8004-contracts
  *
- * These are deployed singletons, so Sentinel registers against them rather than
+ * These are deployed singletons, so Custos registers against them rather than
  * deploying its own. Re-confirm `extcodesize > 0` once the Mantle RPC host is
  * allowlisted in the execution environment (Phase 0.3 gate).
  */

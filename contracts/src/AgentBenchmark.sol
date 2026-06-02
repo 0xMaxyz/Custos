@@ -16,7 +16,7 @@ import {IAgentBenchmark} from "./interfaces/IAgentBenchmark.sol";
  *   - `realizedYieldBps`    — agent's yield since prior decision
  *   - `drawdownAvoidedUsdc` — loss avoided on de-risk events
  *   - `passiveDeltaBps`     — how many bps better/worse than a passive 100%-USDY
- *     holder (positive = Sentinel protected, negative = missed yield)
+ *     holder (positive = Custos protected, negative = missed yield)
  *
  * Only the YieldVault may call `recordDecision`; only ALLOCATOR may call
  * `updateOutcome` (or a designated keeper granted ALLOCATOR).

@@ -1,4 +1,4 @@
-# Sentinel — Execution Roadmap (micro-plans)
+# Custos — Execution Roadmap (micro-plans)
 
 Operational breakdown of the phases in `PLAN.md` into **small, PR-sized tasks**.
 Each task states **What** (work), **Goal** (done criteria), and **Test** (how to
@@ -255,7 +255,7 @@ the de-risk path, and the on-chain decision/benchmark ledger.
 - **What:** record each decision (pre/post weights, `rationaleHash`, `evidenceURI`,
   timestamp); `updateOutcome()` writes realized APY / drawdown-avoided; **baseline
   tracking**: each cycle snapshots what a 100%-USDY passive holder would hold
-  (by oracle NAV), so the contract can emit the bps delta Sentinel outperformed
+  (by oracle NAV), so the contract can emit the bps delta Custos outperformed
   or protected vs passive.
 - **Goal:** verifiable on-chain decision + outcome ledger **with a meaningful
   benchmark** — the Turing Test answer on-chain.
@@ -398,13 +398,13 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
   readFeedback/getSummary` round-trips, reputation links to the canonical identity.
   (Fork suite is skipped in CI like all `Fork*` tests; needs an allowlisted Mantle RPC.)
 - **Built — fallback path:** `interfaces/IERC8004.sol` (simplified subset).
-  `SentinelIdentityRegistry` (ERC721URIStorage; `register` mints the next sequential id
+  `CustosIdentityRegistry` (ERC721URIStorage; `register` mints the next sequential id
   to the caller, owner-only `setAgentURI`, `tokenURI` resolves the card) — note the
-  canonical identity is ABI-compatible for this subset. `SentinelReputationRegistry`
+  canonical identity is ABI-compatible for this subset. `CustosReputationRegistry`
   (role-gated `appendFeedback`, agent ids validated, zero-addr guard) is used only when
   the canonical singleton is absent. `Phase4a.t.sol` — 10 offline tests.
 - **Decision:** SPEC §2.5 updated — production calls the canonical 0x8004 singletons;
-  `Sentinel*` are the fallback. Canonical reputation uses `giveFeedback` (richer,
+  `Custos*` are the fallback. Canonical reputation uses `giveFeedback` (richer,
   client-keyed), not the simplified `appendFeedback`.
 
 ### 4.2 — Agent card + metadata · _PR-4a_ · `[x] DONE` · [PR #12](https://github.com/0xMaxyz/miu/pull/12)
@@ -470,11 +470,11 @@ risk-guardian feed, identity card, deposit/withdraw) on testnet.
 
 ### 4.7 — Baseline counter · _PR-4c_ · `[x] DONE` (fixtures; live `AgentBenchmark` deferred)
 
-- **What:** UI widget showing "Sentinel vs passive USDY holder" — running bps delta
+- **What:** UI widget showing "Custos vs passive USDY holder" — running bps delta
   since the last de-risk event; pulled from `AgentBenchmark` baseline data.
 - **Goal:** the Turing Test answer visible to anyone visiting the app.
 - **Test:** Vitest mocked; correct delta rendered; manual vs testnet.
-- **Built:** `lib/baseline.ts` — `computeBaseline` (per-point Sentinel−passive
+- **Built:** `lib/baseline.ts` — `computeBaseline` (per-point Custos−passive
   spread, latest delta, peak, ahead/behind, empty-series fallback) + `formatDeltaPct`.
   Consumed by the **Dashboard** `BaselineCounter` (headline derived from the series
   via `computeBaseline`, not the raw `passiveDeltaBps`) and also exposed on
@@ -635,9 +635,9 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 
 - **What:** the agent pays per-call (x402, stablecoin) for premium risk/data feeds;
   the x402 receipt is pinned into the decision evidence bundle. Optionally expose
-  Sentinel's RWA risk score as an x402-paid endpoint other agents can call.
+  Custos's RWA risk score as an x402-paid endpoint other agents can call.
 - **Goal:** verifiable "the agent paid for the evidence it acted on", plus a revenue
-  surface that justifies running a Sentinel agent.
+  surface that justifies running a Custos agent.
 - **Test:** Vitest mocked x402 flow; a decision links a valid x402 receipt; the paid
   endpoint returns 402 then 200 after payment.
 - **Built:** `agent/src/payments/x402.ts` — Coinbase x402 "exact" EVM scheme (EIP-3009
@@ -674,9 +674,9 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **Built:** `interfaces/IERC8183.sol` (draft-spec subset: `JobStatus`
   Open/Funded/Submitted/Completed/Rejected/Expired, `Job`, `createJob/setProvider/
   setBudget/fund/submit/complete/reject/claimRefund/getJob` + events).
-  `SentinelJobEscrow.sol` — USDC-escrowed jobs (client funds → provider submits →
+  `CustosJobEscrow.sol` — USDC-escrowed jobs (client funds → provider submits →
   evaluator completes=pay provider / rejects=refund client; expiry refund), **not in the
-  vault custody path** (escrows a per-job bounty, never user deposits). `SentinelDeRiskEvaluator.sol`
+  vault custody path** (escrows a per-job bounty, never user deposits). `CustosDeRiskEvaluator.sol`
   — the **Evaluator is the deterministic guardrail check**: `evaluate(...)` calls
   `Guardrails.evaluateUsdyRisk` and `complete`s (+ writes ERC-8004 `appendFeedback`)
   only when `forceDeRisk`, else `reject`s; KEEPER-gated. **Follow-up — on-chain NAV
@@ -723,7 +723,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   ASCII **architecture diagram** (web ↔ agent ↔ Mantle contracts/protocols), the **three
   AI×RWA submission answers** (what RWA + data sources · the role of the AI + where we
   deliberately don't use it · how it's realized on Mantle), **deployed addresses** (Mantle
-  Sepolia 5003 Sentinel contracts + verified mainnet protocol addresses; mainnet Sentinel
+  Sepolia 5003 Custos contracts + verified mainnet protocol addresses; mainnet Custos
   contracts pending 5.2), run/setup/common-tasks, and a §11-style checklist status. Run
   commands verified against the actual `dev`/`forge` scripts. (Public-deploy 6.1 + video
   6.3 are separate tasks.) `.env.example` verified already comprehensive (no new env
@@ -734,7 +734,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **What:** script + screen+voiceover recording. Sequence: deposit → earning →
   **AI reads attestation/news signal** → de-risk fires (via demo-trigger harness) →
   on-chain decision with evidence → **baseline counter** ("passive holder: –X bps /
-  Sentinel: avoided it") → identity card. Use the harness to fire the de-risk on cue.
+  Custos: avoided it") → identity card. Use the harness to fire the de-risk on cue.
 - **Goal:** a compelling ≥2-min walkthrough that directly answers "can this AI beat
   a passive USDY holder at managing risk?"
 - **Test:** review against the Deployment-Award + UI/UX criteria checklist; the hero

@@ -1,5 +1,5 @@
-/* Sentinel canonical mock data (§15 taxonomy, §16 dictionary, §17 fixtures).
-   Use these exact values — render real data, not invented numbers. Exposed on window.SENTINEL. */
+/* Custos canonical mock data (§15 taxonomy, §16 dictionary, §17 fixtures).
+   Use these exact values — render real data, not invented numbers. Exposed on window.CUSTOS. */
 (function () {
   // ---- §17.1 chain & token facts ----
   const chains = {
@@ -84,8 +84,8 @@
   const baseline = {
     passiveDeltaBps: 180, drawdownAvoidedUsdc: "610.00", realizedYieldBps: 45,
     sinceDecisionId: 12, measuredAt: "2026-06-10T12:00:00Z",
-    // small sparkline series: Sentinel value vs passive USDY, indexed to 0
-    sentinelSeries: [0, 6, 11, 9, 14, 22, 19, 31, 38, 44, 41, 45],
+    // small sparkline series: Custos value vs passive USDY, indexed to 0
+    custosSeries: [0, 6, 11, 9, 14, 22, 19, 31, 38, 44, 41, 45],
     passiveSeries:  [0, 5, 9, 12, 8, 14, 11, 6, -18, -52, -30, -3],
   };
 
@@ -161,7 +161,7 @@
 
   // ---- §17.7 identity card ----
   const identity = {
-    agentId: 7, name: "Sentinel Risk-Guardian",
+    agentId: 7, name: "Custos Risk-Guardian",
     agentURI: "ipfs://bafybeiagentcard0a1b2c3d4e5f6g7h8i9",
     owner: "0xA11c3b9D7e2F4a8c6B0d1E5f9A3c7B2d4E6f8A0E",
     identityRegistry: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
@@ -207,7 +207,7 @@
       "USDY peg (DEX spot vs oracle NAV, currently 20 bps / warn at 30), the oracle range end (2026-07-01, buffer 24h), Aave utilization (74%) and withdrawable liquidity, and the instant-liquidity buffer (50% of TVL vs the 15% floor). AUSD proof-of-reserves is also tracked.",
   };
 
-  window.SENTINEL = {
+  window.CUSTOS = {
     chains, explorer, tokens, erc8004,
     SIGNAL_TYPES, SEVERITY, FLAGS, RISK, BUCKETS, BUCKET_LABEL,
     guardrails, vault, position, walletUsdcBalance, baseline,

@@ -1,7 +1,7 @@
-/* Data-viz (§7). Exported to window. Charts have table fallbacks (§9). Depends on window.fmt, window.SENTINEL. */
+/* Data-viz (§7). Exported to window. Charts have table fallbacks (§9). Depends on window.fmt, window.CUSTOS. */
 (function () {
   const { useState, useId } = React;
-  const { BUCKETS, BUCKET_LABEL } = window.SENTINEL;
+  const { BUCKETS, BUCKET_LABEL } = window.CUSTOS;
   const f = window.fmt;
   const Icon = window.Icon;
   const bucketColor = { IDLE: "var(--chart-idle)", AAVE: "var(--chart-aave)", USDY: "var(--chart-usdy)", AUSD: "var(--chart-ausd)" };

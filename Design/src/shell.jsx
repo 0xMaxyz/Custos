@@ -3,7 +3,7 @@
   const { useState, useRef, useEffect } = React;
   const Icon = window.Icon;
   const f = window.fmt;
-  const { chains } = window.SENTINEL;
+  const { chains } = window.CUSTOS;
 
   const NAV = [
     { route: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
@@ -16,15 +16,15 @@
     return (
       <a className="brand" href="#dashboard" onClick={onClick}>
         <span className="brand-mark"><Icon name="shield-check" size={18} /></span>
-        Sentinel
+        Custos
       </a>
     );
   }
 
   function ThemeToggle({ theme, setTheme }) {
-    const dark = theme === "sentinel-dark";
+    const dark = theme === "custos-dark";
     return (
-      <button className="iconbtn" onClick={() => setTheme(dark ? "sentinel-light" : "sentinel-dark")}
+      <button className="iconbtn" onClick={() => setTheme(dark ? "custos-light" : "custos-dark")}
         aria-label={dark ? "Switch to light theme" : "Switch to dark theme"} title={dark ? "Light theme" : "Dark theme"}>
         <Icon name={dark ? "sun" : "moon"} size={17} />
       </button>
@@ -127,15 +127,15 @@
   }
 
   function Footer() {
-    const { explorer } = window.SENTINEL;
+    const { explorer } = window.CUSTOS;
     return (
       <footer className="footer">
         <div className="footer-inner">
-          <span>Sentinel — autonomous, on-chain risk-guardian vault on Mantle.</span>
+          <span>Custos — autonomous, on-chain risk-guardian vault on Mantle.</span>
           <span style={{ flex: 1 }} />
           <a href="#" onClick={(e) => e.preventDefault()}><Icon name="external-link" size={13} />Repo</a>
           <a href="#" onClick={(e) => e.preventDefault()}><Icon name="external-link" size={13} />Docs</a>
-          <a href={explorer + "/address/" + window.SENTINEL.tokens.USDC.address} target="_blank" rel="noreferrer"><Icon name="external-link" size={13} />Contract on Mantlescan</a>
+          <a href={explorer + "/address/" + window.CUSTOS.tokens.USDC.address} target="_blank" rel="noreferrer"><Icon name="external-link" size={13} />Contract on Mantlescan</a>
         </div>
       </footer>
     );

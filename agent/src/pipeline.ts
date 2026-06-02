@@ -1,5 +1,5 @@
 import { getAddress, type PublicClient } from "viem";
-import { Bucket, PROTOCOLS, TOKENS } from "@sentinel/shared";
+import { Bucket, PROTOCOLS, TOKENS } from "@custos/shared";
 
 import type { AgentConfig } from "./config.js";
 import { makeClients, type ChainClients } from "./chain/clients.js";
@@ -27,7 +27,7 @@ export interface Pipeline {
 
 function requireAddress(value: string | null | undefined, name: string): `0x${string}` {
   if (value === null || value === undefined) {
-    throw new Error(`address "${name}" is unresolved in @sentinel/shared (Phase-0 gate pending)`);
+    throw new Error(`address "${name}" is unresolved in @custos/shared (Phase-0 gate pending)`);
   }
   return getAddress(value);
 }

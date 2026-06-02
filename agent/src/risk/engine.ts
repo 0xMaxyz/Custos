@@ -9,7 +9,7 @@ import {
   ORACLE_RANGE_END_BUFFER,
   ORACLE_MAX_AGE,
   type RiskLevel,
-} from "@sentinel/shared";
+} from "@custos/shared";
 
 import type { MarketSnapshot, RiskAssessment, RiskFlag, WeightsBps } from "../types.js";
 

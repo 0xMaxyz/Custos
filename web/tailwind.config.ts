@@ -11,7 +11,7 @@ const config: Config = {
   daisyui: {
     themes: [
       {
-        "sentinel-light": {
+        "custos-light": {
           primary: "#7c3aed",
           "primary-content": "#ffffff",
           secondary: "#64748b",
@@ -28,7 +28,7 @@ const config: Config = {
           "--rounded-box": "0.75rem",
           "--rounded-btn": "0.5rem",
         },
-        "sentinel-dark": {
+        "custos-dark": {
           primary: "#8b5cf6",
           "primary-content": "#0b0710",
           secondary: "#94a3b8",
@@ -47,7 +47,7 @@ const config: Config = {
         },
       },
     ],
-    darkTheme: "sentinel-dark",
+    darkTheme: "custos-dark",
   },
 };
 

@@ -1,4 +1,4 @@
-import type { Bucket, RiskLevel } from "@sentinel/shared";
+import type { Bucket, RiskLevel } from "@custos/shared";
 
 /**
  * Domain types shared across the agent's pipeline:

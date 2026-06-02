@@ -1,7 +1,7 @@
 /* Activity /activity (§5.2) — Risk-Guardian decision feed + detail modal. Exported to window. */
 (function () {
   const { useState } = React;
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
   const { Card, RiskLevelChip, SignalBadge, EvidenceChip, FlagChip, OutcomeStrip, GuardrailsMark, ConfidenceMeter, AddressChip, WeightBars, EmptyState } = window;
 
   const KIND = { 0: { label: "Rebalance", icon: "refresh-cw" }, 1: { label: "De-risk", icon: "shield" } };
@@ -35,7 +35,7 @@
           <div className="decision-foot">
             <div style={{ flex: 1, minWidth: 200 }}><OutcomeStrip outcome={d.outcome} compact /></div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-              <a className="chip role-neutral" style={{ textDecoration: "none" }} href={`${window.SENTINEL.explorer}/tx/${d.txHash}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+              <a className="chip role-neutral" style={{ textDecoration: "none" }} href={`${window.CUSTOS.explorer}/tx/${d.txHash}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
                 <Icon name="external-link" size={12} />tx
               </a>
               <span className="mono" style={{ fontSize: "0.6875rem", color: "var(--faint)" }} title={d.rationaleHash}>{f.shortHash(d.rationaleHash, 6, 4)}</span>

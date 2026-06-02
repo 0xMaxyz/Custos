@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mantleMainnet, mantleTestnet, supportedChains, DEFAULT_CHAIN } from "./chains";
-import { MANTLE_MAINNET_CHAIN_ID, MANTLE_TESTNET_CHAIN_ID } from "@sentinel/shared";
+import { MANTLE_MAINNET_CHAIN_ID, MANTLE_TESTNET_CHAIN_ID } from "@custos/shared";
 
 describe("Mantle chain config", () => {
   it("uses the canonical Mantle chain ids", () => {

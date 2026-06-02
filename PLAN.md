@@ -1,4 +1,4 @@
-# Sentinel — Project Plan
+# Custos — Project Plan
 
 > An AI risk-guardian real-yield account on Mantle. Users deposit USDC; an AI
 > agent earns tokenized-Treasury (USDY) yield while continuously watching
@@ -8,7 +8,7 @@
 > an ERC-8004 agent identity.
 
 **Status:** Plan locked (v2 — pivoted to real, available Mantle RWAs). No code yet.
-**Working name:** _Sentinel_ (placeholder; may rename).
+**Working name:** _Custos_ (placeholder; may rename).
 
 ---
 
@@ -161,7 +161,7 @@ Everything below must be done before any Addendum work begins.
 - **Demo-trigger harness**: fork-injectable depeg/oracle-staleness condition that fires the hero de-risk moment on demand for the video
 - Anthropic LLM client (`@anthropic-ai/sdk`) behind a thin, mockable `LLMClient` interface
 - ERC-8004 identity (use 0x8004 singletons if on Mantle; else minimal own registry)
-- Frontend: account dashboard + **risk-guardian feed** (rationale + evidence) + deposit/withdraw + identity card + **baseline counter** ("passive USDY holder: +X bps / Sentinel: +Y bps, de-risk avoided Z bps drawdown")
+- Frontend: account dashboard + **risk-guardian feed** (rationale + evidence) + deposit/withdraw + identity card + **baseline counter** ("passive USDY holder: +X bps / Custos: +Y bps, de-risk avoided Z bps drawdown")
 - Deployed + **verified on mantlescan**; public frontend (Docker/Caddy)
 - **≥2-min demo video** showing: deposit → earning → AI reads attestation/news signal → live de-risk → on-chain decision with evidence → baseline comparison
 - README + one-line pitch
@@ -176,7 +176,7 @@ Ordered by hackathon impact:
 5. Compound USDe leg
 6. Per-user EIP-712 signed risk-profile mandates
 7. Multi-agent reputation leaderboard
-8. **Agent micropayments (x402) + verifiable jobs (ERC-8183)** _(high-interest)_ — the agent pays per-call (x402, stablecoin) for premium risk/data feeds, with receipts joining the on-chain evidence trail; Sentinel can also expose its RWA risk signal as an **x402-paid endpoint** — the revenue surface that justifies running a Sentinel agent. Each de-risk is modeled as an **ERC-8183** escrowed Job whose **evaluator is the deterministic guardrail validator**, feeding ERC-8004 reputation. Builds directly on the existing 8004 identity; Core (the verifiable de-risk vault) ships first.
+8. **Agent micropayments (x402) + verifiable jobs (ERC-8183)** _(high-interest)_ — the agent pays per-call (x402, stablecoin) for premium risk/data feeds, with receipts joining the on-chain evidence trail; Custos can also expose its RWA risk signal as an **x402-paid endpoint** — the revenue surface that justifies running a Custos agent. Each de-risk is modeled as an **ERC-8183** escrowed Job whose **evaluator is the deterministic guardrail validator**, feeding ERC-8004 reputation. Builds directly on the existing 8004 identity; Core (the verifiable de-risk vault) ships first.
 
 ### Won't (this hackathon)
 

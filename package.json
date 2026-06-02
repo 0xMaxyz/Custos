@@ -1,8 +1,8 @@
 {
-  "name": "sentinel",
+  "name": "custos",
   "version": "0.0.0",
   "private": true,
-  "description": "Sentinel — AI risk-guardian real-yield account on Mantle",
+  "description": "Custos — AI risk-guardian real-yield account on Mantle",
   "type": "module",
   "engines": {
     "node": ">=22"

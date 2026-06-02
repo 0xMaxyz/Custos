@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 import { validateProposal, applyVerdict, type ChainContext } from "./validator.js";
 import type { MarketSnapshot, RiskAssessment, WeightsBps } from "../types.js";
 import type { RiskVerdict } from "../llm/types.js";

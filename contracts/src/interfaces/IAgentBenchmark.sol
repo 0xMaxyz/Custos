@@ -10,7 +10,7 @@ interface IAgentBenchmark {
     struct Outcome {
         int256  realizedYieldBps;     // agent yield vs prior decision (bps)
         uint256 drawdownAvoidedUsdc;  // estimated loss avoided on de-risk events (6-dec USDC)
-        int256  passiveDeltaBps;      // Sentinel outperformance vs 100%-USDY passive holder (bps)
+        int256  passiveDeltaBps;      // Custos outperformance vs 100%-USDY passive holder (bps)
         uint64  measuredAt;           // unix timestamp of outcome measurement
     }
 

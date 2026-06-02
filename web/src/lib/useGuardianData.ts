@@ -8,14 +8,12 @@
 // Deployed but no events yet → isLive:true, decisions:[] (empty live feed,
 // not the demo fixture data).
 
-import { useReadContract, useWatchContractEvent, usePublicClient } from "wagmi";
+import { useReadContract, useWatchContractEvent, usePublicClient, useChainId } from "wagmi";
 import { useRef, useState, useEffect }                              from "react";
 import { decisions as fixtureDecisions, identity as fixtureIdentity, baseline as fixtureBaseline, type Decision } from "./data";
 import { computeBaseline, type BaselineSummary } from "./baseline";
 import { VAULT_ABI }      from "./vaultAbi";
-
-const VAULT_ADDRESS = (import.meta.env.VITE_VAULT_ADDRESS ?? "") as `0x${string}`;
-const isDeployed = VAULT_ADDRESS.length > 2;
+import { resolveDeployment } from "./deployment";
 
 // Deployment block hint: scope getLogs to avoid full-chain scan on mainnet.
 // Set VITE_VAULT_DEPLOY_BLOCK after deploy (defaults to 0 = from genesis).
@@ -71,6 +69,9 @@ export interface GuardianFeed {
 }
 
 export function useDecisions(): GuardianFeed {
+  const chainId = useChainId();
+  const VAULT_ADDRESS = resolveDeployment(chainId).vault as `0x${string}`;
+  const isDeployed = VAULT_ADDRESS.length > 2;
   // null = loading (deployed, fetch in progress); [] = loaded but empty
   const [liveDecisions, setLiveDecisions] = useState<Decision[] | null>(isDeployed ? null : []);
   const seenIds = useRef(new Set<number>());
@@ -109,7 +110,7 @@ export function useDecisions(): GuardianFeed {
       // getLogs unavailable — fall back to empty live feed, watch-only.
       setLiveDecisions([]);
     });
-  }, [client]);
+  }, [client, VAULT_ADDRESS, isDeployed]);
 
   // Watch for new events after mount.
   useWatchContractEvent({

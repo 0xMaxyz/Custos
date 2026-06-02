@@ -147,7 +147,18 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
             <div className="kvrow"><span className="k">Job id</span><span className="v mono">#{d.job.jobId}</span></div>
             <div className="kvrow"><span className="k">Bounty</span><span className="v mono">{fmt.usd(d.job.budgetUsdc)}</span></div>
             <div className="kvrow"><span className="k">Evaluator</span><AddressChip address={d.job.evaluator} /></div>
-            {d.job.reputation && <div className="kvrow"><span className="k">Reputation · ERC-8004</span><span className="v mono">{d.job.reputation.tag} · +{d.job.reputation.score}</span></div>}
+            {d.job.reputation && (() => {
+              const rep = d.job!.reputation!;
+              const href = resolveDecisionUri(rep.uri);
+              const label = <>{rep.tag} · +{rep.score} <Icon name="external-link" size={12} /></>;
+              return (
+                <div className="kvrow"><span className="k">Reputation · ERC-8004</span>
+                  {href
+                    ? <a className="linklike mono" style={{ fontSize: "0.8125rem" }} href={href} target="_blank" rel="noreferrer">{label}</a>
+                    : <span className="v mono">{rep.tag} · +{rep.score}</span>}
+                </div>
+              );
+            })()}
             <div style={{ fontSize: "0.6875rem", color: "var(--faint)", marginTop: 8 }}>Outside the vault custody path — a per-job bounty, never user deposits.</div>
           </div>
         </Section>

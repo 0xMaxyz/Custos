@@ -20,7 +20,10 @@ describe("Mantle chain config", () => {
     expect(mantleTestnet.rpcUrls.default.http[0]).toMatch(/^https?:\/\//);
   });
 
-  it("defaults to mainnet unless VITE_DEFAULT_CHAIN=testnet", () => {
-    expect(DEFAULT_CHAIN.id).toBe(5000);
+  it("defaults to the chain that has a committed deployment (testnet until mainnet is live)", () => {
+    // Mainnet (5000) has no deployment yet, the testnet (5003) does, so the app
+    // defaults to testnet so it reads live out of the box. Flips to mainnet
+    // automatically once MAINNET_DEPLOYMENT is populated.
+    expect(DEFAULT_CHAIN.id).toBe(5003);
   });
 });

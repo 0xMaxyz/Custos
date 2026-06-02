@@ -1,19 +1,21 @@
 // Deposit / Withdraw / Tx status. Matches Design/src/trade-modals.jsx.
 //
-// When VITE_VAULT_ADDRESS is set (isDeployed), drives real on-chain writes:
+// The vault is resolved for the connected chain via resolveDeployment() (the
+// committed @custos/shared address, or a VITE_VAULT_ADDRESS override). When a
+// vault resolves (isDeployed), drives real on-chain writes:
 //   Deposit:  USDC.approve(vault, amount) → vault.deposit(amount, receiver)
 //   Withdraw: vault.redeem(shares, receiver, owner)  (no approve needed)
-// Otherwise drives the simulated flow used in the undeployed preview.
+// Otherwise (no deploy for the chain, or VITE_DEMO_MODE) drives the simulated flow.
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
 import { Icon } from "../components/Icons";
 import { Spinner } from "../components/Components";
 import { Modal } from "./Modals";
 import * as fmt from "../lib/fmt";
 import { explorer, type VaultState, type PositionState } from "../lib/data";
-import { VAULT_ADDRESS, isDeployed } from "../lib/useVaultData";
+import { resolveDeployment } from "../lib/deployment";
 import { ERC20_APPROVE_ABI, VAULT_ABI } from "../lib/vaultAbi";
 import {
   previewDeposit,
@@ -81,6 +83,9 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
   const [approveHash, setApproveHash] = useState("");
   const [txHash, setTxHash] = useState("");
   const { address: userAddress } = useAccount();
+  // Writes target the connected chain's deployed vault (resolved from @custos/shared).
+  const VAULT_ADDRESS = resolveDeployment(useChainId()).vault as `0x${string}`;
+  const isDeployed = VAULT_ADDRESS.length > 2;
   const sharePrice = parseFloat(vault.sharePrice);
   const bal = parseFloat(wallet.balance ?? "0");
   const tvl = parseFloat(vault.tvlUsdc), cap = parseFloat(vault.tvlCapUsdc);
@@ -211,6 +216,8 @@ export function WithdrawModal({ position, vault, onClose, onToast }: {
   const [phase, setPhase] = useState<WithdrawPhase>("form");
   const [txHash, setTxHash] = useState("");
   const { address: userAddress } = useAccount();
+  const VAULT_ADDRESS = resolveDeployment(useChainId()).vault as `0x${string}`;
+  const isDeployed = VAULT_ADDRESS.length > 2;
   const sharePrice = parseFloat(vault.sharePrice);
   const instant = parseFloat(vault.instantWithdrawableUsdc);
 

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { RainbowKitProvider, getDefaultConfig, lightTheme, darkTheme } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { mantleMainnet, mantleTestnet } from "./lib/chains";
+import { mantleMainnet, mantleTestnet, supportedChains, DEFAULT_CHAIN } from "./lib/chains";
 
 // WalletConnect Cloud project id. Falls back to a placeholder so local dev /
 // tests don't crash; set VITE_WALLETCONNECT_PROJECT_ID for real WC sessions.
@@ -16,7 +16,7 @@ export const wagmiConfig = projectId === "custos-local-dev"
   // Without a real WC project id, RainbowKit's WC connector errors — fall back
   // to a bare injected/transport config so the app still boots in dev/test.
   ? createConfig({
-      chains: [mantleMainnet, mantleTestnet],
+      chains: supportedChains,
       transports: {
         [mantleMainnet.id]: http(),
         [mantleTestnet.id]: http(),
@@ -25,7 +25,7 @@ export const wagmiConfig = projectId === "custos-local-dev"
   : getDefaultConfig({
       appName: "Custos",
       projectId,
-      chains: [mantleMainnet, mantleTestnet],
+      chains: supportedChains,
       transports: {
         [mantleMainnet.id]: http(),
         [mantleTestnet.id]: http(),
@@ -40,6 +40,7 @@ export function Providers({ children, theme }: { children: ReactNode; theme: str
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
+          initialChain={DEFAULT_CHAIN}
           theme={dark ? darkTheme({ accentColor: "#7c3aed" }) : lightTheme({ accentColor: "#7c3aed" })}
           modalSize="compact"
         >

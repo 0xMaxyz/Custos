@@ -20,7 +20,9 @@ import { SentinelJobEscrow } from "../src/SentinelJobEscrow.sol";
 import { SentinelDeRiskEvaluator } from "../src/SentinelDeRiskEvaluator.sol";
 import { SentinelIdentityRegistry } from "../src/SentinelIdentityRegistry.sol";
 import { SentinelReputationRegistry } from "../src/SentinelReputationRegistry.sol";
+import { UsdyAdapter } from "../src/UsdyAdapter.sol";
 import { IERC8183 } from "../src/interfaces/IERC8183.sol";
+import { MockRWADynamicOracle } from "./mocks/MockRWADynamicOracle.sol";
 
 contract ERC20Mock {
     string public name = "USD Coin";
@@ -67,10 +69,16 @@ contract PhaseA4Test is Test {
     SentinelReputationRegistry internal reputation;
     SentinelJobEscrow internal escrow;
     SentinelDeRiskEvaluator internal evaluator;
+    MockRWADynamicOracle internal oracle;
+    UsdyAdapter internal usdyAdapter;
 
     uint256 internal agentId;
     uint256 constant BUDGET = 100e6; // $100 bounty
     bytes32 constant DELIVERABLE = keccak256("ipfs://decision-bundle");
+    // Keeper-supplied DEX spots vs the on-chain NAV ($1). 0.98 = 200 bps below NAV
+    // (past the 100 bps de-risk threshold); 1.00 = on peg.
+    uint256 constant DEPEG_SPOT = 0.98e18;
+    uint256 constant HEALTHY_SPOT = 1e18;
 
     function setUp() public {
         vm.warp(1_000_000);
@@ -86,7 +94,17 @@ contract PhaseA4Test is Test {
         agentId = identity.register("ipfs://agent-card");
 
         escrow = new SentinelJobEscrow(address(usdc));
-        evaluator = new SentinelDeRiskEvaluator(address(gr), address(reputation), agentId, admin);
+
+        // On-chain NAV source for the evaluator: a USDY adapter over a mock oracle
+        // (NAV = $1). The keeper supplies only the DEX spot — it cannot fake the NAV.
+        ERC20Mock usdy = new ERC20Mock();
+        oracle = new MockRWADynamicOracle(1e18, type(uint32).max);
+        usdyAdapter = new UsdyAdapter(
+            makeAddr("aggregator"), address(usdc), address(usdy), address(0), address(oracle), makeAddr("usdyVault"), 50
+        );
+        evaluator = new SentinelDeRiskEvaluator(
+            address(gr), address(reputation), address(usdyAdapter), agentId, admin
+        );
 
         // Wire roles: the evaluator may write reputation; the keeper may evaluate.
         vm.startPrank(admin);
@@ -95,26 +113,6 @@ contract PhaseA4Test is Test {
         vm.stopPrank();
 
         usdc.mint(client, BUDGET);
-    }
-
-    // ── Market snapshots ────────────────────────────────────────────────────────
-
-    function _depegged() internal view returns (Guardrails.MarketState memory s) {
-        s.usdyOracleNav = 1e18;
-        s.usdyDexSpot = 0.98e18; // 200 bps below NAV → past 100 bps de-risk threshold
-        s.oracleUpdatedAt = uint64(block.timestamp);
-        s.oracleRangeEnd = uint64(block.timestamp + 30 days);
-        s.totalAssets = BUDGET;
-        s.lastRebalanceAt = uint64(block.timestamp);
-    }
-
-    function _healthy() internal view returns (Guardrails.MarketState memory s) {
-        s.usdyOracleNav = 1e18;
-        s.usdyDexSpot = 1e18; // on peg → no de-risk justified
-        s.oracleUpdatedAt = uint64(block.timestamp);
-        s.oracleRangeEnd = uint64(block.timestamp + 30 days);
-        s.totalAssets = BUDGET;
-        s.lastRebalanceAt = uint64(block.timestamp);
     }
 
     /// Create → set budget → fund → submit a de-risk Job, returning its id.
@@ -140,7 +138,7 @@ contract PhaseA4Test is Test {
         assertEq(usdc.balanceOf(address(escrow)), BUDGET, "budget escrowed");
 
         vm.prank(keeper);
-        bool completed = evaluator.evaluate(escrow, jobId, _depegged(), 610, "ipfs://evidence", "depeg-200bps");
+        bool completed = evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 610, "ipfs://evidence", "depeg-200bps");
 
         assertTrue(completed, "guardrail justified -> completed");
         assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Completed));
@@ -161,7 +159,7 @@ contract PhaseA4Test is Test {
         uint256 jobId = _openFundedSubmittedJob();
 
         vm.prank(keeper);
-        bool completed = evaluator.evaluate(escrow, jobId, _healthy(), 0, "ipfs://evidence", "on-peg");
+        bool completed = evaluator.evaluate(escrow, jobId, HEALTHY_SPOT, 0, "ipfs://evidence", "on-peg");
 
         assertFalse(completed, "no de-risk justified -> rejected");
         assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Rejected));
@@ -171,8 +169,32 @@ contract PhaseA4Test is Test {
     }
 
     function test_WouldComplete_View() public view {
-        assertTrue(evaluator.wouldComplete(_depegged()));
-        assertFalse(evaluator.wouldComplete(_healthy()));
+        assertTrue(evaluator.wouldComplete(DEPEG_SPOT));
+        assertFalse(evaluator.wouldComplete(HEALTHY_SPOT));
+    }
+
+    /// The NAV is read on-chain from the pinned adapter — the keeper can't fake it.
+    /// Same keeper spot (0.98) is a DEPEG at NAV $1 but on-peg once the real NAV is 0.98.
+    function test_NavReadOnChain_NotKeeperFakeable() public {
+        uint256 jobId = _openFundedSubmittedJob();
+        oracle.setPrice(0.98e18); // move the REAL on-chain NAV down to match the spot
+        vm.prank(keeper);
+        bool completed = evaluator.evaluate(escrow, jobId, 0.98e18, 0, "ipfs://e", "spot==nav");
+        assertFalse(completed, "spot == on-chain NAV -> 0 bps deviation -> not a depeg -> rejected");
+        assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Rejected));
+        // Contrast: at the default NAV ($1) the same 0.98 spot completes
+        // (test_DeRiskJustified_SettlesAndWritesReputation) — the decision follows NAV.
+    }
+
+    /// Oracle down → fail-closed REVERT (not a silent reject): the job stays Submitted
+    /// and is recoverable via claimRefund at expiry; the keeper re-evaluates on recovery.
+    function test_OracleDown_EvaluateRevertsFailClosed() public {
+        uint256 jobId = _openFundedSubmittedJob();
+        oracle.setShouldRevert(true);
+        vm.prank(keeper);
+        vm.expectRevert(SentinelDeRiskEvaluator.OracleUnavailable.selector);
+        evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 0, "ipfs://e", "oracle-down");
+        assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Submitted), "job not stranded-settled");
     }
 
     // ── Expiry refund ────────────────────────────────────────────────────────────
@@ -264,7 +286,7 @@ contract PhaseA4Test is Test {
         uint256 jobId = _openFundedSubmittedJob();
         vm.prank(rando);
         vm.expectRevert(); // AccessControlUnauthorizedAccount
-        evaluator.evaluate(escrow, jobId, _depegged(), 0, "ipfs://e", "r");
+        evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 0, "ipfs://e", "r");
     }
 
     function test_CreateJobRevertsBadExpiry() public {

@@ -50,6 +50,23 @@ describe("loadConfig", () => {
   it("rejects an out-of-range log level", () => {
     expect(() => loadConfig({ ...minimalEnv, AGENT_LOG_LEVEL: "verbose" })).toThrow();
   });
+
+  it("parses X402_SETTLE_ONCHAIN as a strict boolean (default false; only 'true' is true)", () => {
+    expect(loadConfig(minimalEnv).x402SettleOnChain).toBe(false); // default
+    expect(loadConfig({ ...minimalEnv, X402_SETTLE_ONCHAIN: "true" }).x402SettleOnChain).toBe(true);
+    expect(loadConfig({ ...minimalEnv, X402_SETTLE_ONCHAIN: "TRUE" }).x402SettleOnChain).toBe(true);
+    // Any non-"true" string is false — never accidentally enables on-chain settlement.
+    expect(loadConfig({ ...minimalEnv, X402_SETTLE_ONCHAIN: "false" }).x402SettleOnChain).toBe(false);
+    expect(loadConfig({ ...minimalEnv, X402_SETTLE_ONCHAIN: "1" }).x402SettleOnChain).toBe(false);
+  });
+
+  it("requires X402_ASSET when X402_PAY_TO is set", () => {
+    const payTo = `0x${"be".repeat(20)}`;
+    expect(() => loadConfig({ ...minimalEnv, X402_PAY_TO: payTo })).toThrow();
+    expect(
+      loadConfig({ ...minimalEnv, X402_PAY_TO: payTo, X402_ASSET: `0x${"a0".repeat(20)}` }).x402PayTo,
+    ).toBe(payTo);
+  });
 });
 
 describe("tryLoadConfig", () => {

@@ -62,6 +62,13 @@ const configSchema = z.object({
   // Optional premium feed the agent PAYS for via x402; its settlement receipt is
   // pinned into the decision evidence bundle.
   x402PremiumFeedUrl: z.string().url().optional(),
+  // When true (and an ALLOCATOR wallet is present), /risk-score SETTLES inbound
+  // payments on-chain via transferWithAuthorization; otherwise it verifies the
+  // EIP-712 signature and delegates settlement to a facilitator.
+  x402SettleOnChain: z.preprocess(
+    (v) => (typeof v === "string" ? v.toLowerCase() === "true" : v),
+    z.boolean().default(false),
+  ),
 
   // ── Service ──
   agentPort: z.coerce.number().int().positive().default(8080),
@@ -119,6 +126,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     x402TokenVersion: pick("X402_TOKEN_VERSION"),
     x402TimeoutSeconds: pick("X402_TIMEOUT_SECONDS"),
     x402PremiumFeedUrl: pick("X402_PREMIUM_FEED_URL"),
+    x402SettleOnChain: pick("X402_SETTLE_ONCHAIN"),
     agentPort: pick("AGENT_PORT"),
     agentLogLevel: pick("AGENT_LOG_LEVEL"),
   };

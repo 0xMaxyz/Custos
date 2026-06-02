@@ -708,7 +708,7 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
 - **Goal:** a public URL (not localhost).
 - **Test:** load public URL; deposit/withdraw works; perf sanity (Lighthouse).
 
-### 6.2 — README + docs · _PR-6a_ · `[x] DONE`
+### 6.2 — README + docs · _PR-6a_ · `[x] DONE` · [PR #24](https://github.com/0xMaxyz/miu/pull/24)
 
 - **What:** setup, architecture diagram, deployed addresses, `.env.example`, and the
   three submission answers (data sources / AI role / Mantle realization).
@@ -721,7 +721,8 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   Sepolia 5003 Sentinel contracts + verified mainnet protocol addresses; mainnet Sentinel
   contracts pending 5.2), run/setup/common-tasks, and a §11-style checklist status. Run
   commands verified against the actual `dev`/`forge` scripts. (Public-deploy 6.1 + video
-  6.3 are separate tasks.)
+  6.3 are separate tasks.) `.env.example` verified already comprehensive (no new env
+  vars this task); the README now points to its grouped config sections.
 
 ### 6.3 — Demo video (≥2 min) · _PR-6a_
 

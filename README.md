@@ -25,8 +25,8 @@ evidence** on-chain under an ERC-8004 identity.
    **immutable on-chain guardrails**.
 3. It continuously monitors **peg deviation, oracle freshness, liquidity** (deterministic)
    and reads **attestations / regulatory news** (the LLM) for threats a threshold misses.
-4. On danger it calls **`deRisk`**: rotates USDY → AUSD/USDC and records a `Decision`
-   event with a `rationaleHash` + an IPFS evidence bundle (`decisionURI`).
+4. On danger it calls **`deRisk`**: rotates USDY → AUSD/USDC and emits a
+   **`DecisionRecorded`** event with a `rationaleHash` + an IPFS evidence bundle (`decisionURI`).
 5. An on-chain **`AgentBenchmark`** records the bps delta vs a **passive 100%-USDY
    holder** — the "can the AI actually beat passive?" answer, verifiable by anyone.
 
@@ -88,7 +88,7 @@ the custody/execution path.**
   **LLM proposes → deterministic validator checks → immutable on-chain `Guardrails`
   backstop**; on any API failure the agent falls back to the deterministic allocation.
 - **Verifiable, not a black box:** every decision + evidence is recorded on-chain
-  (`Decision` + IPFS `decisionURI`); the agent has an **ERC-8004 identity** and accrues
+  (a `DecisionRecorded` event + IPFS `decisionURI`); the agent has an **ERC-8004 identity** and accrues
   **reputation**; each de-risk is modelled as an **ERC-8183 escrowed job whose Evaluator
   _is_ the deterministic guardrail check**; and `AgentBenchmark` records the bps delta
   vs a passive USDY holder.
@@ -104,7 +104,7 @@ the custody/execution path.**
   reason an aggregator is used inside the custody boundary at all.
 - The agent registers against the **canonical ERC-8004 singletons live on Mantle**; the
   **AI-powered on-chain function** (`rebalance`/`deRisk`, ALLOCATOR-only, guardrail-gated)
-  is callable on-chain and emits verifiable `Decision`s.
+  is callable on-chain and emits verifiable `DecisionRecorded` events.
 - Addendum agent-economy layers — **x402** micropayments (EIP-3009/USDC) for paid data +
   a sellable risk-score endpoint, and **ERC-8183** job escrow — stay **outside the vault
   custody path** (per-job bounties, never user deposits).
@@ -161,9 +161,16 @@ _(AaveV3Adapter skipped on testnet — no Aave v3 pool on Mantle Sepolia.)_
 
 ```bash
 pnpm install                 # JS/TS workspaces
-cp .env.example .env         # fill in RPC, LLM, 1delta, signer keys (see .env.example)
+cp .env.example .env         # fill in RPC, LLM, 1delta, signer keys
 forge build --root contracts # Solidity (installs solc 0.8.28 on first run)
 ```
+
+All configuration is documented in [`.env.example`](./.env.example), grouped by concern:
+**chain/RPC** (`MANTLE_RPC_URL`, …), **data** (`ONEDELTA_API_KEY`), **LLM**
+(`ANTHROPIC_API_KEY`), **signer** (`ALLOCATOR_PRIVATE_KEY` — the guardrail-bounded hot
+key), **IPFS**, **deploy** (`DEPLOYER_PRIVATE_KEY`, testnet token addresses), **alerts**
+(Telegram/Discord), **x402** (`X402_*`), and **frontend** (`VITE_*`). Every path that
+needs a secret is optional except `MANTLE_RPC_URL`, so read-only/dev runs need almost nothing.
 
 ## Run it
 
@@ -172,8 +179,8 @@ pnpm -C agent dev            # agent API: /health /snapshot /ask /risk-score (x4
 pnpm -C web dev             # web app (Vite dev server)
 
 # Solidity tests
-forge test --root contracts --no-match-contract Fork        # offline unit tests
-forge test --root contracts --fork-url $MANTLE_RPC_URL      # fork tests (needs a Mantle RPC)
+forge test --root contracts --no-match-contract Fork                   # offline unit tests
+forge test --root contracts --match-contract Fork --fork-url $MANTLE_RPC_URL  # fork tests only (needs a Mantle RPC)
 ```
 
 The agent runs read-only without an `ALLOCATOR_PRIVATE_KEY`/`VAULT_ADDRESS`; set those
@@ -201,7 +208,7 @@ Solidity + Foundry · React + Vite + Tailwind + daisyUI · RainbowKit + wagmi + 
 
 - [x] Smart contracts deployed on Mantle (testnet 5003; mainnet pending keys).
 - [ ] Contracts **verified on mantlescan** (with the mainnet deploy).
-- [x] An **AI-powered on-chain function** (`rebalance`/`deRisk`, ALLOCATOR-gated, emits `Decision`).
+- [x] An **AI-powered on-chain function** (`rebalance`/`deRisk`, ALLOCATOR-gated, emits `DecisionRecorded`).
 - [ ] Frontend demo **publicly accessible** (ROADMAP 6.1 — Docker/Caddy).
 - [ ] **Deployment address** in the DoraHacks submission.
 - [ ] **Demo video ≥ 2 min** (ROADMAP 6.3) — deposit → AI reads a signal → de-risk → baseline delta.

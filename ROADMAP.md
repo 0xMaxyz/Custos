@@ -678,11 +678,16 @@ Work through the Addendum list from §8 in order. Stop when time runs out. Each 
   evaluator completes=pay provider / rejects=refund client; expiry refund), **not in the
   vault custody path** (escrows a per-job bounty, never user deposits). `SentinelDeRiskEvaluator.sol`
   — the **Evaluator is the deterministic guardrail check**: `evaluate(...)` calls
-  `Guardrails.evaluateUsdyRisk(MarketState)` and `complete`s (+ writes
-  ERC-8004 `appendFeedback`) only when `forceDeRisk`, else `reject`s; KEEPER-gated
-  (the keeper supplies the same snapshot the vault's `deRisk` uses). Tests:
-  `PhaseA4.t.sol` (12) — justified de-risk settles + writes reputation, unjustified is
-  rejected + refunds, expiry refund, full access-control + state-machine guards.
+  `Guardrails.evaluateUsdyRisk` and `complete`s (+ writes ERC-8004 `appendFeedback`)
+  only when `forceDeRisk`, else `reject`s; KEEPER-gated. **Follow-up — on-chain NAV
+  read · [PR #25](https://github.com/0xMaxyz/miu/pull/25):** the evaluator now reads the
+  oracle NAV + range end on-chain from the pinned `UsdyAdapter.oracleData()` and accepts
+  **only the DEX spot** from the keeper (mirrors `YieldVault.deRisk`), so the keeper can't
+  fake the NAV to force a settlement; oracle-down is fail-closed (`OracleUnavailable`
+  revert, recoverable via `claimRefund` at expiry). Tests:
+  `PhaseA4.t.sol` (16) — justified de-risk settles + writes reputation, unjustified is
+  rejected + refunds, expiry refund, zero-provider guards, **NAV-read-on-chain (keeper
+  can't fake it)**, **oracle-down fail-closed revert**, full access-control + state-machine guards.
 - **UI surfaces (web/src) for A4 + the mUSD leg (per `UI.md`) · `[x] DONE` · [PR #23](https://github.com/0xMaxyz/miu/pull/23):** `Components.tsx` adds
   `PaidEvidenceBadge` (x402 receipt), `JobStatusChip` (ERC-8183 status), and
   `RwaFormSplit` (USDY/mUSD allocation sublabel). Wired in: Dashboard allocation card

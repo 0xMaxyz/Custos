@@ -1,4 +1,4 @@
-# Sentinel
+# Custos
 
 **AI risk-guardian real-yield account on Mantle.** Deposit USDC; an AI agent earns
 tokenized-Treasury (USDY) yield with an Aave v3 USDC liquidity floor, and
@@ -6,7 +6,7 @@ tokenized-Treasury (USDY) yield with an Aave v3 USDC liquidity floor, and
 oracle staleness, issuer/regulatory shock) — recording every decision **and its
 evidence** on-chain under an ERC-8004 identity.
 
-> **One-line pitch:** Sentinel earns tokenized-Treasury yield and **autonomously
+> **One-line pitch:** Custos earns tokenized-Treasury yield and **autonomously
 > de-risks on-chain before RWA danger hits** — recording every decision and its
 > evidence under a verifiable ERC-8004 identity, and proving on-chain that it beats a
 > passive USDY holder. The verifiable autonomous defense — not the swap-to-USDY — is
@@ -120,7 +120,7 @@ packages/shared/   Shared types, verified addresses, token metadata, guardrail c
 
 ## Deployed addresses
 
-**Mantle Sepolia testnet (5003)** — Sentinel contracts (see `packages/shared/src/deployments.ts`):
+**Mantle Sepolia testnet (5003)** — Custos contracts (see `packages/shared/src/deployments.ts`):
 
 | Contract       | Address |
 | -------------- | ------- |
@@ -147,7 +147,7 @@ _(AaveV3Adapter skipped on testnet — no Aave v3 pool on Mantle Sepolia.)_
 | ERC-8004 Identity (canonical) | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
 | ERC-8004 Reputation (canonical) | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` |
 
-> **Sentinel mainnet contracts:** pending the mainnet deploy (ROADMAP 5.2 — needs a
+> **Custos mainnet contracts:** pending the mainnet deploy (ROADMAP 5.2 — needs a
 > Mantle RPC + deployer/ALLOCATOR keys). Addresses land in `deployments.ts` +
 > `deployments/5000.json` after broadcast + mantlescan verification.
 

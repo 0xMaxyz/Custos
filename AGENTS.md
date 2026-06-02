@@ -15,7 +15,7 @@ deviating.
 
 ## 1. What we are building (one paragraph)
 
-**Sentinel** — an **AI risk-guardian real-yield account** on **Mantle**. Users
+**Custos** — an **AI risk-guardian real-yield account** on **Mantle**. Users
 deposit **USDC**; an AI agent (powered by the **Anthropic API**) earns tokenized-Treasury
 (**USDY**) yield with an **Aave v3** USDC floor for liquidity, and **autonomously
 de-risks on-chain** into **AUSD**/USDC when RWA risk appears (depeg, oracle
@@ -57,7 +57,7 @@ product. See `PLAN.md`.
    the *form* of the bucket, not its value or weight.
    **Addendum layers stay outside custody (A4):** x402 micropayments (the agent pays a
    guardrail-bounded payer key for data, and sells its risk score) and the ERC-8183
-   `SentinelJobEscrow`/`SentinelDeRiskEvaluator` (each de-risk modelled as a verifiable
+   `CustosJobEscrow`/`CustosDeRiskEvaluator` (each de-risk modelled as a verifiable
    escrowed Job whose Evaluator IS the deterministic guardrail check) are
    record/payment/reputation layers — they escrow per-job bounties and feed ERC-8004
    reputation, and **never move vault deposits**. The on-chain `Guardrails` remain the

@@ -1,7 +1,7 @@
 /* App controller: routing, theme/network/wallet state, modal host, toasts. */
 (function () {
   const { useState, useEffect, useCallback } = React;
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
 
   const ROUTES = ["dashboard", "activity", "agent", "insights"];
   const MOCK_WALLET = { address: "0xA11c3b9D7e2F4a8c6B0d1E5f9A3c7B2d4E6f8A0E", balance: S.walletUsdcBalance, connector: "MetaMask" };
@@ -34,7 +34,7 @@
   }
 
   function App() {
-    const [theme, setThemeState] = useState(() => localStorage.getItem("sentinel-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "sentinel-dark" : "sentinel-light"));
+    const [theme, setThemeState] = useState(() => localStorage.getItem("custos-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "custos-dark" : "custos-light"));
     const [net, setNet] = useState("mainnet");
     const [wallet, setWallet] = useState({ connected: false });
     const [route, go] = useHashRoute();
@@ -47,7 +47,7 @@
 
     useEffect(() => {
       document.documentElement.setAttribute("data-theme", theme);
-      localStorage.setItem("sentinel-theme", theme);
+      localStorage.setItem("custos-theme", theme);
     }, [theme]);
     const setTheme = (t) => setThemeState(t);
 
@@ -107,5 +107,5 @@
     );
   }
 
-  window.SentinelApp = App;
+  window.CustosApp = App;
 })();

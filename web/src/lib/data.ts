@@ -1,4 +1,4 @@
-// Sentinel canonical mock data (§15 taxonomy, §16 dictionary, §17 fixtures).
+// Custos canonical mock data (§15 taxonomy, §16 dictionary, §17 fixtures).
 // Mirrors Design/src/data.js with TypeScript types.
 
 export const chains = {
@@ -109,7 +109,7 @@ export const walletUsdcBalance = "12500.00";
 export const baseline = {
   passiveDeltaBps: 180, drawdownAvoidedUsdc: "610.00", realizedYieldBps: 45,
   sinceDecisionId: 12, measuredAt: "2026-06-10T12:00:00Z",
-  sentinelSeries: [0, 6, 11, 9, 14, 22, 19, 31, 38, 44, 41, 45],
+  custosSeries: [0, 6, 11, 9, 14, 22, 19, 31, 38, 44, 41, 45],
   passiveSeries:  [0, 5, 9, 12, 8, 14, 11, 6, -18, -52, -30, -3],
 };
 
@@ -279,7 +279,7 @@ export const watchlist = [
 ];
 
 export const identity = {
-  agentId: 7, name: "Sentinel Risk-Guardian",
+  agentId: 7, name: "Custos Risk-Guardian",
   agentURI: "ipfs://bafybeiagentcard0a1b2c3d4e5f6g7h8i9",
   owner: "0xA11c3b9D7e2F4a8c6B0d1E5f9A3c7B2d4E6f8A0E" as `0x${string}`,
   identityRegistry: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as `0x${string}`,

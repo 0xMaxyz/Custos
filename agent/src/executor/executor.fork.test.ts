@@ -51,7 +51,7 @@ describeFork("Executor + Scheduler (fork integration)", () => {
   it("3.7: depeg snapshot (injected) forces de-risk → USDY weight 0", async () => {
     const { assess } = await import("../risk/engine.js");
     const { applyVerdict } = await import("../risk/validator.js");
-    const { Bucket } = await import("@sentinel/shared");
+    const { Bucket } = await import("@custos/shared");
 
     // Construct a snapshot with ~100bps peg deviation (forces forceDeRisk deterministically).
     const pipeline = buildPipeline(config);

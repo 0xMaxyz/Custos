@@ -1,4 +1,4 @@
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 
 import type { MarketSnapshot, WeightsBps } from "../types.js";
 import { TtlCache } from "./cache.js";

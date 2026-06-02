@@ -1,4 +1,4 @@
-# Sentinel — UI / UX Plan
+# Custos — UI / UX Plan
 
 Design spec for the frontend, intended as the brief for generating screens (Claude
 design). Stack is fixed: **React + Vite + Tailwind + daisyUI**, wallet via
@@ -49,7 +49,7 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 ```js
 // daisyui.themes
 {
-  "sentinel-light": {
+  "custos-light": {
     "primary": "#7c3aed", "primary-content": "#ffffff",
     "secondary": "#64748b", "accent": "#7c3aed",
     "neutral": "#1e293b",
@@ -58,7 +58,7 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
     "info": "#2563eb", "success": "#16a34a", "warning": "#d97706", "error": "#dc2626",
     "--rounded-box": "0.75rem", "--rounded-btn": "0.5rem"
   },
-  "sentinel-dark": {
+  "custos-dark": {
     "primary": "#8b5cf6", "primary-content": "#0b0710",
     "secondary": "#94a3b8", "accent": "#8b5cf6",
     "neutral": "#0f172a",
@@ -93,7 +93,7 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 
 ```
 ┌ Topbar ───────────────────────────────────────────────┐
-│ [Sentinel logo]   Dashboard  Activity  Agent  Insights │
+│ [Custos logo]   Dashboard  Activity  Agent  Insights │
 │                         [network pill] [theme] [wallet]│
 └────────────────────────────────────────────────────────┘
 │  Global banners (wrong-network / paused / kill-switch)  │
@@ -137,10 +137,10 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 - **Your position:** deposited value, current value, shares, all-time yield, blended
   APY. Primary buttons **Deposit** / **Withdraw** (open modals).
 - **Baseline counter (hero — the Turing-Test answer):** a prominent, always-visible
-  comparison **"Sentinel vs a passive 100% USDY holder"** — running **bps delta**
+  comparison **"Custos vs a passive 100% USDY holder"** — running **bps delta**
   (`passiveDeltaBps`) since inception / last de-risk, **drawdown avoided**
   (`drawdownAvoidedUsdc`, USD) summed across de-risk events, and **realized yield**
-  (`realizedYieldBps`). Render as a paired stat ("Passive USDY +X bps · Sentinel
+  (`realizedYieldBps`). Render as a paired stat ("Passive USDY +X bps · Custos
   +Y bps · avoided −Z bps drawdown") with a small sparkline. This is the single most
   important number on the page; legible disconnected (vault-wide) and personalized to
   the user's position when connected. Source: `AgentBenchmark` outcomes (§16).
@@ -314,7 +314,7 @@ receipt), **JobStatusChip** (ERC-8183 Open/Funded/Submitted/Completed/Rejected/E
 - **Conversational, bounded:** Ask-the-agent explains; it never executes from chat.
 - **Live "what I'm watching":** turns an invisible loop into something observable —
   the "radical transparency" theme made tangible.
-- **Beat-the-baseline, on-chain:** the Baseline counter (§5.1) shows Sentinel vs a
+- **Beat-the-baseline, on-chain:** the Baseline counter (§5.1) shows Custos vs a
   passive USDY holder in bps + drawdown avoided — the "can the AI actually beat
   passive?" answer, sourced from the on-chain `AgentBenchmark`.
 - **Guardrails made visible:** the Limits panel (§5.3) shows the immutable on-chain
@@ -500,7 +500,7 @@ Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR*
 | UI element | Field | Unit | Example | Source |
 |---|---|---|---|---|
 | Agent id | ERC-8004 `agentId` | uint | `7` | CHAIN |
-| Agent name / URI | `tokenURI` JSON `{name, agentURI}` | string | `Sentinel Risk-Guardian` | CHAIN |
+| Agent name / URI | `tokenURI` JSON `{name, agentURI}` | string | `Custos Risk-Guardian` | CHAIN |
 | Owner | NFT owner | address | `0xA11c…E0a` | CHAIN |
 | Identity registry | ERC-8004 Identity | address | `0x8004A169…a432` | CHAIN |
 | Decisions handled | `decisionCount` | uint | `14` | BM |
@@ -521,12 +521,12 @@ Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR*
 | Paid-evidence tx | receipt `transaction` | hash | `0xab12…` | AGENT (x402) |
 | Paid-evidence resource | receipt `resource` | url | `https://…/usdy-attestation` | AGENT (x402) |
 | Risk-score price | `maxAmountRequired` @ `payTo` | base units @ addr | `10000` @ `0x…bEEF` | AGENT (x402) |
-| Job status | ERC-8183 `JobStatus` | enum | `Completed` | JOBS (SentinelJobEscrow) |
+| Job status | ERC-8183 `JobStatus` | enum | `Completed` | JOBS (CustosJobEscrow) |
 | Job bounty | `Job.budget` | USDC | `$100.00` | JOBS |
 | Job evaluator | `Job.evaluator` | address | `0x…Eval` (guardrail-gated) | JOBS |
 | Job reputation | `appendFeedback(tag=DERISK)` | int (score) | `+610` | BM / ERC-8004 |
 
-> **JOBS** = `SentinelJobEscrow` / `SentinelDeRiskEvaluator` reads — a record layer,
+> **JOBS** = `CustosJobEscrow` / `CustosDeRiskEvaluator` reads — a record layer,
 > never the vault custody path.
 
 ---
@@ -574,7 +574,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 ### 17.3 Baseline counter (Dashboard hero)
 ```jsonc
 {
-  "passiveDeltaBps": 180,            // Sentinel +1.80% vs a 100%-USDY holder
+  "passiveDeltaBps": 180,            // Custos +1.80% vs a 100%-USDY holder
   "drawdownAvoidedUsdc": "610.00",   // summed across de-risk events
   "realizedYieldBps": 45,
   "sinceDecisionId": 12, "measuredAt": "2026-06-10T12:00:00Z"
@@ -641,7 +641,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 ### 17.7 Identity card (Agent §5.3)
 ```jsonc
 {
-  "agentId": 7, "name": "Sentinel Risk-Guardian",
+  "agentId": 7, "name": "Custos Risk-Guardian",
   "agentURI": "ipfs://bafy…agentcard", "owner": "0xA11c…E0a",
   "identityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
   "trackRecord": { "decisions": 14, "deRiskEvents": 2, "realizedVsPassivePct": 1.8, "drawdownAvoidedUsdc": "610.00" }

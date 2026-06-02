@@ -1,5 +1,5 @@
 {
-  "name": "@sentinel/web",
+  "name": "@custos/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.11",
-    "@sentinel/shared": "workspace:*",
+    "@custos/shared": "workspace:*",
     "@tanstack/react-query": "^5.100.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

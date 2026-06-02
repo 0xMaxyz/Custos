@@ -31,8 +31,8 @@ describe("useIdentity", () => {
     const r = useIdentity();
     expect(r.isLive).toBe(false);
     expect(r.identity.agentId).toBe(7);
-    // Derived from the canonical baseline fixture (sentinel 45 − passive -3 = 48).
+    // Derived from the canonical baseline fixture (custos 45 − passive -3 = 48).
     expect(r.baseline.deltaBps).toBe(48);
-    expect(r.baseline.sentinelAhead).toBe(true);
+    expect(r.baseline.custosAhead).toBe(true);
   });
 });

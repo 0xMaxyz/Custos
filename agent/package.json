@@ -1,5 +1,5 @@
 {
-  "name": "@sentinel/agent",
+  "name": "@custos/agent",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
-    "@sentinel/shared": "workspace:*",
+    "@custos/shared": "workspace:*",
     "fastify": "^5.2.0",
     "viem": "^2.21.55",
     "zod": "^3.24.1"

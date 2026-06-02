@@ -2,10 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Sentinel} from "../src/Sentinel.sol";
+import {Custos} from "../src/Custos.sol";
 
-contract SentinelTest is Test {
+contract CustosTest is Test {
     function test_MantleChainIdConstant() public pure {
-        assertEq(Sentinel.MANTLE_CHAIN_ID, 5000);
+        assertEq(Custos.MANTLE_CHAIN_ID, 5000);
     }
 }

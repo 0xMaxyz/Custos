@@ -1,5 +1,5 @@
 import { getAddress, keccak256, toBytes, type WalletClient, type PublicClient } from "viem";
-import { Bucket, MAX_SLIPPAGE_BPS, TOKENS, PROTOCOLS } from "@sentinel/shared";
+import { Bucket, MAX_SLIPPAGE_BPS, TOKENS, PROTOCOLS } from "@custos/shared";
 
 import type { AgentConfig } from "../config.js";
 import type { ChainClients } from "../chain/clients.js";

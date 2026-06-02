@@ -1,7 +1,7 @@
 /* Modals (§6): Modal shell, Connect, Deposit, Withdraw, TxStatus, NetworkSwitch, Account. Exported to window. */
 (function () {
   const { useState, useEffect, useRef } = React;
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
 
   // ---------- Modal shell: focus-trap, Esc, scroll-lock, aria ----------
   function Modal({ title, icon, onClose, children, footer, size }) {

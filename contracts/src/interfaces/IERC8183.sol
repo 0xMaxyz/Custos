@@ -3,11 +3,11 @@ pragma solidity 0.8.28;
 
 /**
  * @title IERC8183 — Agentic Commerce (verifiable escrowed jobs)
- * @notice Subset of the draft ERC-8183 standard (Virtuals + EF dAI) that Sentinel
+ * @notice Subset of the draft ERC-8183 standard (Virtuals + EF dAI) that Custos
  *         uses to model each de-risk as a verifiable, escrowed Job: a Client funds a
  *         budget, a Provider performs the work and submits a deliverable, and a single
  *         trusted Evaluator attests completion or rejection. Outcomes feed ERC-8004
- *         reputation (see SentinelDeRiskEvaluator).
+ *         reputation (see CustosDeRiskEvaluator).
  *
  * State machine (per the spec):
  *   Open      → Funded     (client funds the agreed budget)

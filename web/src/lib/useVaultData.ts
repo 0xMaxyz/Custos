@@ -115,7 +115,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   };
 
   // Build live baseline from the latest on-chain outcome when available.
-  // When on-chain data exists, clear sentinelSeries/passiveSeries so
+  // When on-chain data exists, clear custosSeries/passiveSeries so
   // computeBaseline() derives the headline delta from on-chain passiveDeltaBps
   // rather than from fixture series that would yield demo numbers (+0.48%).
   // Phase 5b will backfill the full series from benchmark history.
@@ -132,7 +132,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
       measuredAt:          new Date(Number(o.measuredAt) * 1000).toISOString(),
       sinceDecisionId:     decisionCount > 0 ? decisionCount - 1 : 0,
       // Clear demo series so computeBaseline falls back to on-chain passiveDeltaBps.
-      sentinelSeries: [],
+      custosSeries: [],
       passiveSeries:  [],
     };
   }

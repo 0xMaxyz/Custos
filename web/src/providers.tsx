@@ -10,9 +10,9 @@ import { mantleMainnet, mantleTestnet } from "./lib/chains";
 
 // WalletConnect Cloud project id. Falls back to a placeholder so local dev /
 // tests don't crash; set VITE_WALLETCONNECT_PROJECT_ID for real WC sessions.
-const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "sentinel-local-dev";
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "custos-local-dev";
 
-export const wagmiConfig = projectId === "sentinel-local-dev"
+export const wagmiConfig = projectId === "custos-local-dev"
   // Without a real WC project id, RainbowKit's WC connector errors — fall back
   // to a bare injected/transport config so the app still boots in dev/test.
   ? createConfig({
@@ -23,7 +23,7 @@ export const wagmiConfig = projectId === "sentinel-local-dev"
       },
     })
   : getDefaultConfig({
-      appName: "Sentinel",
+      appName: "Custos",
       projectId,
       chains: [mantleMainnet, mantleTestnet],
       transports: {
@@ -35,7 +35,7 @@ export const wagmiConfig = projectId === "sentinel-local-dev"
 const queryClient = new QueryClient();
 
 export function Providers({ children, theme }: { children: ReactNode; theme: string }) {
-  const dark = theme === "sentinel-dark";
+  const dark = theme === "custos-dark";
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>

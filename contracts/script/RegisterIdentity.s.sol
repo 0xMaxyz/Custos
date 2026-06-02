@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 /**
- * @title RegisterIdentity - Register the Sentinel agent in the ERC-8004 canonical
+ * @title RegisterIdentity - Register the Custos agent in the ERC-8004 canonical
  *        Identity Registry and pin the agent card URI (task 4.1 / 5.2).
  *
  * Run after Deploy.s.sol. Reads VAULT_ADDRESS, AGENT_CARD_URI from env.

@@ -7,7 +7,7 @@ schema), and `UI.md` (UI/UX plan). This file restates only the non-negotiables s
 they are never missed.
 
 ## Project (one line)
-**Sentinel** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
+**Custos** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
 5000). Users deposit **USDC**; an AI agent (Anthropic API (Claude)) earns tokenized-Treasury
 (**USDY**) yield with an **Aave v3** USDC liquidity floor, and **autonomously
 de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle staleness,

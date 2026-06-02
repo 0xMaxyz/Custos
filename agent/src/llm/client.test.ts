@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Bucket } from "@sentinel/shared";
+import { Bucket } from "@custos/shared";
 import type { LLMClient, RiskVerdict } from "./types.js";
 import { runSignalLayer, type EvidenceFetcher } from "./signals.js";
 import type { MarketSnapshot, RiskAssessment, WeightsBps } from "../types.js";

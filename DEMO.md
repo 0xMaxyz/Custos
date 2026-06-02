@@ -1,4 +1,4 @@
-# Sentinel — Demo Video Script & Production Plan
+# Custos — Demo Video Script & Production Plan
 
 The submission demo video. Optimized for the **20 Project Deployment Award**
 (requires a **≥2-min** walkthrough of the core use case), and to support **Best
@@ -34,11 +34,11 @@ on-camera requirement).
 ### 0:00–0:15 — Hook (the problem)
 - **VO:** "Tokenized US Treasuries pay real yield on-chain — but holding them blind
   is risky: pegs slip, oracles stall, issuers and regulations change. Most people
-  can't watch all of that. Sentinel can."
+  can't watch all of that. Custos can."
 - **SCR:** Landing/dashboard hero in dark theme; subtle scroll showing the clean UI.
 
 ### 0:15–0:35 — What it is
-- **VO:** "Sentinel is an AI risk-guardian real-yield account on Mantle. You deposit
+- **VO:** "Custos is an AI risk-guardian real-yield account on Mantle. You deposit
   USDC; it earns Treasury yield through USDY, keeps a liquid Aave floor, and an
   autonomous agent defends your money on-chain — proving every move."
 - **SCR:** Connect wallet (RainbowKit modal → connected), network pill shows Mantle.
@@ -97,8 +97,8 @@ on-camera requirement).
 
 1. "Tokenized US Treasuries pay real yield on-chain — but holding them blind is
    risky: pegs slip, oracles stall, issuers and regulations change. Most people
-   can't watch all of that. Sentinel can."
-2. "Sentinel is an AI risk-guardian real-yield account on Mantle. You deposit USDC;
+   can't watch all of that. Custos can."
+2. "Custos is an AI risk-guardian real-yield account on Mantle. You deposit USDC;
    it earns Treasury yield through USDY, keeps a liquid Aave floor, and an autonomous
    agent defends your money on-chain — proving every move."
 3. "Depositing is one flow. Approve, deposit USDC, and you receive vault shares. The

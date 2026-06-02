@@ -1,4 +1,4 @@
-/* Sentinel — design tokens (§2). Two themes as CSS custom properties on [data-theme].
+/* Custos — design tokens (§2). Two themes as CSS custom properties on [data-theme].
    Mirrors the daisyUI config sketch in §2.2. Primary violet, slate neutrals, status colors. */
 
 :root {
@@ -22,7 +22,7 @@
 }
 
 /* ---------------- LIGHT ---------------- */
-[data-theme="sentinel-light"] {
+[data-theme="custos-light"] {
   --primary: #7c3aed;
   --primary-hover: #6d28d9;
   --primary-soft: #f3effe;
@@ -56,7 +56,7 @@
 }
 
 /* ---------------- DARK ---------------- */
-[data-theme="sentinel-dark"] {
+[data-theme="custos-dark"] {
   --primary: #8b5cf6;
   --primary-hover: #a78bfa;
   --primary-soft: #1c1633;

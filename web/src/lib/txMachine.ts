@@ -11,7 +11,7 @@
 // Guardrails) so UI caps never drift. The web app works in human USDC units, so we
 // convert the 6-decimal shared constant down by 1e6.
 
-import { PER_TX_DEPOSIT_CAP_USDC } from "@sentinel/shared";
+import { PER_TX_DEPOSIT_CAP_USDC } from "@custos/shared";
 
 /** Per-transaction deposit cap (human USDC). Derived from PER_TX_DEPOSIT_CAP_USDC. */
 export const PER_TX_DEPOSIT_CAP = PER_TX_DEPOSIT_CAP_USDC / 1_000_000;

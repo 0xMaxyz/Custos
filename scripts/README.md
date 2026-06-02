@@ -4,10 +4,10 @@ Standalone operational scripts. No build step — run directly with Node 22+.
 
 ## check-mantle-liquidity.mjs
 
-Live liquidity + peg probe for Sentinel's RWA legs (USDY, mUSD, AUSD, USDC) on
+Live liquidity + peg probe for Custos's RWA legs (USDY, mUSD, AUSD, USDC) on
 Mantle. Answers "is there real DEX liquidity for USDY/mUSD on Mantle right now,
 and are the stables at peg?" — the question that decides whether the de-risk
-swaps Sentinel relies on are actually executable.
+swaps Custos relies on are actually executable.
 
 ```sh
 node scripts/check-mantle-liquidity.mjs              # human-readable report

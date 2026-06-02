@@ -23,7 +23,7 @@ import {
  *    (facilitator) — the receipt's `transaction` is a content-addressed reference.
  *  - {@link onChainSettlingVerifier}: verifies the signature, then SETTLES by submitting
  *    `transferWithAuthorization` (EIP-3009) on-chain and returns the real tx hash. Use
- *    this when Sentinel captures the payment itself.
+ *    this when Custos captures the payment itself.
  *
  * Neither touches the vault custody path; both keep settlement an explicit, auditable step.
  */
@@ -104,7 +104,7 @@ export interface OnChainSettleDeps {
 
 /**
  * Verifies the signature, then SETTLES by submitting `transferWithAuthorization`
- * on-chain (anyone may submit an EIP-3009 meta-tx; Sentinel relays it). Returns the
+ * on-chain (anyone may submit an EIP-3009 meta-tx; Custos relays it). Returns the
  * real settlement tx hash. Returns null (and submits nothing) if verification fails.
  */
 export function onChainSettlingVerifier(deps: OnChainSettleDeps): PaymentVerifier {

@@ -32,7 +32,7 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.100.1
         version: 0.100.1(zod@3.25.76)
-      '@sentinel/shared':
+      '@custos/shared':
         specifier: workspace:*
         version: link:../packages/shared
       fastify:
@@ -69,12 +69,12 @@ importers:
 
   web:
     dependencies:
+      '@custos/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       '@rainbow-me/rainbowkit':
         specifier: ^2.2.11
         version: 2.2.11(@tanstack/react-query@5.100.14(react@18.3.1))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)(viem@2.51.3(typescript@5.9.3)(zod@3.25.76))(wagmi@3.6.16(@tanstack/query-core@5.100.14)(@tanstack/react-query@5.100.14(react@18.3.1))(@types/react@18.3.29)(immer@11.1.8)(react@18.3.1)(typescript@5.9.3)(viem@2.51.3(typescript@5.9.3)(zod@3.25.76)))
-      '@sentinel/shared':
-        specifier: workspace:*
-        version: link:../packages/shared
       '@tanstack/react-query':
         specifier: ^5.100.14
         version: 5.100.14(react@18.3.1)

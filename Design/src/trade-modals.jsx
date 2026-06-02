@@ -1,7 +1,7 @@
 /* Deposit / Withdraw / Tx status modals (§6). Exported to window. */
 (function () {
   const { useState } = React;
-  const Icon = window.Icon, f = window.fmt, S = window.SENTINEL;
+  const Icon = window.Icon, f = window.fmt, S = window.CUSTOS;
   const Modal = window.Modal;
 
   const PER_TX_CAP = 10000, SHARE_PRICE = parseFloat(S.vault.sharePrice);

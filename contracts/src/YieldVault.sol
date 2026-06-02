@@ -106,7 +106,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
      */
     constructor(address usdc, address admin, address _guardrails)
         ERC4626(IERC20(usdc))
-        ERC20("Sentinel Yield Vault", "svUSDC")
+        ERC20("Custos Yield Vault", "svUSDC")
     {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(Roles.ADMIN, admin);

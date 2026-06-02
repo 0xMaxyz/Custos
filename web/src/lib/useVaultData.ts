@@ -8,8 +8,8 @@
 // Live fields: totalAssets (TVL), share price, the caller's position, the
 // allocation donut (idle + each adapter's totalAssets), kill-switch, and the
 // latest AgentBenchmark outcome. APY/peg/oracle figures are agent-computed
-// (off-chain) and remain fixture-backed here — the Insights radar serves those
-// live from the agent's /snapshot.
+// (off-chain), not produced here; the dashboard overlays them from the agent's
+// /snapshot via lib/vaultMetrics (the Insights radar uses the same source).
 
 import { useReadContracts, useReadContract, useChainId } from "wagmi";
 import { formatUnits }      from "viem";

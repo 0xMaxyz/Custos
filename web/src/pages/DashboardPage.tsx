@@ -264,11 +264,12 @@ export function DashboardPage({ connected, paused, killed, emptyPosition, go, on
   const { address } = useAccount();
   const { vault: vaultRaw, position, baseline, isLive: vaultLive } = useVaultData(address);
   // APY/peg/oracle are agent-computed: overlay them from the live /snapshot.
-  const { snapshot } = useInsightsData();
+  const { snapshot, stale } = useInsightsData();
   const vault = mergeSnapshotIntoVault(vaultRaw, snapshot);
-  // Live vault but no live snapshot → the agent isn't running; show "—" for its
-  // metrics instead of the demo fixtures. In demo mode (undeployed) keep fixtures.
-  const metricsUnavailable = vaultLive && !snapshot.live;
+  // Live vault but no live snapshot (agent never up) OR a stale one (agent was up,
+  // now failing — snapshot.live stays true on cached values) → show "—" for its
+  // metrics instead of demo/stale numbers. In demo mode (undeployed) keep fixtures.
+  const metricsUnavailable = vaultLive && (!snapshot.live || stale);
 
   if (loading) {
     return (

@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { Icon } from "../components/Icons";
-import { Card, Skeleton, EmptyState, InfoTip, ConfidenceMeter, SignalBadge } from "../components/Components";
+import { Card, Skeleton, EmptyState, InfoTip, ConfidenceMeter, SignalBadge, RwaFormSplit } from "../components/Components";
 import { AllocationChart, AllocationLegend, Sparkline, PegGauge } from "../components/Charts";
 import * as fmt from "../lib/fmt";
-import { RISK } from "../lib/data";
+import { RISK, rwaCore } from "../lib/data";
 import { useVaultData } from "../lib/useVaultData";
 import { useDecisions } from "../lib/useGuardianData";
 import { computeBaseline, formatDeltaPct } from "../lib/baseline";
@@ -177,6 +177,7 @@ function AllocationCard({ vault }: { vault: VaultState }) {
         </div>
         <div style={{ flex: "1 1 220px", minWidth: 200 }}>
           <AllocationLegend weightsBps={vault.weightsBps} tvlUsdc={vault.tvlUsdc} />
+          {vault.weightsBps.USDY > 0 && <RwaFormSplit usdyUsdc={rwaCore.usdyUsdc} musdUsdc={rwaCore.musdUsdc} />}
         </div>
       </div>
       <div style={{ marginTop: 16, padding: "12px 14px", borderRadius: "var(--rounded-btn)", background: ok ? "var(--success-soft)" : "var(--error-soft)", display: "flex", alignItems: "center", gap: 10 }}>

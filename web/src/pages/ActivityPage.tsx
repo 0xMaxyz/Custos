@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "../components/Icons";
-import { Card, RiskLevelChip, SignalBadge, EvidenceChip, FlagChip, OutcomeStrip, GuardrailsMark, ConfidenceMeter, AddressChip, Skeleton, EmptyState, ErrorState } from "../components/Components";
+import { Card, RiskLevelChip, SignalBadge, EvidenceChip, FlagChip, OutcomeStrip, GuardrailsMark, ConfidenceMeter, AddressChip, Skeleton, EmptyState, ErrorState, PaidEvidenceBadge, JobStatusChip } from "../components/Components";
 import { WeightBars } from "../components/Charts";
 import { Modal } from "../modals/Modals";
 import * as fmt from "../lib/fmt";
@@ -37,6 +37,8 @@ function DecisionItem({ d, onOpen }: { d: Decision; onOpen: (d: Decision) => voi
         <div style={{ margin: "14px 0", maxWidth: 420 }}><WeightBars pre={d.preWeightsBps} post={d.postWeightsBps} /></div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {d.signals.map((s, i) => <SignalBadge key={i} type={s.type} severity={s.severity} />)}
+          {d.payments?.map((p) => <PaidEvidenceBadge key={p.evidenceId} receipt={p} />)}
+          {d.job && <JobStatusChip status={d.job.status} />}
           <ConfidenceMeter value={d.confidence} compact />
           <GuardrailsMark small />
         </div>
@@ -67,6 +69,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onClose: () => void }) {
   const r = RISK[d.riskLevel];
   const evById = Object.fromEntries(d.evidence.map((e) => [e.id, e]));
+  const paidById = Object.fromEntries((d.payments ?? []).map((p) => [p.evidenceId, p]));
   return (
     <Modal title={`Decision #${d.id}`} icon={KIND[d.kind]?.icon ?? "refresh-cw"} onClose={onClose} size="lg">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
@@ -119,6 +122,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
                   <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "0.75rem", color: "var(--faint)" }}>Evidence:</span>
                     <EvidenceChip ev={ev} />
+                    {paidById[ev.id] && <PaidEvidenceBadge receipt={paidById[ev.id]!} />}
                     <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{ev.summary}</span>
                   </div>
                 )}
@@ -133,6 +137,32 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
           {d.outcome?.measuredAt && <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 10 }}>Measured {fmt.dateTime(d.outcome.measuredAt)}</div>}
         </div>
       </Section>
+      {d.job && (
+        <Section title="Verifiable job · ERC-8183">
+          <div style={{ padding: "14px 16px", borderRadius: "var(--rounded-btn)", background: "var(--base-200)" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+              <JobStatusChip status={d.job.status} />
+              <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>Settled by the deterministic guardrail Evaluator — released only because the de-risk was guardrail-justified.</span>
+            </div>
+            <div className="kvrow"><span className="k">Job id</span><span className="v mono">#{d.job.jobId}</span></div>
+            <div className="kvrow"><span className="k">Bounty</span><span className="v mono">{fmt.usd(d.job.budgetUsdc)}</span></div>
+            <div className="kvrow"><span className="k">Evaluator</span><AddressChip address={d.job.evaluator} /></div>
+            {d.job.reputation && (() => {
+              const rep = d.job!.reputation!;
+              const href = resolveDecisionUri(rep.uri);
+              const label = <>{rep.tag} · +{rep.score} <Icon name="external-link" size={12} /></>;
+              return (
+                <div className="kvrow"><span className="k">Reputation · ERC-8004</span>
+                  {href
+                    ? <a className="linklike mono" style={{ fontSize: "0.8125rem" }} href={href} target="_blank" rel="noreferrer">{label}</a>
+                    : <span className="v mono">{rep.tag} · +{rep.score}</span>}
+                </div>
+              );
+            })()}
+            <div style={{ fontSize: "0.6875rem", color: "var(--faint)", marginTop: 8 }}>Outside the vault custody path — a per-job bounty, never user deposits.</div>
+          </div>
+        </Section>
+      )}
       <Section title="Verifiability">
         <div className="kvrow"><span className="k">Transaction</span><AddressChip address={d.txHash} kind="tx" /></div>
         <div className="kvrow"><span className="k">Rationale hash</span><span className="mono v" style={{ fontSize: "0.8125rem" }}>{fmt.shortHash(d.rationaleHash, 10, 6)}</span></div>

@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Icon } from "../components/Icons";
-import { Card, AddressChip, StatusDot, Skeleton } from "../components/Components";
+import { Card, AddressChip, StatusDot, Skeleton, PaidEvidenceBadge, JobStatusChip } from "../components/Components";
 import * as fmt from "../lib/fmt";
-import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions } from "../lib/data";
+import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions, agentEconomics } from "../lib/data";
 import { askAgent } from "../lib/askAgent";
 import { useIdentity } from "../lib/useGuardianData";
 
@@ -91,6 +91,54 @@ function GuardrailsPanel() {
             <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{g.label}</div>
             <div className="mono" style={{ fontWeight: 600, fontSize: "1rem", marginTop: 3 }}>{g.value}</div>
             <div className="mono" style={{ fontSize: "0.6875rem", color: "var(--faint)", marginTop: 2 }}>{g.field}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function AgentEconomicsPanel() {
+  const { sells, paidEvidence, jobs } = agentEconomics;
+  return (
+    <Card>
+      <div className="card-hl">
+        <span className="card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Agent economics · A4</span>
+        <span className="chip role-neutral" style={{ height: 22 }} title="x402 payments and ERC-8183 job escrow never move vault deposits.">outside custody</span>
+      </div>
+      <p style={{ margin: "0 0 14px", fontSize: "0.875rem", color: "var(--muted)", lineHeight: 1.5 }}>
+        Buys its evidence, sells its judgment — and settles each de-risk as a verifiable job. None of this touches vault deposits.
+      </p>
+
+      <div className="stat-label" style={{ marginBottom: 6 }}>Sells · x402 paid endpoint</div>
+      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Risk score</span><span className="v mono">GET {sells.endpoint}</span></div>
+      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Price</span><span className="v mono">{sells.priceUsdc} {sells.asset} / call</span></div>
+      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Pay to</span><AddressChip address={sells.payTo} /></div>
+      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Calls served</span><span className="v mono">{sells.callsServed}</span></div>
+
+      <hr className="divider" />
+
+      <div className="stat-label" style={{ marginBottom: 8 }}>Buys · paid evidence (x402)</div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {paidEvidence.map((p, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <PaidEvidenceBadge receipt={{ evidenceId: "", amountUsdc: p.amountUsdc, asset: p.asset, transaction: p.transaction, network: "mantle", payer: sells.payTo, resource: "" }} />
+            <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{p.source} → decision <span className="mono">#{p.forDecision}</span></span>
+          </div>
+        ))}
+      </div>
+
+      <hr className="divider" />
+
+      <div className="stat-label" style={{ marginBottom: 8 }}>Verifiable jobs · ERC-8183 → ERC-8004 reputation</div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {jobs.map((j) => (
+          <div key={j.jobId} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <JobStatusChip status={j.status} />
+            <span className="mono" style={{ fontSize: "0.8125rem" }}>#{j.jobId}</span>
+            <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{fmt.usd(j.budgetUsdc)} bounty</span>
+            {j.forDecision != null && <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>→ decision <span className="mono">#{j.forDecision}</span></span>}
+            {j.reputationScore != null && <span className="chip role-success" style={{ height: 22 }}>+{j.reputationScore} rep</span>}
           </div>
         ))}
       </div>
@@ -187,6 +235,7 @@ export function AgentPage({ loading }: { loading: boolean }) {
         <div className="grid" style={{ gap: 16, alignContent: "start" }}>
           <IdentityCard />
           <WatchlistPanel />
+          <AgentEconomicsPanel />
           <GuardrailsPanel />
         </div>
         <AskPanel />

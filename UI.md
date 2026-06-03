@@ -22,6 +22,73 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 
 ---
 
+## 0. Status — what's shipped (the latest app)
+
+> This section records the **as-built** state, so the spec below reads as intent.
+> **Where they differ, this section wins.** Last synced after the dashboard
+> live-metrics work (PR #28/#30) and the **Sentinel → Custos** rename (PR #27).
+
+**App name & brand.** The product is **Custos** (Latin *guardian / keeper*, echoing
+*custody*) — the earlier working name "Sentinel" is fully retired (theme key, registry
+labels, and copy all migrated). The shipped brand mark is a lucide **`shield-check`**
+glyph + the **"Custos"** wordmark in the topbar; it's a placeholder for the generated
+mark briefed in [`Design/LOGO_PROMPT.md`](./Design/LOGO_PROMPT.md) — a shield fused with
+a watchful **aperture / eye**, violet `#7C3AED`. Tagline: *the guardian that proves
+every move.* Title/tab: "Custos — AI risk-guardian real-yield".
+
+**Pages & surfaces — all shipped** on the four hash routes: **Dashboard**, **Activity**
+(risk-guardian feed + decision-detail modal), **Agent** (identity · watchlist ·
+guardrails/limits · **Agent economics** A4 panel · Ask-the-agent), **Insights** (risk
+radar). Deposit/Withdraw are modals. The A4 + mUSD components shipped too —
+`RwaFormSplit`, `PaidEvidenceBadge`, `JobStatusChip`, `AgentEconomicsPanel`.
+
+**Live data by default.** Reads hit the **deployed contracts** via wagmi/viem and fall
+back to the §17 fixtures only in *demo mode* (no deployment/RPC configured):
+- `useVaultData` reads the live **`YieldVault`** (TVL/`totalAssets`, share price, the
+  caller's position, kill-switch), each **adapter's `totalAssets`** (allocation donut +
+  instant-liquidity), and the latest **`AgentBenchmark`** outcome (baseline headline),
+  resolved from `packages/shared/deployments`.
+- `useGuardianData` indexes the vault's **`DecisionRecorded`** logs (the Activity feed)
+  and resolves the **ERC-8004 `tokenURI`** (agent card) when `VITE_AGENT_ID` is set.
+- **Deployment:** **Mantle Sepolia 5003 is live and wired**; **mainnet 5000 switches on
+  automatically** once ROADMAP 5.2 records its addresses (consumers unchanged).
+- **Guardrails are fixture-displayed, not read on-chain (yet).** The Agent page "the
+  limits" panel renders the typed `web/src/lib/data.ts` array; its values mirror the
+  immutable `packages/shared` constants (identical to on-chain `Guardrails`), but no
+  `Guardrails.sol` call is made — a future seam (see Deferred).
+- **Agent-computed metrics** (blended APY, USDY peg = NAV vs DEX spot, oracle status) are
+  overlaid from the agent's **`GET /snapshot`**. When the agent is offline the dashboard
+  shows an explicit **"—" / "metrics unavailable"** state — it never paints demo numbers
+  over live chain data. Insights polls `/snapshot` every **15s** with an **updated /
+  stale / demo** freshness chip.
+- **Ask-the-agent** calls the live **`POST /ask`** endpoint when `VITE_AGENT_API_URL`
+  is set (showing grounding freshness), else returns fixture answers.
+
+**Stack realities (these differ from the forward-looking notes in §3/§4/§13):**
+- **Routing is hash-based** (`#dashboard` … `#insights`) via a tiny in-app router —
+  *not* react-router (no such dependency ships).
+- **Charts are hand-built inline SVG** (`AllocationChart` donut, `WeightBars`,
+  `Sparkline`, `PegGauge`, `LiquidityBufferBar`, `LineChart` + a "Show data table"
+  fallback) — *not* recharts/visx at runtime.
+- **Network status & switching is RainbowKit's `ConnectButton`** (`chainStatus="icon"`),
+  not a separate "network pill"; the wrong-network **banner** + disabled writes still apply.
+- **Themes** ship as **daisyUI-equivalent CSS custom properties** on
+  `.app-root[data-theme]` (the daisyUI config in §2.2 is present in `tailwind.config.ts`).
+  The choice persists under **`custos-theme`** (one-time migration from the legacy
+  `sentinel-theme` key); default follows `prefers-color-scheme`.
+- A **dev-only "Demo states" panel** toggles the §8 edge cases (paused / kill-switch /
+  wrong-network / empty position / activity error).
+
+**Deferred (Phase 5b / mainnet deploy, behind the existing `use*Data` seams):**
+per-decision **bundle enrichment** in the feed — signals · evidence · confidence ·
+outcome · accurate timestamps · txHash from the `decisionURI` (the `DecisionRecorded`
+*index* already ships live; each item is a minimal record until enriched); the identity
+**track-record** stats + the baseline **series**; a live **`Guardrails.sol`** read for the
+limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-backed. See
+ROADMAP 4.4 / 4.6 / 4.7 / 4.8 and Phase 5.
+
+---
+
 ## 1. Principles
 
 - **Trust through clarity.** This app moves money autonomously; every number, state,
@@ -69,9 +136,10 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
   }
 }
 ```
-- Theme persisted via `data-theme` on `<html>` + `localStorage`; default follows
-  `prefers-color-scheme`. RainbowKit theme is matched (lightTheme/darkTheme with
-  `accentColor` = primary) and switched in lockstep.
+- Theme persisted under the **`custos-theme`** `localStorage` key (with a one-time
+  migration from the legacy `sentinel-theme` key) and applied via `data-theme` on `<html>`
+  + the `.app-root` wrapper; default follows `prefers-color-scheme`. RainbowKit theme is
+  matched (lightTheme/darkTheme with `accentColor` = primary) and switched in lockstep.
 
 ### 2.3 Typography
 - **UI:** Inter (variable), system fallback `ui-sans-serif, system-ui, sans-serif`.
@@ -94,17 +162,18 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
 ```
 ┌ Topbar ───────────────────────────────────────────────┐
 │ [Custos logo]   Dashboard  Activity  Agent  Insights │
-│                         [network pill] [theme] [wallet]│
+│                       [theme] [ConnectButton ▸ chain]  │
 └────────────────────────────────────────────────────────┘
 │  Global banners (wrong-network / paused / kill-switch)  │
 │  Page content (max-w ~1100px, centered, responsive)     │
 └ Footer (links: repo, docs, contract on mantlescan) ─────┘
 ```
-- **Routes (react-router):** `/` Dashboard · `/activity` Risk-Guardian feed ·
-  `/agent` Agent · `/insights` Risk radar (Should). Deposit/withdraw are **modals**,
-  not routes.
-- **Topbar** persistent: nav tabs, **network pill** (Mainnet/Testnet), **theme
-  toggle**, **RainbowKit ConnectButton**.
+- **Routes (hash-based):** `#dashboard` Dashboard · `#activity` Risk-Guardian feed ·
+  `#agent` Agent · `#insights` Risk radar (Should). Deposit/withdraw are **modals**,
+  not routes. (Ships as a small in-app hash router — not react-router.)
+- **Topbar** persistent: nav tabs, **theme toggle**, and the **RainbowKit
+  ConnectButton** (`chainStatus="icon"`) — it surfaces the current chain and opens the
+  chain switcher, standing in for a separate network pill.
 - Mobile: nav collapses to a bottom tab bar or hamburger; content single-column.
 
 ---
@@ -115,7 +184,8 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
   WalletConnect, Coinbase Wallet.
 - **Chains:** Mantle mainnet (5000) + Mantle Sepolia testnet (5003). `wagmi` config
   with viem transports (our RPC + fallback). RainbowKit theme matched to light/dark.
-- **Network pill** shows current chain; clicking opens RainbowKit chain switcher.
+- **Network status** is shown by the RainbowKit **ConnectButton** (`chainStatus="icon"`);
+  clicking it opens the chain switcher. (No separate network-pill component ships.)
 - **Wrong-network guard:** if connected to an unsupported chain, show a sticky
   warning banner + "Switch to Mantle" button; disable all write actions.
 - **Account states:** Disconnected (CTA to connect) · Connected (address, balance,
@@ -211,7 +281,9 @@ UI/UX award: Visual Design 30% · Interaction & Flow 30% · **AI Interaction Des
   interval 1h · peg warn/block/de-risk 0.3 / 0.5 / 1.0% · TVL cap $50k · per-tx deposit
   cap $10k · add-strategy timelock 48h**. Makes the "AI proposes, guardrails dispose —
   the model is never the last line of defense" thesis concrete. Source: `packages/shared`
-  constants, identical to on-chain `Guardrails.config()` (§16).
+  constants, identical to on-chain `Guardrails.config()` (§16) — currently
+  **fixture-displayed** from `web/src/lib/data.ts`, not yet a live `Guardrails.sol` read
+  (see §0).
 - **Ask the agent (Should):** chat panel — "Why am I in AUSD right now?", "What
   changed today?" — answered from decision history + current snapshot. Clearly
   labeled as explanations (read-only; the agent never takes orders from chat).
@@ -352,14 +424,19 @@ receipt), **JobStatusChip** (ERC-8183 Open/Funded/Submitted/Completed/Rejected/E
 
 ## 13. Tech implementation notes
 
-- **Libs:** react-router, @rainbow-me/rainbowkit, wagmi, viem, @tanstack/react-query
-  (via wagmi), tailwindcss, daisyui, lucide-react, a light chart lib (recharts or
-  visx) with table fallback. **Backend/agent also use viem** (no ethers).
-- **Theming:** daisyUI two custom themes (§2.2) toggled via `data-theme`; RainbowKit
-  `lightTheme`/`darkTheme` matched to primary; single theme context.
+- **Libs (as shipped):** @rainbow-me/rainbowkit, wagmi, viem, @tanstack/react-query
+  (via wagmi), tailwindcss + daisyui, lucide-style inline icons. **Routing is a small
+  hash router** (no react-router). **Charts are hand-built inline SVG** with a
+  "Show data table" fallback (no recharts/visx at runtime). **Backend/agent also use
+  viem** (no ethers).
+- **Theming:** two daisyUI-equivalent themes (§2.2) as CSS custom properties toggled via
+  `data-theme` on `.app-root`; RainbowKit `lightTheme`/`darkTheme` matched to primary;
+  persisted under `custos-theme` (one-time migration from the legacy `sentinel-theme`).
 - **Data layer:** wagmi hooks (reads) + viem wallet client (writes); contract ABIs &
-  addresses imported from `packages/shared`; agent/API endpoints (Fastify) for
-  decision history, evidence resolution (IPFS), and Ask-the-agent.
+  addresses imported from `packages/shared/deployments` (**live by default**; fixtures
+  only in demo mode). Agent/API endpoints (Fastify): **`GET /snapshot`** (agent-computed
+  APY/peg/oracle, polled by Insights + Dashboard), **`POST /ask`** (Ask-the-agent), plus
+  decision history + evidence resolution (IPFS).
 - **Env:** RPC URLs, WalletConnect projectId, API base — via Vite env; never commit.
 
 ---
@@ -377,6 +454,11 @@ receipt), **JobStatusChip** (ERC-8183 Open/Funded/Submitted/Completed/Rejected/E
 > Build with mock data first (typed fixtures), then wire to chain/agent so screens
 > can be designed and reviewed before contracts land on testnet. The fixtures in §17
 > are the canonical mock set — design and review against those exact values.
+>
+> **Status:** this fixtures-first build order is complete. Screens now read **live by
+> default** from the deployed contracts + the agent `/snapshot`, with the §17 fixtures as
+> the demo-mode fallback (see §0). Remaining live wiring (decision-event indexing, live
+> registry/benchmark reads) lands with the mainnet deploy, behind the same `use*Data` seams.
 
 ---
 

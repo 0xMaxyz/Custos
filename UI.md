@@ -281,7 +281,9 @@ ROADMAP 4.4 / 4.6 / 4.7 / 4.8 and Phase 5.
   interval 1h · peg warn/block/de-risk 0.3 / 0.5 / 1.0% · TVL cap $50k · per-tx deposit
   cap $10k · add-strategy timelock 48h**. Makes the "AI proposes, guardrails dispose —
   the model is never the last line of defense" thesis concrete. Source: `packages/shared`
-  constants, identical to on-chain `Guardrails.config()` (§16).
+  constants, identical to on-chain `Guardrails.config()` (§16) — currently
+  **fixture-displayed** from `web/src/lib/data.ts`, not yet a live `Guardrails.sol` read
+  (see §0).
 - **Ask the agent (Should):** chat panel — "Why am I in AUSD right now?", "What
   changed today?" — answered from decision history + current snapshot. Clearly
   labeled as explanations (read-only; the agent never takes orders from chat).

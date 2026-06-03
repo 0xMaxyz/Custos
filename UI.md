@@ -44,10 +44,18 @@ radar). Deposit/Withdraw are modals. The A4 + mUSD components shipped too —
 
 **Live data by default.** Reads hit the **deployed contracts** via wagmi/viem and fall
 back to the §17 fixtures only in *demo mode* (no deployment/RPC configured):
-- `useVaultData` / `useGuardianData` read the live `YieldVault` / `Guardrails` /
-  `AgentBenchmark` from `packages/shared/deployments` — **Mantle Sepolia 5003 is live
-  and wired**; **mainnet 5000 switches on automatically** once ROADMAP 5.2 records its
-  addresses (consumers unchanged).
+- `useVaultData` reads the live **`YieldVault`** (TVL/`totalAssets`, share price, the
+  caller's position, kill-switch), each **adapter's `totalAssets`** (allocation donut +
+  instant-liquidity), and the latest **`AgentBenchmark`** outcome (baseline headline),
+  resolved from `packages/shared/deployments`.
+- `useGuardianData` indexes the vault's **`DecisionRecorded`** logs (the Activity feed)
+  and resolves the **ERC-8004 `tokenURI`** (agent card) when `VITE_AGENT_ID` is set.
+- **Deployment:** **Mantle Sepolia 5003 is live and wired**; **mainnet 5000 switches on
+  automatically** once ROADMAP 5.2 records its addresses (consumers unchanged).
+- **Guardrails are fixture-displayed, not read on-chain (yet).** The Agent page "the
+  limits" panel renders the typed `web/src/lib/data.ts` array; its values mirror the
+  immutable `packages/shared` constants (identical to on-chain `Guardrails`), but no
+  `Guardrails.sol` call is made — a future seam (see Deferred).
 - **Agent-computed metrics** (blended APY, USDY peg = NAV vs DEX spot, oracle status) are
   overlaid from the agent's **`GET /snapshot`**. When the agent is offline the dashboard
   shows an explicit **"—" / "metrics unavailable"** state — it never paints demo numbers
@@ -71,10 +79,13 @@ back to the §17 fixtures only in *demo mode* (no deployment/RPC configured):
 - A **dev-only "Demo states" panel** toggles the §8 edge cases (paused / kill-switch /
   wrong-network / empty position / activity error).
 
-**Deferred (lands with the mainnet deploy, behind the existing `use*Data` seams):**
-live `DecisionRecorded`/`OutcomeUpdated` event indexing for the feed, live ERC-8004
-registry + `AgentBenchmark` track-record reads, and live x402 / ERC-8183-job indexing —
-all currently on fixtures. See ROADMAP 4.4 / 4.6 / 4.7 / 4.8 and Phase 5.
+**Deferred (Phase 5b / mainnet deploy, behind the existing `use*Data` seams):**
+per-decision **bundle enrichment** in the feed — signals · evidence · confidence ·
+outcome · accurate timestamps · txHash from the `decisionURI` (the `DecisionRecorded`
+*index* already ships live; each item is a minimal record until enriched); the identity
+**track-record** stats + the baseline **series**; a live **`Guardrails.sol`** read for the
+limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-backed. See
+ROADMAP 4.4 / 4.6 / 4.7 / 4.8 and Phase 5.
 
 ---
 

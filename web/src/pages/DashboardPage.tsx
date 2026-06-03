@@ -9,6 +9,8 @@ import * as fmt from "../lib/fmt";
 import { RISK, rwaCore } from "../lib/data";
 import { useVaultData } from "../lib/useVaultData";
 import { useDecisions } from "../lib/useGuardianData";
+import { useInsightsData } from "../lib/useInsightsData";
+import { mergeSnapshotIntoVault } from "../lib/vaultMetrics";
 import { computeBaseline, formatDeltaPct } from "../lib/baseline";
 import type { PositionState, VaultState } from "../lib/data";
 import type { VaultData } from "../lib/useVaultData";
@@ -100,9 +102,9 @@ function BaselineCounter({ baseline: b }: { baseline: VaultData["baseline"] }) {
   );
 }
 
-function PositionCard({ connected, empty, paused, killed, vault, position, onDeposit, onWithdraw, onConnect }: {
+function PositionCard({ connected, empty, paused, killed, vault, position, metricsUnavailable, onDeposit, onWithdraw, onConnect }: {
   connected: boolean; empty: boolean; paused: boolean; killed: boolean;
-  vault: VaultState; position: PositionState;
+  vault: VaultState; position: PositionState; metricsUnavailable: boolean;
   onDeposit: () => void; onWithdraw: () => void; onConnect: () => void;
 }) {
   if (!connected) {
@@ -130,7 +132,9 @@ function PositionCard({ connected, empty, paused, killed, vault, position, onDep
     <Card>
       <div className="card-hl">
         <span className="card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Your position</span>
-        <span className="chip role-success" style={{ height: 22 }}>{fmt.bpsToPct(vault.blendedApyBps)} blended APY</span>
+        {metricsUnavailable
+          ? <span className="chip" style={{ height: 22 }} title="Live APY comes from the agent — start it (VITE_AGENT_API_URL)">blended APY —</span>
+          : <span className="chip role-success" style={{ height: 22 }}>{fmt.bpsToPct(vault.blendedApyBps)} blended APY</span>}
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div>
@@ -189,7 +193,7 @@ function AllocationCard({ vault }: { vault: VaultState }) {
   );
 }
 
-function VaultStatsCard({ vault }: { vault: VaultState }) {
+function VaultStatsCard({ vault, metricsUnavailable }: { vault: VaultState; metricsUnavailable: boolean }) {
   const [open, setOpen] = useState(false);
   const tvl = parseFloat(vault.tvlUsdc), cap = parseFloat(vault.tvlCapUsdc);
   const usedPct = Math.round((tvl / cap) * 100);
@@ -209,11 +213,11 @@ function VaultStatsCard({ vault }: { vault: VaultState }) {
           <div className="stat-label" style={{ display: "flex", alignItems: "center", gap: 4 }}>Blended APY
             <button className="iconbtn-sm" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="Toggle APY breakdown"><Icon name="chevron-down" size={13} style={{ transform: open ? "rotate(180deg)" : "", transition: "transform var(--dur)" }} /></button>
           </div>
-          <div className="mono" style={{ fontWeight: 600, fontSize: "1.125rem", marginTop: 4, color: "var(--success)" }}>{fmt.bpsToPct(vault.blendedApyBps)}</div>
+          <div className="mono" style={{ fontWeight: 600, fontSize: "1.125rem", marginTop: 4, color: metricsUnavailable ? "var(--muted)" : "var(--success)" }}>{metricsUnavailable ? "—" : fmt.bpsToPct(vault.blendedApyBps)}</div>
           {open && (
             <div style={{ marginTop: 8, fontSize: "0.8125rem" }}>
-              <div className="kvrow" style={{ padding: "4px 0" }}><span className="k">USDY implied APY</span><span className="v mono" style={{ fontSize: "0.8125rem" }}>{fmt.bpsToPct(vault.usdyImpliedApyBps)}</span></div>
-              <div className="kvrow" style={{ padding: "4px 0" }}><span className="k">Aave supply APY</span><span className="v mono" style={{ fontSize: "0.8125rem" }}>{fmt.bpsToPct(vault.aaveUsdcSupplyApyBps)}</span></div>
+              <div className="kvrow" style={{ padding: "4px 0" }}><span className="k">USDY implied APY</span><span className="v mono" style={{ fontSize: "0.8125rem" }}>{metricsUnavailable ? "—" : fmt.bpsToPct(vault.usdyImpliedApyBps)}</span></div>
+              <div className="kvrow" style={{ padding: "4px 0" }}><span className="k">Aave supply APY</span><span className="v mono" style={{ fontSize: "0.8125rem" }}>{metricsUnavailable ? "—" : fmt.bpsToPct(vault.aaveUsdcSupplyApyBps)}</span></div>
               <div style={{ fontSize: "0.6875rem", color: "var(--faint)", marginTop: 4 }}>The yield spread the agent weighs.</div>
             </div>
           )}
@@ -223,17 +227,30 @@ function VaultStatsCard({ vault }: { vault: VaultState }) {
       <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         <div>
           <div className="stat-label" style={{ marginBottom: 8 }}>USDY peg</div>
-          <PegGauge deviationBps={vault.pegDeviationBps} />
+          {metricsUnavailable
+            ? <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 8 }}>Peg comparison (NAV vs DEX) comes from the agent.</div>
+            : <PegGauge deviationBps={vault.pegDeviationBps} />}
         </div>
         <div>
           <div className="stat-label">Oracle status</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-            <span className="chip role-success"><Icon name="check" size={13} />Valid</span>
-          </div>
-          <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 8 }}>Range valid until <span className="mono">{fmt.dateShort(vault.oracleRangeEnd)}</span></div>
-          <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 3 }}>Range-based oracle — not a staleness clock.</div>
+          {metricsUnavailable ? (
+            <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 8 }}>—<span style={{ color: "var(--faint)" }}> · agent offline</span></div>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <span className="chip role-success"><Icon name="check" size={13} />Valid</span>
+              </div>
+              <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 8 }}>Range valid until <span className="mono">{fmt.dateShort(vault.oracleRangeEnd)}</span></div>
+              <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 3 }}>Range-based oracle — not a staleness clock.</div>
+            </>
+          )}
         </div>
       </div>
+      {metricsUnavailable && (
+        <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 12 }}>
+          Yield &amp; peg metrics are agent-computed — start the agent (<span className="mono">VITE_AGENT_API_URL</span>) to see live values.
+        </div>
+      )}
     </Card>
   );
 }
@@ -245,7 +262,14 @@ interface DashboardPageProps {
 
 export function DashboardPage({ connected, paused, killed, emptyPosition, go, onDeposit, onWithdraw, onConnect, loading }: DashboardPageProps) {
   const { address } = useAccount();
-  const { vault, position, baseline } = useVaultData(address);
+  const { vault: vaultRaw, position, baseline, isLive: vaultLive } = useVaultData(address);
+  // APY/peg/oracle are agent-computed: overlay them from the live /snapshot.
+  const { snapshot, stale } = useInsightsData();
+  const vault = mergeSnapshotIntoVault(vaultRaw, snapshot);
+  // Live vault but no live snapshot (agent never up) OR a stale one (agent was up,
+  // now failing — snapshot.live stays true on cached values) → show "—" for its
+  // metrics instead of demo/stale numbers. In demo mode (undeployed) keep fixtures.
+  const metricsUnavailable = vaultLive && (!snapshot.live || stale);
 
   if (loading) {
     return (
@@ -269,10 +293,10 @@ export function DashboardPage({ connected, paused, killed, emptyPosition, go, on
         <AgentStatusCard go={go} />
         <BaselineCounter baseline={baseline} />
         <div className="grid dash-cols">
-          <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} vault={vault} position={position} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
+          <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} vault={vault} position={position} metricsUnavailable={metricsUnavailable} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
           <AllocationCard vault={vault} />
         </div>
-        <VaultStatsCard vault={vault} />
+        <VaultStatsCard vault={vault} metricsUnavailable={metricsUnavailable} />
       </div>
     </div>
   );

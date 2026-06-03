@@ -77,14 +77,37 @@ prepare_env_file() {
   fi
 }
 
+ensure_docker_daemon() {
+  if [[ -S /var/run/docker.sock ]]; then
+    return 0
+  fi
+
+  log "Starting Docker daemon..."
+  run_optional service docker start
+  run_optional systemctl start docker
+
+  local i
+  for i in $(seq 1 30); do
+    [[ -S /var/run/docker.sock ]] && return 0
+    sleep 1
+  done
+
+  warn "Docker daemon did not become ready; skipping compose stack"
+  return 1
+}
+
 start_docker_stack() {
   if [[ ! -f "$ROOT/docker-compose.yml" ]]; then
     return 0
   fi
 
-  log "Starting docker compose stack..."
+  ensure_docker_daemon || return 0
+
+  log "Prefetching docker compose images..."
   cd "$ROOT"
   export_foundry_path
+  run_optional docker pull node:22-slim
+  run_optional docker pull caddy:2-alpine
   run_optional docker compose up -d --build
 }
 

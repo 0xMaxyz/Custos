@@ -11,6 +11,9 @@
 #   Node 20/21/22 (nvm), pnpm/npm/yarn, Docker + docker compose, git/jq/ripgrep
 #   https://code.claude.com/docs/en/claude-code-on-the-web#installed-tools
 #
+# Docker daemon is NOT running during this setup script — do not pull images here.
+# Image pulls and `docker compose up` run in the repo SessionStart hook instead.
+#
 # Trusted network mode blocks binaries.soliditylang.org — solc is fetched from
 # GitHub releases instead. Add rpc.mantle.xyz + api.1delta.io to Allowed domains
 # in the environment for Mantle fork tests / live RPC (per-repo concern).
@@ -22,13 +25,22 @@ readonly FOUNDRY_VERSION="v1.4.1"
 readonly SOLC_VERSION="0.8.28"
 readonly NODE_VERSION="22"
 readonly PNPM_VERSION="10.33.0"
+readonly FOUNDRY_BIN_DIR="$HOME/.foundry/bin"
 
 log() { printf '[custos-cloud-env] %s\n' "$*"; }
 warn() { printf '[custos-cloud-env] WARN: %s\n' "$*" >&2; }
+die() { printf '[custos-cloud-env] ERROR: %s\n' "$*" >&2; exit 1; }
 
 run_optional() {
   log "+ $*"
   "$@" || warn "optional step failed (continuing): $*"
+}
+
+persist_foundry_path() {
+  export PATH="${FOUNDRY_BIN_DIR}:$PATH"
+  if ! grep -q 'foundry/bin' "$HOME/.bashrc" 2>/dev/null; then
+    echo 'export PATH="$HOME/.foundry/bin:$PATH"' >>"$HOME/.bashrc"
+  fi
 }
 
 activate_node_toolchain() {
@@ -46,21 +58,37 @@ activate_node_toolchain() {
 }
 
 install_foundry() {
-  export PATH="$HOME/.foundry/bin:$PATH"
+  persist_foundry_path
+  mkdir -p "$FOUNDRY_BIN_DIR"
 
-  if command -v forge >/dev/null 2>&1; then
-    log "Foundry already installed: $(forge --version | head -1)"
+  if [[ -x "${FOUNDRY_BIN_DIR}/forge" ]]; then
+    log "Foundry already installed: $("${FOUNDRY_BIN_DIR}/forge" --version | head -1)"
     return 0
   fi
 
-  log "Installing Foundry ${FOUNDRY_VERSION}..."
-  curl -sSL https://foundry.paradigm.xyz | bash
-  [[ -f "$HOME/.foundry/bin/foundryup" ]] || { log "ERROR: foundry install failed"; exit 1; }
-  "$HOME/.foundry/bin/foundryup" --version "$FOUNDRY_VERSION"
+  local arch="amd64"
+  case "$(uname -m)" in
+    aarch64 | arm64) arch="arm64" ;;
+    x86_64) arch="amd64" ;;
+    *) die "Unsupported CPU architecture: $(uname -m)" ;;
+  esac
 
-  if ! grep -q 'foundry/bin' "$HOME/.bashrc" 2>/dev/null; then
-    echo 'export PATH="$HOME/.foundry/bin:$PATH"' >>"$HOME/.bashrc"
-  fi
+  local tarball="foundry_${FOUNDRY_VERSION}_linux_${arch}.tar.gz"
+  local url="https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/${tarball}"
+
+  log "Installing Foundry ${FOUNDRY_VERSION} from GitHub releases..."
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -fsSL "$url" | tar -xzf - -C "$tmp"
+
+  for bin in forge cast anvil chisel; do
+    [[ -f "$tmp/$bin" ]] || die "Foundry archive missing $bin"
+    install -m 755 "$tmp/$bin" "${FOUNDRY_BIN_DIR}/${bin}"
+  done
+  rm -rf "$tmp"
+
+  [[ -x "${FOUNDRY_BIN_DIR}/forge" ]] || die "Foundry install failed: forge not found in ${FOUNDRY_BIN_DIR}"
+  log "Foundry installed: $("${FOUNDRY_BIN_DIR}/forge" --version | head -1)"
 }
 
 install_solc_offline() {
@@ -81,7 +109,7 @@ install_solc_offline() {
 
   log "Installing solc ${SOLC_VERSION} from GitHub releases..."
   mkdir -p "$solc_dir"
-  curl -sSL -o "$solc_bin" \
+  curl -fsSL -o "$solc_bin" \
     "https://github.com/ethereum/solidity/releases/download/v${SOLC_VERSION}/${asset}"
   chmod +x "$solc_bin"
 }
@@ -92,19 +120,12 @@ install_playwright() {
   run_optional npx --yes playwright install chromium
 }
 
-cache_base_images() {
-  log "Prefetching Docker base images used by Custos Dockerfiles..."
-  run_optional docker pull node:22-slim
-  run_optional docker pull caddy:2-alpine
-}
-
 verify_toolchain() {
   log "Verifying environment toolchain..."
   node --version
   pnpm --version
-  export PATH="$HOME/.foundry/bin:$PATH"
-  forge --version | head -1
-  docker compose version
+  persist_foundry_path
+  "${FOUNDRY_BIN_DIR}/forge" --version | head -1
   run_optional npx --yes playwright --version
   log "Cloud environment setup complete."
 }
@@ -113,5 +134,4 @@ activate_node_toolchain
 install_foundry
 install_solc_offline
 install_playwright
-cache_base_images
 verify_toolchain

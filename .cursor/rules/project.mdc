@@ -1,22 +1,22 @@
 ---
 description: >
   Custos project rules — AI risk-guardian real-yield account on Mantle.
-  Canonical guide AGENTS.md; plan PLAN.md; execution ROADMAP.md; specs SPEC.md;
-  UI UI.md. Read ALL before acting. PR review rules in pr-review.mdc.
+  Canonical guide docs/agents.md; design docs/architecture.md; specs docs/spec.md;
+  UI docs/ui.md. Read ALL before acting. PR review rules in pr-review.mdc.
 alwaysApply: true
 ---
 
 # Custos — Cursor Project Rules
 
-`AGENTS.md` is the **canonical operating guide**, `PLAN.md` the **full plan**,
-`ROADMAP.md` the **PR-sized execution breakdown** (per-phase tasks with What / Goal /
-Test), `SPEC.md` the **technical spec** (guardrail parameters, contract interfaces,
-Anthropic API prompt + risk-signal schema), and `UI.md` the **UI/UX plan**. Read
-all five before acting. This rule restates the non-negotiables.
+`docs/agents.md` is the **canonical operating guide**, `docs/architecture.md` the
+**project design & decisions**, `docs/spec.md` the **technical spec** (guardrail
+parameters, contract interfaces, Anthropic API prompt + risk-signal schema), and
+`docs/ui.md` the **UI/UX plan**. Read all four before acting. This rule restates
+the non-negotiables.
 
 **For PR reviews** (human or agentic): use `.cursor/rules/pr-review.mdc` — it
-contains the full acceptance criteria, build/test commands, phase-specific gates,
-and the required review output format.
+contains the full acceptance criteria, build/test commands, and the required review
+output format.
 
 ## Project (one line)
 **Custos** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
@@ -24,8 +24,8 @@ and the required review output format.
 tokenized-Treasury (**USDY**) yield with an **Aave v3** USDC liquidity floor, and
 **autonomously de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle
 staleness, issuer/regulatory shock), recording every decision **and its evidence**
-on-chain under an **ERC-8004** identity. Track: **AI x RWA (Application path)**. The
-verifiable autonomous defense — not the swap-to-USDY — is the product.
+on-chain under an **ERC-8004** identity. The verifiable autonomous defense — not the
+swap-to-USDY — is the product.
 
 ## Non-negotiables
 - **1delta = data + optional swap routing ONLY.** Never in the custody/execution
@@ -34,7 +34,7 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
   that call protocols/DEXs directly with on-chain `minOut`/guardrail checks.
 - **Guardrails are final.** LLM proposes -> deterministic TS validator checks ->
   immutable on-chain guardrails are the backstop. The LLM may only **tighten**
-  risk, never loosen it (see `SPEC.md` section 3). Shared constants between
+  risk, never loosen it (see `docs/spec.md` section 3). Shared constants between
   `Guardrails.sol` and the TS validator live in `packages/shared`.
 - **AI only where it beats an algorithm.** Yield math, peg/oracle/liquidity/
   execution stay deterministic. LLM is used only for: unstructured->structured RWA
@@ -45,14 +45,13 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
   never KYC-gated mint; no leverage/looping; ALLOCATOR is a guardrail-bounded hot
   key with a kill switch.
 - **Verify addresses on-chain** before integrating. Develop/test against
-  `anvil --fork` of Mantle mainnet. Phase-0 liquidity/oracle gates are mandatory.
+  `anvil --fork` of Mantle mainnet.
 - **Ground-truth reads via RPC** for held assets (Aave position, USDY NAV/DEX price,
   AUSD proof-of-reserves); 1delta is breadth/UX only.
 - **Never commit secrets.** Git-ignored `.env` + documented `.env.example`. No
   secret logging.
-- **Scope discipline (MoSCoW + ROADMAP):** Must -> Should -> Could. Work in PR-sized
-  tasks per `ROADMAP.md`; don't start a phase before prior exit criteria are met.
-  Feature-freeze **2026-06-12**.
+- **Scope discipline:** Must -> Should -> Could. Keep changes focused; no speculative
+  features or premature abstractions.
 
 ## Stack (do not substitute without asking)
 Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI ·
@@ -60,18 +59,18 @@ Solidity + Foundry (forge/anvil/cast) · React + Vite + Tailwind + daisyUI ·
 (backend/agent — no ethers)** · Vitest + Forge tests · Docker + Caddy · **Anthropic
 API (Claude) via `@anthropic-ai/sdk`** · 1delta API + Mantle RPC.
 UI: clean/professional, purple accent (#7c3aed light / #8b5cf6 dark), light+dark
-themes — see `UI.md`.
+themes — see `docs/ui.md`.
 
 ## Conventions
 - TypeScript strict mode; no plain JS source files.
 - Solidity: explicit visibility, custom errors (not `require("string")`), NatSpec on
   external/public functions, checks-effects-interactions, reentrancy guards on
-  fund-moving functions. Prefer OpenZeppelin/Solmate. Match `SPEC.md` section 2 interfaces.
+  fund-moving functions. Prefer OpenZeppelin/Solmate. Match `docs/spec.md` section 2 interfaces.
 - Comments explain non-obvious WHY only — never narrate what code does, never leave
   "explaining the change" comments.
 - Every fund-moving contract needs Forge fork tests (happy path + guardrail
   violation + depeg/de-risk + liquidity-crunch withdrawal). Risk engine + TS
-  validator need Vitest. Frontend follows `UI.md`; build with mock data first.
+  validator need Vitest. Frontend follows `docs/ui.md`; build with mock data first.
 - Money math: bigint/fixed-point everywhere — no floats for on-chain amounts.
   Always enforce minOut/slippage on swaps.
 
@@ -80,11 +79,10 @@ themes — see `UI.md`.
   working branch unless asked.
 - **Commits:** one logical change per commit; clear messages.
 - **PRs:** **create a GitHub PR after every completed task or logical step.** PR body
-  must state phase, task number(s), what was built, and which gate/test passes. Mark
-  tasks `[x] DONE` in `ROADMAP.md` and record the PR number so future sessions pick
-  up current state without re-reading history.
+  must state what was built and which tests pass. Update the relevant `docs/` file
+  if the plan changes.
 - **Review:** every PR must pass the checks in `.cursor/rules/pr-review.mdc` before
   merge. Agentic reviewers must use that file as their review checklist.
-- Keep `PLAN.md` / `ROADMAP.md` / `SPEC.md` / `UI.md` / `AGENTS.md` / `CLAUDE.md` /
-  `project.mdc` in sync when the plan changes.
+- Keep `docs/architecture.md` / `docs/spec.md` / `docs/ui.md` / `docs/agents.md` /
+  `CLAUDE.md` / `project.mdc` in sync when the plan changes.
 - When unsure about guardrails, custody, the 1delta boundary, or scope — ask first.

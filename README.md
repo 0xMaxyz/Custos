@@ -13,8 +13,8 @@ evidence** on-chain under an ERC-8004 identity.
 > the product.
 
 **Track:** AI × RWA (Application path), exclusively supported by Mantle. See
-[`PLAN.md`](./PLAN.md), [`ROADMAP.md`](./ROADMAP.md), [`SPEC.md`](./SPEC.md),
-[`AGENTS.md`](./AGENTS.md), and [`UI.md`](./UI.md).
+[`docs/architecture.md`](./docs/architecture.md), [`docs/spec.md`](./docs/spec.md),
+[`docs/agents.md`](./docs/agents.md), and [`docs/ui.md`](./docs/ui.md).
 
 ## How it works
 
@@ -215,22 +215,18 @@ Solidity + Foundry · React + Vite + Tailwind + daisyUI · RainbowKit + wagmi + 
 - [x] Open-source repo with **README** (setup · architecture · deployed addresses · the 3 answers).
 - [x] One-line pitch + the three answers (above).
 
-## Note for Claude Code on the web / restricted environments
+## Note for restricted environments (no public internet)
 
-This environment's network allowlist permits npm, GitHub, and the Anthropic API,
-but **blocks the Mantle RPC, 1delta API, and `binaries.soliditylang.org`.**
-Consequences:
+If `forge build` cannot reach `binaries.soliditylang.org`, install solc from GitHub
+releases (one-time per container):
 
-- **Solidity compiler:** `forge build` cannot fetch solc from the Solidity binary
-  server. Install it from GitHub releases instead (one-time per container):
-  ```bash
-  mkdir -p ~/.svm/0.8.28
-  curl -sSL -o ~/.svm/0.8.28/solc-0.8.28 \
-    https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux
-  chmod +x ~/.svm/0.8.28/solc-0.8.28
-  forge build --root contracts --offline
-  ```
-- **On-chain work** (fork tests, `cast` calls, the agent's RPC/1delta calls)
-  requires adding these hosts to the environment's network policy:
-  `rpc.mantle.xyz` (+ mirrors), `api.1delta.io`. (`api.anthropic.com` is already
-  allowed.)
+```bash
+mkdir -p ~/.svm/0.8.28
+curl -sSL -o ~/.svm/0.8.28/solc-0.8.28 \
+  https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux
+chmod +x ~/.svm/0.8.28/solc-0.8.28
+forge build --root contracts --offline
+```
+
+Fork tests and agent RPC/1delta calls additionally require `rpc.mantle.xyz` and
+`api.1delta.io` to be reachable.

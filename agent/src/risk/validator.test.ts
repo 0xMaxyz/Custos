@@ -85,6 +85,7 @@ describe("validateProposal — individual guardrail checks", () => {
 
   it("rejects a move exceeding the 50% cap", () => {
     // IDLE 300→5301 (+5001), AAVE 4700→4699 (−1), USDY 5000→0 (−5000) → totalMove = 5001 > 5000 cap.
+    // AAVE decreases, so this is NOT a pure risk-reduction → still capped (M2 exemption N/A).
     const r = validateProposal(
       { [Bucket.IDLE]: 5_301, [Bucket.AAVE]: 4_699, [Bucket.USDY]: 0, [Bucket.AUSD]: 0 },
       CURRENT,
@@ -92,6 +93,21 @@ describe("validateProposal — individual guardrail checks", () => {
       MAX_USDY,
       CTX,
     );
+    expect(r.errors).toContain("MOVE_EXCEEDS_MAX");
+  });
+
+  it("exempts a pure risk-reducing USDY exit (>50%) from the move cap (M2)", () => {
+    // USDY 60% → 0 into IDLE, AAVE flat. totalMove = 60% > 50%, but risk-reducing → valid.
+    const currentHighUsdy = weights(0, 4_000, 6_000, 0);
+    const r = validateProposal(weights(6_000, 4_000, 0, 0), currentHighUsdy, BASE_SNAPSHOT, MAX_USDY, CTX);
+    expect(r.errors).not.toContain("MOVE_EXCEEDS_MAX");
+    expect(r.valid).toBe(true);
+  });
+
+  it("still caps a risk-neutral AAVE→AUSD reshuffle with flat USDY (M2)", () => {
+    // AAVE 90% → 30%, AUSD 0 → 60%, USDY flat. totalMove = 60% > 50%, NOT risk-reducing.
+    const current = weights(1_000, 9_000, 0, 0);
+    const r = validateProposal(weights(1_000, 3_000, 0, 6_000), current, BASE_SNAPSHOT, MAX_USDY, CTX);
     expect(r.errors).toContain("MOVE_EXCEEDS_MAX");
   });
 

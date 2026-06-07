@@ -409,6 +409,73 @@ contract Phase2aTest is Test {
         console2.log("[2.5] vault idle USDC after deRisk:", usdc.balanceOf(address(vault)));
     }
 
+    function test_DeRiskRevertsWhenSwapUnderpaysBelowFloor() public {
+        // C2 regression: de-risk must enforce an oracle-derived USDC floor, not
+        // minOut=0. Seed the USDY bucket (deposit $1k, rebalance 50% into USDY).
+        usdc.mint(user, DEPOSIT);
+        vm.startPrank(user);
+        usdc.approve(address(vault), DEPOSIT);
+        vault.deposit(DEPOSIT, user);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 2 hours);
+        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
+        bytes[] memory sd = new bytes[](4);
+        sd[2] = _buyUsdy(DEPOSIT / 2);
+        vm.prank(allocator);
+        vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), NAV);
+
+        uint256 usdyBefore = usdy.balanceOf(address(adapter));
+        assertGt(usdyBefore, 0);
+
+        // Aggregator underpays (pays half): realized ~250e6 < the oracle floor
+        // (500e6 × 99.5% = 497.5e6). Pre-fix this ran with minOut=0 and SUCCEEDED
+        // with the USDY unsold; the floor now makes it fail closed.
+        router.setShouldUnderpay(true);
+        bytes[] memory exit = new bytes[](4);
+        exit[2] = _sellUsdy(usdyBefore);
+        vm.prank(guardian);
+        vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput (selector-only match unavailable for errors with args)
+        vault.deRisk(0, exit, "underpay", bytes32("evidence"), 0);
+    }
+
+    function test_DeRiskSpotAwareFloorCompletesDuringDepeg() public {
+        // C2 regression: a depeg is the scenario de-risk exists for, so the floor
+        // must track the agent-supplied DEX spot (min(NAV, spot)) rather than NAV
+        // alone — otherwise it would wrongly block the exit. Seed the USDY bucket.
+        usdc.mint(user, DEPOSIT);
+        vm.startPrank(user);
+        usdc.approve(address(vault), DEPOSIT);
+        vault.deposit(DEPOSIT, user);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 2 hours);
+        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
+        bytes[] memory sd = new bytes[](4);
+        sd[2] = _buyUsdy(DEPOSIT / 2);
+        vm.prank(allocator);
+        vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), NAV);
+
+        uint256 usdyBefore = usdy.balanceOf(address(adapter)); // 500e18
+        bytes[] memory exit = new bytes[](4);
+        exit[2] = _sellUsdy(usdyBefore);
+
+        // Depeg: oracle NAV stays 1.00 but the DEX now pays only 0.99 → realized 495e6.
+        router.setRate(address(usdy), address(usdc), 99, 100e12);
+
+        // A NAV-only floor (spot=0 → 497.5e6) would WRONGLY revert during the depeg…
+        vm.prank(guardian);
+        vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput: realized 495e6 < 497.5e6 NAV floor
+        vault.deRisk(0, exit, "nav-floor", bytes32("evidence"), 0);
+
+        // …but the spot-aware floor (spot=0.99e18 → 495e6 × 99.5% = 492.525e6) clears,
+        // so the de-risk completes and the USDY bucket is fully exited.
+        vm.prank(guardian);
+        vault.deRisk(0, exit, "spot-floor", bytes32("evidence"), 0.99e18);
+        assertEq(usdy.balanceOf(address(adapter)), 0);
+        assertGt(usdc.balanceOf(address(vault)), 0);
+    }
+
     function test_DeRiskAllocatorBlockedWithoutOracleCondition() public {
         // Allocator cannot deRisk if oracle hasn't tripped.
         usdc.mint(user, DEPOSIT);

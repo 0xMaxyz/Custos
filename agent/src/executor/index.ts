@@ -319,8 +319,10 @@ export class Executor {
         const deltaWeightBps = BigInt(currentUsdy - finalUsdy);
         const usdcValue = (deltaWeightBps * snapshot.totalAssetsUsdc) / 10_000n;
         // usdyOracleNavUsdc is 18-dec (price of 1 USDY in USDC × 1e18).
-        // usdyIn = usdcValue (6-dec) * 1e18 / usdyOracleNavUsdc (18-dec) → 6-dec, then scale to 18.
-        const usdyIn = (usdcValue * 10n ** 18n) / snapshot.usdyOracleNavUsdc;
+        // usdyIn (18-dec) = usdcValue (6-dec) × 1e30 / nav (18-dec) — mirrors the on-chain
+        // UsdyAdapter.deposit math (expectedUsdy = usdcAmount × 1e30 / nav). The 1e30 carries
+        // both the 6→18 decimal scale (1e12) and the price inversion (1e18).
+        const usdyIn = (usdcValue * 10n ** 30n) / snapshot.usdyOracleNavUsdc;
         quote = await oneDelta.getSwapQuote(
           TOKENS.USDY.address,
           TOKENS.USDC.address,

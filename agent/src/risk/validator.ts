@@ -60,6 +60,20 @@ const UNFIXABLE = new Set<ValidationError>([
 ]);
 
 /**
+ * True when a move only reduces USDY (RWA) exposure into safe buckets: USDY strictly
+ * decreases and IDLE/AAVE/AUSD are all non-decreasing. Such de-risk moves are exempt
+ * from the per-rebalance move cap (M2; mirrors Guardrails._isRiskReducing).
+ */
+function isRiskReducing(pre: WeightsBps, post: WeightsBps): boolean {
+  return (
+    post[Bucket.USDY] < pre[Bucket.USDY] &&
+    post[Bucket.IDLE] >= pre[Bucket.IDLE] &&
+    post[Bucket.AAVE] >= pre[Bucket.AAVE] &&
+    post[Bucket.AUSD] >= pre[Bucket.AUSD]
+  );
+}
+
+/**
  * Pure check: runs all guardrail checks and returns the list of violated rules.
  * Shared by {@link validateProposal} and the repair re-check to avoid recursion.
  */
@@ -98,14 +112,19 @@ function checkErrors(
     errors.push("REBALANCE_TOO_SOON");
   }
 
-  // 6. Per-rebalance move cap (sum of absolute changes / 2).
+  // 6. Per-rebalance move cap (sum of absolute changes / 2). Pure risk-reductions
+  //    (USDY strictly down, every other bucket non-decreasing) are exempt so an
+  //    LLM-news de-risk of a >50% USDY position can fully exit (M2; mirrors
+  //    Guardrails._isRiskReducing).
   const totalMove =
     (Math.abs(proposed[Bucket.IDLE] - current[Bucket.IDLE]) +
       Math.abs(proposed[Bucket.AAVE] - current[Bucket.AAVE]) +
       Math.abs(proposed[Bucket.USDY] - current[Bucket.USDY]) +
       Math.abs(proposed[Bucket.AUSD] - current[Bucket.AUSD])) /
     2;
-  if (totalMove > MAX_REBALANCE_MOVE_BPS) errors.push("MOVE_EXCEEDS_MAX");
+  if (totalMove > MAX_REBALANCE_MOVE_BPS && !isRiskReducing(current, proposed)) {
+    errors.push("MOVE_EXCEEDS_MAX");
+  }
 
   // 7a. USDY guardrail ceiling.
   if (proposed[Bucket.USDY] > maxUsdyWeightBpsAllowed) errors.push("USDY_EXCEEDS_GUARDRAIL");

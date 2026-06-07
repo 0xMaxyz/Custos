@@ -180,7 +180,10 @@ contract Guardrails is AccessControl {
             return (false, RebalanceIntervalNotElapsed.selector);
         }
 
-        // 6. Max single-rebalance move size.
+        // 6. Max single-rebalance move size. Exempt pure risk-reductions (USDY weight
+        //    strictly down, every other bucket non-decreasing) so an LLM-news de-risk of
+        //    a >50% USDY position can fully exit into safe buckets without tripping the
+        //    cap (M2). Such moves never add RWA risk; all other guardrails still apply.
         uint256 totalMoveBps = 0;
         for (uint8 i = 0; i < 4; i++) {
             totalMoveBps += postWeightsBps[i] > preWeightsBps[i]
@@ -188,7 +191,7 @@ contract Guardrails is AccessControl {
                 : preWeightsBps[i] - postWeightsBps[i];
         }
         totalMoveBps /= 2; // each dollar moved is counted twice (out + in)
-        if (totalMoveBps > c.maxRebalanceMoveBps) {
+        if (totalMoveBps > c.maxRebalanceMoveBps && !_isRiskReducing(preWeightsBps, postWeightsBps)) {
             return (false, RebalanceMoveTooLarge.selector);
         }
 
@@ -283,6 +286,22 @@ contract Guardrails is AccessControl {
 
     function _sum(uint16[4] calldata w) private pure returns (uint256 s) {
         s = uint256(w[0]) + w[1] + w[2] + w[3];
+    }
+
+    /**
+     * @notice True when a move only reduces USDY (RWA) exposure into safe buckets:
+     *         USDY strictly decreases and IDLE/AAVE/AUSD are all non-decreasing. Such
+     *         de-risk moves are exempt from the per-rebalance move-size cap (M2) — they
+     *         add no RWA risk, so the cap (which bounds fat-finger/MEV on reallocations)
+     *         should not block a full USDY exit; every other guardrail still applies.
+     */
+    function _isRiskReducing(uint16[4] calldata pre, uint16[4] calldata post)
+        private
+        pure
+        returns (bool)
+    {
+        return post[_USDY] < pre[_USDY] && post[_IDLE] >= pre[_IDLE] && post[_AAVE] >= pre[_AAVE]
+            && post[_AUSD] >= pre[_AUSD];
     }
 
     function _min(uint16 a, uint16 b) private pure returns (uint16) {

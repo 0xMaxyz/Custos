@@ -571,6 +571,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     s.lastRebalanceAt = lastRebalanceAt;
 
     // USDY oracle values: populated when the USDY adapter (bucket 2) is registered.
+    // H1: s.oracleUpdatedAt is intentionally left 0 — Mantle's Ondo oracle exposes no
+    // on-chain updatedAt, and oracleData() returns rangeEnd=0 (currentRange() reverts),
+    // so the Guardrails staleness checks are inert here by design (see Guardrails §H1).
     IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
     if (address(usdyAdapter) != address(0)) {
       try IUsdyAdapter(address(usdyAdapter)).oracleData() returns (uint256 nav, uint64 rangeEnd) {
@@ -580,7 +583,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         /* oracle down: leave as 0, guard stays inactive this cycle */
       }
     }
-    // Use agent-supplied DEX spot; guard only fires when both nav and spot are non-zero.
+    // H2: usdyDexSpot is a TRUSTED allocator-supplied input (the same hot key the depeg
+    // guard constrains). The $5k notional / 60% weight caps bound the exposure; an
+    // on-chain TWAP cross-check is deferred to Phase 2b. The guard only fires when both
+    // nav and spot are non-zero.
     s.usdyDexSpot = usdyDexSpotUsdc;
   }
 

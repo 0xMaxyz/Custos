@@ -46,7 +46,7 @@ export interface CycleResult {
 
 // keccak256("DecisionRecorded(uint256,uint8,bytes32,string)") — topic0 used to
 // identify the event in receipts without relying on log position.
-const DECISION_RECORDED_TOPIC0 = keccak256(
+export const DECISION_RECORDED_TOPIC0 = keccak256(
   toBytes("DecisionRecorded(uint256,uint8,bytes32,string)"),
 ) as `0x${string}`;
 
@@ -378,12 +378,15 @@ function buildDeterministicRationale(assessment: ReturnType<typeof assess>): str
  * Filters by topic0 (event signature hash) and vault address to avoid mis-identifying
  * other indexed events from unrelated contracts.
  */
-function extractDecisionId(
+export function extractDecisionId(
   receipt: { logs: { address?: string; topics: readonly `0x${string}`[] }[] },
 ): bigint | undefined {
   for (const log of receipt.logs) {
-    if (log.topics[0] === DECISION_RECORDED_TOPIC0 && log.topics[1]) {
-      return BigInt(log.topics[1]);
+    const idTopic = log.topics[1];
+    // Require a well-formed 32-byte topic before BigInt() — a malformed/short topic
+    // would otherwise throw and abort receipt parsing (L3).
+    if (log.topics[0] === DECISION_RECORDED_TOPIC0 && idTopic && /^0x[0-9a-fA-F]{64}$/.test(idTopic)) {
+      return BigInt(idTopic);
     }
   }
   return undefined;

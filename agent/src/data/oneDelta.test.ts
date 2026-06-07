@@ -45,6 +45,14 @@ describe("OneDeltaClient", () => {
     await expect(client.getAaveUsdcMarket()).rejects.toThrow(/HTTP 503/);
   });
 
+  it("includes the response body in the error message (L4)", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ error: "rate limited" }, false, 429),
+    ) as unknown as FetchLike;
+    const client = new OneDeltaClient(config, { fetchImpl });
+    await expect(client.getAaveUsdcMarket()).rejects.toThrow(/rate limited/);
+  });
+
   it("parses a valid DEX spot into a bigint", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse({ spotUsdc18: "1081000000000000000" }),

@@ -51,6 +51,12 @@ export interface ServerOptions {
    * (`GET /risk-score`) other agents can call (ROADMAP A4.1 revenue surface).
    */
   readonly x402?: X402Options | undefined;
+  /**
+   * CORS allowlist for the public endpoints. `["*"]` (default) allows any origin —
+   * fine for the read-only/x402 surface today. Provide explicit origins to lock it
+   * down before adding any authenticated/mutating endpoint (L5).
+   */
+  readonly allowedOrigins?: readonly string[] | undefined;
 }
 
 /** Minimal fixed-window throttle (dependency-free). Global, not per-IP — the goal
@@ -84,12 +90,21 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     logger: { level: process.env.AGENT_LOG_LEVEL ?? "info" },
   });
 
-  // Permissive CORS for the read-only public endpoints: the agent controls no
-  // funds via HTTP and only surfaces already-public market data. In production
-  // the web app and agent sit behind the same Caddy reverse proxy (same-origin);
-  // this header keeps local cross-port dev working without a new dependency.
+  // CORS for the read-only public endpoints: the agent controls no funds via HTTP
+  // and only surfaces already-public market data. In production the web app and
+  // agent sit behind the same Caddy reverse proxy (same-origin). The allowlist
+  // defaults to "*" (keeps local cross-port dev working) but can be locked to
+  // specific origins via CORS_ALLOWED_ORIGINS before any authenticated endpoint (L5).
+  const allowedOrigins = options.allowedOrigins ?? ["*"];
+  const allowAllOrigins = allowedOrigins.includes("*");
   app.addHook("onSend", async (req, reply, payload) => {
-    reply.header("access-control-allow-origin", "*");
+    const origin = req.headers.origin;
+    if (allowAllOrigins) {
+      reply.header("access-control-allow-origin", "*");
+    } else if (origin && allowedOrigins.includes(origin)) {
+      reply.header("access-control-allow-origin", origin);
+      reply.header("vary", "Origin");
+    }
     // `x-payment` lets cross-origin agents pay the /risk-score endpoint (A4.1);
     // `x-payment-response` is exposed so they can read the settlement receipt.
     reply.header("access-control-allow-headers", "content-type, x-payment");

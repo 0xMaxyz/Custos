@@ -1,3 +1,4 @@
+import { formatUnits } from "viem";
 import { Bucket } from "@custos/shared";
 import { pegDeviationBps } from "../risk/engine.js";
 import type { MarketSnapshot, RiskAssessment } from "../types.js";
@@ -68,8 +69,10 @@ function buildLLMInput(
   const nav18 = snapshot.usdyOracleNavUsdc;
   const spot18 = snapshot.usdyDexSpotUsdc;
 
-  const fmt18 = (v: bigint): string => (Number(v) / 1e18).toFixed(6);
-  const fmt6 = (v: bigint): string => (Number(v) / 1e6).toFixed(2);
+  // Convert via formatUnits (divides on the bigint — no precision loss) before the
+  // final fixed-decimal display; Number(bigint)/1e18 lost precision above 2^53 (L6).
+  const fmt18 = (v: bigint): string => Number(formatUnits(v, 18)).toFixed(6);
+  const fmt6 = (v: bigint): string => Number(formatUnits(v, 6)).toFixed(2);
 
   return {
     asOf: snapshot.asOf,

@@ -676,6 +676,24 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
   });
 });
 
+// ── extractDecisionId — malformed-topic robustness (L3) ────────────────────────
+
+describe("extractDecisionId", () => {
+  it("returns the id from a well-formed DecisionRecorded topic", async () => {
+    const { extractDecisionId, DECISION_RECORDED_TOPIC0 } = await import("./index.js");
+    const id = `0x${"0".repeat(63)}7` as `0x${string}`; // uint256 = 7, 32 bytes
+    const receipt = { logs: [{ topics: [DECISION_RECORDED_TOPIC0, id] }] };
+    expect(extractDecisionId(receipt)).toBe(7n);
+  });
+
+  it("skips a malformed (short) topic instead of throwing (L3)", async () => {
+    const { extractDecisionId, DECISION_RECORDED_TOPIC0 } = await import("./index.js");
+    const receipt = { logs: [{ topics: [DECISION_RECORDED_TOPIC0, "0x123" as `0x${string}`] }] };
+    expect(() => extractDecisionId(receipt)).not.toThrow();
+    expect(extractDecisionId(receipt)).toBeUndefined();
+  });
+});
+
 // ── Paid-evidence (x402) wiring (A4.1) ─────────────────────────────────────────
 // A decision must link a valid x402 receipt: with a paid-evidence fetcher injected,
 // the pinned bundle carries `payments` (and the bought evidence) — mocked 402→pay→200.

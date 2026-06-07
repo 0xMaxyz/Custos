@@ -170,6 +170,26 @@ describe("agent server — /ask (A3.1)", () => {
     expect(res.headers["access-control-allow-origin"]).toBe("*");
     await app.close();
   });
+
+  it("echoes an allow-listed origin and omits ACAO for others (L5)", async () => {
+    const app = buildServer({ allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+
+    const allowed = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "https://app.custos.xyz" },
+    });
+    expect(allowed.headers["access-control-allow-origin"]).toBe("https://app.custos.xyz");
+
+    const denied = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "https://evil.example" },
+    });
+    expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
+    await app.close();
+  });
 });
 
 describe("agent server — /snapshot (A2.1)", () => {

@@ -113,7 +113,8 @@ const x402 =
       }
     : undefined;
 
-const app = buildServer({ explainClient, getContext, x402 });
+const allowedOrigins = config.corsAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean);
+const app = buildServer({ explainClient, getContext, x402, allowedOrigins });
 
 // Wire the autonomous loop when execution prerequisites are configured.
 // Graceful read-only mode: if ALLOCATOR_PRIVATE_KEY or VAULT_ADDRESS are absent,

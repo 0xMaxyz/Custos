@@ -75,6 +75,10 @@ const configSchema = z.object({
   agentLogLevel: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  // Comma-separated CORS allowlist for the public read-only endpoints. Default "*"
+  // keeps local cross-port dev working; set specific origins before exposing any
+  // authenticated/mutating endpoint (L5).
+  corsAllowedOrigins: z.string().default("*"),
 }).superRefine((cfg, ctx) => {
   // The x402 paid endpoint needs an asset (EIP-712 verifyingContract) to settle in.
   if (cfg.x402PayTo && !cfg.x402Asset) {
@@ -129,6 +133,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     x402SettleOnChain: pick("X402_SETTLE_ONCHAIN"),
     agentPort: pick("AGENT_PORT"),
     agentLogLevel: pick("AGENT_LOG_LEVEL"),
+    corsAllowedOrigins: pick("CORS_ALLOWED_ORIGINS"),
   };
 }
 

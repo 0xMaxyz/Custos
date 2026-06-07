@@ -185,7 +185,9 @@ interface IYieldVault /* is IERC4626 */ {
     function unpause() external;       // GUARDIAN
     function kill() external;          // GUARDIAN
 
-    function setGuardrails(address) external;          // ADMIN
+    // Swapping the guardrail brain is the most sensitive admin action → timelocked (H3).
+    function queueGuardrails(address) external;         // ADMIN, queue
+    function activateGuardrails() external;             // ADMIN, after addStrategyTimelock
     function addStrategy(uint8 bucket, address adapter) external;   // ADMIN, timelocked
     function setTargetCaps(uint16[4] calldata maxWeightsBps) external; // ADMIN
 
@@ -217,15 +219,21 @@ interface IGuardrails {
 
     struct MarketState {
         uint256 usdyOracleNav;   // USDC per USDY, oracle
-        uint256 usdyDexSpot;     // USDC per USDY, DEX TWAP/quote
-        uint64  oracleUpdatedAt;
-        uint64  oracleRangeEnd;
+        uint256 usdyDexSpot;     // USDC per USDY — TRUSTED allocator-supplied input (H2)
+        uint64  oracleUpdatedAt; // INERT on Mantle: no on-chain updatedAt source (H1)
+        uint64  oracleRangeEnd;  // INERT on Mantle: currentRange() reverts → 0 (H1)
         uint256 aaveWithdrawable;
         uint256 totalAssets;
         uint64  lastRebalanceAt;
     }
 
     function config() external view returns (Config memory);
+
+    // Config governance (H3): setConfig is a one-shot bootstrap at deploy (applies
+    // instantly, then seals); every later change — tighten OR loosen — is timelocked.
+    function setConfig(Config calldata newConfig) external;   // ADMIN, one-shot bootstrap
+    function queueConfig(Config calldata newConfig) external; // ADMIN, queue
+    function activateConfig() external;                       // ADMIN, after addStrategyTimelock
 
     /// @return ok / reason selector. Pure check of a proposed allocation vs config + state.
     function validateRebalance(
@@ -241,6 +249,21 @@ interface IGuardrails {
         returns (bool blockNewUsdy, bool forceDeRisk, uint8 riskLevel); // 0 NORMAL,1 CAUTION,2 DERISK
 }
 ```
+
+**Oracle-staleness trust model on Mantle (H1).** `_evaluateUsdyRisk` has two staleness
+checks — `oracleStale` (via `oracleRangeEnd`) and `oracleAged` (via `oracleUpdatedAt`).
+Both are **inert on Mantle**: the deployed Ondo oracle exposes only `getPrice()` +
+`currentRange()` (no round/`updatedAt` accessor), and `currentRange()` reverts so the
+adapter returns `oracleRangeEnd = 0`. The real staleness guards are therefore
+`UsdyAdapter._requireOracleFresh`/`getPrice()` reverting on a dead oracle (which blocks
+deposit/withdraw/convert) plus the off-chain engine's `oracleUpdatedAt` check. The
+on-chain peg-deviation branch (NAV vs DEX spot) remains the active de-risk trigger.
+
+**Peg-input trust model (H2).** `MarketState.usdyDexSpot` is supplied by the ALLOCATOR
+on `rebalance`/`deRisk`, so the depeg guard that gates new USDY is fed by the same hot
+key it constrains. Exposure is bounded by the $5k USDY notional and 60% weight caps; a
+compromised allocator passing `spot == nav` only *clears* the gate (it cannot raise the
+caps). An on-chain DEX TWAP cross-check is deferred to Phase 2b.
 
 ### 2.4 `AgentBenchmark`
 ```solidity

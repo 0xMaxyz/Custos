@@ -290,6 +290,13 @@ contract Guardrails is AccessControl {
         view
         returns (bool blockNewUsdy, bool forceDeRisk, uint8 riskLevel)
     {
+        // H1 — both staleness checks below are INERT on Mantle: the deployed Ondo
+        // oracle has no on-chain `updatedAt` (so oracleUpdatedAt is never fed → 0) and
+        // its `currentRange()` reverts (so oracleRangeEnd is 0). The real staleness
+        // guards are UsdyAdapter._requireOracleFresh / getPrice() reverting on a dead
+        // oracle, plus the off-chain engine's updatedAt check; the peg-deviation branch
+        // below stays active. Kept here so the backstop works on any chain whose oracle
+        // DOES expose range/updatedAt. See docs/spec.md §2.3.
         // Oracle staleness: past range end = invalid NAV.
         bool oracleStale = s.oracleRangeEnd > 0 && block.timestamp > s.oracleRangeEnd;
         // Secondary staleness guard.

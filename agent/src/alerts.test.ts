@@ -78,6 +78,37 @@ describe("AlertNotifier", () => {
     expect((mockFetch.mock.calls[0]![0] as string)).toContain("discord.com");
   });
 
+  it("passes an AbortSignal on each webhook request (N4)", async () => {
+    const { notifier, mockFetch } = makeNotifier();
+    await notifier.notify(ALERT);
+    for (const call of mockFetch.mock.calls) {
+      const init = call[1] as RequestInit;
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("aborts a hung webhook after the timeout instead of stalling the scheduler (N4)", async () => {
+    vi.useFakeTimers();
+    try {
+      // Never resolves on its own; only the abort signal can settle it.
+      const hangingFetch = vi.fn((_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+      );
+      const notifier = new AlertNotifier(
+        { telegramBotToken: "t", telegramChatId: "c", timeoutMs: 5_000 },
+        hangingFetch as unknown as typeof fetch,
+      );
+      const pending = notifier.notify(ALERT);
+      await vi.advanceTimersByTimeAsync(5_000); // trip the timeout → abort → reject → swallowed
+      await expect(pending).resolves.toBeUndefined();
+      expect(hangingFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not throw when both channels fail", async () => {
     const failFetch = vi.fn().mockResolvedValue({ ok: false, text: async () => "internal error" });
     const notifier = new AlertNotifier(

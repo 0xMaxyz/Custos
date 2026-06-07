@@ -29,6 +29,9 @@ export interface RationaleBundle {
   readonly payments?: PaidEvidenceReceipt[];
 }
 
+/** Max time to wait on the IPFS pin before aborting (L2). */
+const PIN_TIMEOUT_MS = 10_000;
+
 export interface PinResult {
   /** IPFS CID (or a fallback URI when no IPFS backend is configured). */
   readonly uri: string;
@@ -75,10 +78,20 @@ export async function pinJson(
   const form = new FormData();
   form.append("file", new Blob([json], { type: "application/json" }), filename);
 
-  const res = await fetchImpl(`${config.ipfsApiUrl}/api/v0/add?pin=true`, {
-    method: "POST",
-    body: form,
-  });
+  // Bound the pin so a slow/hung pinning provider can't block the decision cycle (L2).
+  // The pin is fail-open in the executor, so an abort surfaces as a thrown error there.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PIN_TIMEOUT_MS);
+  let res: Awaited<ReturnType<typeof fetchImpl>>;
+  try {
+    res = await fetchImpl(`${config.ipfsApiUrl}/api/v0/add?pin=true`, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) throw new Error(`IPFS pin failed: HTTP ${res.status}`);
 

@@ -146,11 +146,30 @@ export class OneDeltaClient {
         signal: controller.signal,
       });
       if (!res.ok) {
-        throw new Error(`1delta request failed: ${path} → HTTP ${res.status}`);
+        // Include a truncated response body for debuggability (L4). The API key rides
+        // the request header, not the response, so this is safe to surface.
+        const body = await readBodySafe(res);
+        throw new Error(
+          `1delta request failed: ${path} → HTTP ${res.status}${body ? ` — ${body}` : ""}`,
+        );
       }
       return await res.json();
     } finally {
       clearTimeout(timer);
     }
+  }
+}
+
+/**
+ * Best-effort read of a (JSON) error body for diagnostics, truncated to 200 chars.
+ * Never throws — returns "" if the body is absent or unparseable (L4).
+ */
+async function readBodySafe(res: { json: () => Promise<unknown> }): Promise<string> {
+  try {
+    const body = await res.json();
+    const str = typeof body === "string" ? body : JSON.stringify(body);
+    return str.length > 200 ? `${str.slice(0, 200)}…` : str;
+  } catch {
+    return "";
   }
 }

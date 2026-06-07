@@ -10,11 +10,11 @@ pragma solidity 0.8.28;
  * Run: forge test --match-contract AaveV3AdapterTest -vv
  */
 
-import {Test} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {AaveV3Adapter} from "../src/AaveV3Adapter.sol";
-import {MockAaveV3Pool} from "./mocks/MockAaveV3Pool.sol";
+import { AaveV3Adapter } from "../src/AaveV3Adapter.sol";
+import { MockAaveV3Pool } from "./mocks/MockAaveV3Pool.sol";
 
 // Mintable/burnable ERC-20 for USDC and the aToken.
 contract MintBurnERC20 {

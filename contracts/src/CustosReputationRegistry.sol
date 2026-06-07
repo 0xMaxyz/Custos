@@ -83,7 +83,9 @@ contract CustosReputationRegistry is IReputationRegistry, AccessControl {
         onlyRole(REPORTER)
     {
         // Reverts if the agent id was never registered (tokenURI on a missing id reverts).
-        try IDENTITY.tokenURI(agentId) returns (string memory) {
+        try IDENTITY.tokenURI(agentId) returns (
+            string memory
+        ) {
         // exists
         }
         catch {
@@ -91,8 +93,7 @@ contract CustosReputationRegistry is IReputationRegistry, AccessControl {
         }
 
         uint256 index = _feedback[agentId].length;
-        _feedback[agentId]
-        .push(
+        _feedback[agentId].push(
             Feedback({
                 reporter: msg.sender, tag: tag, score: score, uri: uri, at: uint64(block.timestamp)
             })

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
-import {Roles}           from "./Roles.sol";
-import {IAgentBenchmark} from "./interfaces/IAgentBenchmark.sol";
+import { Roles } from "./Roles.sol";
+import { IAgentBenchmark } from "./interfaces/IAgentBenchmark.sol";
 
 /**
  * @title AgentBenchmark
@@ -62,7 +62,7 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
     function recordDecision(
         uint256 decisionId,
         bytes32 rationaleHash,
-        string  calldata decisionURI,
+        string calldata decisionURI,
         uint256 usdyNavAtDecision
     ) external override {
         if (msg.sender != VAULT) revert OnlyVault();
@@ -81,7 +81,9 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
         if (!_recorded[decisionId]) revert DecisionNotFound();
         if (_outcomes[decisionId].measuredAt != 0) revert OutcomeAlreadySet();
         _outcomes[decisionId] = o;
-        emit OutcomeUpdated(decisionId, o.realizedYieldBps, o.drawdownAvoidedUsdc, o.passiveDeltaBps);
+        emit OutcomeUpdated(
+            decisionId, o.realizedYieldBps, o.drawdownAvoidedUsdc, o.passiveDeltaBps
+        );
     }
 
     /// @inheritdoc IAgentBenchmark
@@ -93,5 +95,4 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
     function navAtDecision(uint256 decisionId) external view override returns (uint256) {
         return _navAtDecision[decisionId];
     }
-
 }

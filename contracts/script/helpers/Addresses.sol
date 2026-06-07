@@ -19,20 +19,22 @@ library Addresses {
     address internal constant MAINNET_MUSD = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
 
     /// Ondo USDY Redemption Price Oracle — getPrice() returns 18-dec NAV.
-    address internal constant MAINNET_USDY_ORACLE   = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
+    address internal constant MAINNET_USDY_ORACLE = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
     /// Pinned Odos aggregator router for USDC<->USDY swaps (UsdyAdapter).
-    address internal constant MAINNET_USDY_ROUTER   = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
+    address internal constant MAINNET_USDY_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
     /// Aave v3 PoolAddressesProvider; Pool + aUSDC resolved dynamically.
     address internal constant MAINNET_AAVE_PROVIDER = 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f;
 
     // ERC-8004 canonical singletons (present on Mantle mainnet).
-    address internal constant MAINNET_ERC8004_IDENTITY   = 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432;
-    address internal constant MAINNET_ERC8004_REPUTATION = 0x8004BAa17C55a88189AE136b182e5fdA19dE9b63;
+    address internal constant MAINNET_ERC8004_IDENTITY = 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432;
+    address internal constant MAINNET_ERC8004_REPUTATION =
+        0x8004BAa17C55a88189AE136b182e5fdA19dE9b63;
 
     // ── Mantle testnet / Mantle Sepolia (chainId 5003) ────────────────────────
 
     // Token addresses on Mantle Sepolia — resolved from env vars TESTNET_USDC etc.
     // Fallback: deploy mock tokens via DeployMocks.s.sol if no env var set.
-    address internal constant TESTNET_ERC8004_IDENTITY   = 0x8004A818BFB912233c491871b3d84c89A494BD9e;
-    address internal constant TESTNET_ERC8004_REPUTATION = 0x8004B663056A597Dffe9eCcC1965A193B7388713;
+    address internal constant TESTNET_ERC8004_IDENTITY = 0x8004A818BFB912233c491871b3d84c89A494BD9e;
+    address internal constant TESTNET_ERC8004_REPUTATION =
+        0x8004B663056A597Dffe9eCcC1965A193B7388713;
 }

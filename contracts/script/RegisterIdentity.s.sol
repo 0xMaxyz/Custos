@@ -14,8 +14,8 @@ pragma solidity 0.8.28;
  * After the tx, set AGENT_ID (printed below) in .env and deployments/<chainId>.json.
  */
 
-import {Script, console2} from "forge-std/Script.sol";
-import {Addresses}        from "./helpers/Addresses.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { Addresses } from "./helpers/Addresses.sol";
 
 interface ICanonicalIdentityRegistry {
     function register(string calldata agentURI) external returns (uint256 agentId);
@@ -25,7 +25,7 @@ interface ICanonicalIdentityRegistry {
 
 contract RegisterIdentity is Script {
     function run() external {
-        uint256 key      = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 key = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(key);
 
         // Agent card URI - set by `agent/src/identity/agentCard.ts` pinAgentCard().
@@ -34,9 +34,8 @@ contract RegisterIdentity is Script {
         require(bytes(agentCardUri).length > 0, "AGENT_CARD_URI not set - run pinAgentCard() first");
 
         bool isMainnet = block.chainid == 5000;
-        address registry = isMainnet
-            ? Addresses.MAINNET_ERC8004_IDENTITY
-            : Addresses.TESTNET_ERC8004_IDENTITY;
+        address registry =
+            isMainnet ? Addresses.MAINNET_ERC8004_IDENTITY : Addresses.TESTNET_ERC8004_IDENTITY;
 
         console2.log("=== ERC-8004 identity registration ===");
         console2.log("Registry:", registry);
@@ -48,7 +47,7 @@ contract RegisterIdentity is Script {
         vm.stopBroadcast();
 
         string memory resolved = ICanonicalIdentityRegistry(registry).tokenURI(agentId);
-        address owner          = ICanonicalIdentityRegistry(registry).ownerOf(agentId);
+        address owner = ICanonicalIdentityRegistry(registry).ownerOf(agentId);
 
         console2.log("=== Registration successful ===");
         console2.log("AGENT_ID=%s", agentId);

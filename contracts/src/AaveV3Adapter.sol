@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20}    from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {IStrategyAdapter}      from "./interfaces/IStrategyAdapter.sol";
-import {IAaveV3Pool, ReserveData} from "./interfaces/IAaveV3Pool.sol";
+import { IStrategyAdapter } from "./interfaces/IStrategyAdapter.sol";
+import { IAaveV3Pool, ReserveData } from "./interfaces/IAaveV3Pool.sol";
 
 /**
  * @title AaveV3Adapter
@@ -53,13 +53,14 @@ contract AaveV3Adapter is IStrategyAdapter, ReentrancyGuard {
      * @param vault  YieldVault address (the only caller allowed).
      */
     constructor(address pool, address usdc, address aUsdc, address vault) {
-        if (pool == address(0) || usdc == address(0) || aUsdc == address(0) || vault == address(0)) {
+        if (pool == address(0) || usdc == address(0) || aUsdc == address(0) || vault == address(0))
+        {
             revert ZeroAddress();
         }
-        POOL       = IAaveV3Pool(pool);
+        POOL = IAaveV3Pool(pool);
         underlying = usdc;
-        A_USDC     = aUsdc;
-        VAULT      = vault;
+        A_USDC = aUsdc;
+        VAULT = vault;
         // Pre-approve pool to spend USDC from this adapter (vault sends USDC here first).
         IERC20(usdc).forceApprove(pool, type(uint256).max);
     }

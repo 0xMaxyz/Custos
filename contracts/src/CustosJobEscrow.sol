@@ -126,7 +126,11 @@ contract CustosJobEscrow is IERC8183, ReentrancyGuard {
 
     /// @inheritdoc IERC8183
     /// @dev Evaluator completes a submitted job (Submitted → Completed) → pays provider.
-    function complete(uint256 jobId, bytes32 reason, bytes calldata) external override nonReentrant {
+    function complete(uint256 jobId, bytes32 reason, bytes calldata)
+        external
+        override
+        nonReentrant
+    {
         Job storage j = _job(jobId);
         if (msg.sender != j.evaluator) revert NotEvaluator();
         _requireStatus(j, JobStatus.Submitted);

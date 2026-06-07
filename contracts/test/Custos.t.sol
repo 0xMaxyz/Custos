@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {Custos} from "../src/Custos.sol";
+import { Test } from "forge-std/Test.sol";
+import { Custos } from "../src/Custos.sol";
 
 contract CustosTest is Test {
     function test_MantleChainIdConstant() public pure {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Roles} from "./Roles.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Roles } from "./Roles.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title Guardrails
@@ -42,33 +42,33 @@ contract Guardrails is AccessControl {
 
     struct Config {
         // Allocation limits
-        uint16[4] maxWeightBps;        // per bucket; index = Bucket id
-        uint16    minIdleBps;          // min IDLE fraction of TVL (bps)
-        uint16    minInstantLiquidityBps; // min (IDLE + Aave-withdrawable) fraction (bps)
-        uint256   maxUsdyNotionalUsdc; // absolute USDY exposure cap, 6-dec USDC (0 = disabled)
+        uint16[4] maxWeightBps; // per bucket; index = Bucket id
+        uint16 minIdleBps; // min IDLE fraction of TVL (bps)
+        uint16 minInstantLiquidityBps; // min (IDLE + Aave-withdrawable) fraction (bps)
+        uint256 maxUsdyNotionalUsdc; // absolute USDY exposure cap, 6-dec USDC (0 = disabled)
         // Execution safety
-        uint16    maxSlippageBps;
-        uint16    maxRebalanceMoveBps;
-        uint32    minRebalanceInterval; // seconds
-        uint256   tvlCap;              // 6-dec USDC
-        uint256   perTxDepositCap;     // 6-dec USDC
-        uint32    addStrategyTimelock; // seconds
+        uint16 maxSlippageBps;
+        uint16 maxRebalanceMoveBps;
+        uint32 minRebalanceInterval; // seconds
+        uint256 tvlCap; // 6-dec USDC
+        uint256 perTxDepositCap; // 6-dec USDC
+        uint32 addStrategyTimelock; // seconds
         // USDY risk thresholds
-        uint16    pegWarnBps;
-        uint16    pegBlockBps;
-        uint16    pegDeRiskBps;
-        uint32    oracleMaxAge;        // seconds
-        uint32    oracleRangeEndBuffer; // seconds
+        uint16 pegWarnBps;
+        uint16 pegBlockBps;
+        uint16 pegDeRiskBps;
+        uint32 oracleMaxAge; // seconds
+        uint32 oracleRangeEndBuffer; // seconds
     }
 
     struct MarketState {
-        uint256 usdyOracleNav;     // USDC per USDY (18-dec oracle price)
-        uint256 usdyDexSpot;       // USDC per USDY (18-dec DEX quote)
-        uint64  oracleUpdatedAt;   // unix timestamp of last oracle update
-        uint64  oracleRangeEnd;    // unix timestamp when oracle range expires
-        uint256 aaveWithdrawable;  // current USDC withdrawable from Aave (6-dec)
-        uint256 totalAssets;       // vault TVL in 6-dec USDC
-        uint64  lastRebalanceAt;   // unix timestamp of last rebalance
+        uint256 usdyOracleNav; // USDC per USDY (18-dec oracle price)
+        uint256 usdyDexSpot; // USDC per USDY (18-dec DEX quote)
+        uint64 oracleUpdatedAt; // unix timestamp of last oracle update
+        uint64 oracleRangeEnd; // unix timestamp when oracle range expires
+        uint256 aaveWithdrawable; // current USDC withdrawable from Aave (6-dec)
+        uint256 totalAssets; // vault TVL in 6-dec USDC
+        uint64 lastRebalanceAt; // unix timestamp of last rebalance
     }
 
     // ── Constants (default values — match packages/shared/src/guardrails.ts) ──
@@ -77,7 +77,7 @@ contract Guardrails is AccessControl {
     uint16 private constant _AAVE = 1;
     uint16 private constant _USDY = 2;
     uint16 private constant _AUSD = 3;
-    uint16 private constant _BPS  = 10_000;
+    uint16 private constant _BPS = 10_000;
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -101,29 +101,29 @@ contract Guardrails is AccessControl {
         // Set defaults from packages/shared/src/guardrails.ts
         uint16[4] memory maxW;
         maxW[_IDLE] = 10_000; // no upper cap on idle
-        maxW[_AAVE] = 9_000;  // 90%
-        maxW[_USDY] = 6_000;  // 60%
+        maxW[_AAVE] = 9_000; // 90%
+        maxW[_USDY] = 6_000; // 60%
         maxW[_AUSD] = 10_000; // 100%
 
         _config = Config({
-            maxWeightBps:           maxW,
-            minIdleBps:             200,     // 2%
-            minInstantLiquidityBps: 1_500,   // 15%
+            maxWeightBps: maxW,
+            minIdleBps: 200, // 2%
+            minInstantLiquidityBps: 1_500, // 15%
             // Absolute USDY cap: Mantle USDY pools total ~$1.5k. Cap exposure at
             // $5k so the deterministic ceiling tracks real aggregator depth
             // regardless of TVL — well below the 60% weight cap at a $50k TVL.
-            maxUsdyNotionalUsdc:    5_000 * 1e6,
-            maxSlippageBps:         50,      // 0.5%
-            maxRebalanceMoveBps:    5_000,   // 50%
-            minRebalanceInterval:   3_600,   // 1h
-            tvlCap:                 50_000 * 1e6,  // $50k
-            perTxDepositCap:        10_000 * 1e6,  // $10k
-            addStrategyTimelock:    2 days,
-            pegWarnBps:             30,      // 0.3%
-            pegBlockBps:            50,      // 0.5%
-            pegDeRiskBps:           100,     // 1.0%
-            oracleMaxAge:           100_800, // ~28h
-            oracleRangeEndBuffer:   86_400   // 24h
+            maxUsdyNotionalUsdc: 5_000 * 1e6,
+            maxSlippageBps: 50, // 0.5%
+            maxRebalanceMoveBps: 5_000, // 50%
+            minRebalanceInterval: 3_600, // 1h
+            tvlCap: 50_000 * 1e6, // $50k
+            perTxDepositCap: 10_000 * 1e6, // $10k
+            addStrategyTimelock: 2 days,
+            pegWarnBps: 30, // 0.3%
+            pegBlockBps: 50, // 0.5%
+            pegDeRiskBps: 100, // 1.0%
+            oracleMaxAge: 100_800, // ~28h
+            oracleRangeEndBuffer: 86_400 // 24h
         });
     }
 
@@ -212,12 +212,15 @@ contract Guardrails is AccessControl {
 
         // 4. Minimum instant liquidity (IDLE + Aave-withdrawable).
         //    Aave-withdrawable expressed as fraction of TVL.
-        uint256 aaveFractionBps = s.totalAssets > 0
-            ? (s.aaveWithdrawable * _BPS) / s.totalAssets
-            : 0;
+        uint256 aaveFractionBps =
+            s.totalAssets > 0 ? (s.aaveWithdrawable * _BPS) / s.totalAssets : 0;
         // aaveFractionBps is capped at 10000 by definition so truncation to uint16 is safe
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 instantBps = postWeightsBps[_IDLE] + _min(postWeightsBps[_AAVE], uint16(aaveFractionBps > type(uint16).max ? type(uint16).max : aaveFractionBps));
+        uint256 instantBps = postWeightsBps[_IDLE]
+            + _min(
+                postWeightsBps[_AAVE],
+                uint16(aaveFractionBps > type(uint16).max ? type(uint16).max : aaveFractionBps)
+            );
         if (instantBps < c.minInstantLiquidityBps) {
             return (false, InstantLiquidityTooLow.selector);
         }
@@ -238,7 +241,8 @@ contract Guardrails is AccessControl {
                 : preWeightsBps[i] - postWeightsBps[i];
         }
         totalMoveBps /= 2; // each dollar moved is counted twice (out + in)
-        if (totalMoveBps > c.maxRebalanceMoveBps && !_isRiskReducing(preWeightsBps, postWeightsBps)) {
+        if (totalMoveBps > c.maxRebalanceMoveBps && !_isRiskReducing(preWeightsBps, postWeightsBps))
+        {
             return (false, RebalanceMoveTooLarge.selector);
         }
 
@@ -300,11 +304,10 @@ contract Guardrails is AccessControl {
         // Oracle staleness: past range end = invalid NAV.
         bool oracleStale = s.oracleRangeEnd > 0 && block.timestamp > s.oracleRangeEnd;
         // Secondary staleness guard.
-        bool oracleAged  = s.oracleUpdatedAt > 0
-            && block.timestamp - s.oracleUpdatedAt > c.oracleMaxAge;
+        bool oracleAged =
+            s.oracleUpdatedAt > 0 && block.timestamp - s.oracleUpdatedAt > c.oracleMaxAge;
         // Within 24h of range end = caution.
-        bool oracleNearEnd = s.oracleRangeEnd > 0
-            && s.oracleRangeEnd > block.timestamp
+        bool oracleNearEnd = s.oracleRangeEnd > 0 && s.oracleRangeEnd > block.timestamp
             && s.oracleRangeEnd - block.timestamp < c.oracleRangeEndBuffer;
 
         if (oracleStale || oracleAged) {

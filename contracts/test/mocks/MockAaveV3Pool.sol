@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IAaveV3Pool, ReserveData} from "../../src/interfaces/IAaveV3Pool.sol";
+import { IAaveV3Pool, ReserveData } from "../../src/interfaces/IAaveV3Pool.sol";
 
 /**
  * @notice Minimal Aave v3 Pool mock for offline AaveV3Adapter tests. Mints/burns a
@@ -59,7 +59,11 @@ contract MockAaveV3Pool is IAaveV3Pool {
         IMintBurn(ATOKEN).mint(onBehalfOf, amount);
     }
 
-    function withdraw(address asset, uint256 amount, address to) external override returns (uint256) {
+    function withdraw(address asset, uint256 amount, address to)
+        external
+        override
+        returns (uint256)
+    {
         IMintBurn(ATOKEN).burn(msg.sender, amount);
         IERC20(asset).safeTransfer(to, amount);
         return amount;

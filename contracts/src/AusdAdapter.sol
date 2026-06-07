@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20}          from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20}       from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {IStrategyAdapter} from "./interfaces/IStrategyAdapter.sol";
-import {AggregatorSwapLib} from "./AggregatorSwapLib.sol";
+import { IStrategyAdapter } from "./interfaces/IStrategyAdapter.sol";
+import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
 
 /**
  * @title AusdAdapter
@@ -76,15 +76,17 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
         address usdc,
         address ausd,
         address vault,
-        uint16  maxSlippageBps
+        uint16 maxSlippageBps
     ) {
-        if (aggregator == address(0) || usdc == address(0) ||
-            ausd == address(0) || vault == address(0)) revert ZeroAddress();
+        if (
+            aggregator == address(0) || usdc == address(0) || ausd == address(0)
+                || vault == address(0)
+        ) revert ZeroAddress();
 
-        AGGREGATOR       = aggregator;
-        underlying       = usdc;
-        AUSD             = ausd;
-        VAULT            = vault;
+        AGGREGATOR = aggregator;
+        underlying = usdc;
+        AUSD = ausd;
+        VAULT = vault;
         MAX_SLIPPAGE_BPS = maxSlippageBps;
 
         // Pre-approve the pinned aggregator for both swap directions (max

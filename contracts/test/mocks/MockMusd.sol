@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20}           from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20}        from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IRWADynamicOracle} from "../../src/interfaces/IRWADynamicOracle.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IRWADynamicOracle } from "../../src/interfaces/IRWADynamicOracle.sol";
 
 /**
  * @notice Mock of Ondo's mUSD wrap/unwrap converter for unit tests. Stands in for
@@ -21,9 +21,9 @@ import {IRWADynamicOracle} from "../../src/interfaces/IRWADynamicOracle.sol";
 contract MockMusd {
     using SafeERC20 for IERC20;
 
-    string  public constant name     = "Mock mUSD";
-    string  public constant symbol   = "mUSD";
-    uint8   public constant decimals = 18;
+    string public constant name = "Mock mUSD";
+    string public constant symbol = "mUSD";
+    uint8 public constant decimals = 18;
 
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
@@ -33,7 +33,7 @@ contract MockMusd {
     address public immutable oracle;
 
     constructor(address _usdy, address _oracle) {
-        usdy   = _usdy;
+        usdy = _usdy;
         oracle = _oracle;
     }
 
@@ -62,8 +62,9 @@ contract MockMusd {
     }
 
     function transferFrom(address from, address to, uint256 amt) external returns (bool) {
-        if (allowance[from][msg.sender] != type(uint256).max)
+        if (allowance[from][msg.sender] != type(uint256).max) {
             allowance[from][msg.sender] -= amt;
+        }
         balanceOf[from] -= amt;
         balanceOf[to] += amt;
         return true;

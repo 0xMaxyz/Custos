@@ -14,15 +14,15 @@ pragma solidity 0.8.28;
  *   - maxWithdrawable() respects pool liquidity.
  */
 
-import {Test, console2} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Roles}           from "../src/Roles.sol";
-import {Guardrails}      from "../src/Guardrails.sol";
-import {YieldVault}      from "../src/YieldVault.sol";
-import {AaveV3Adapter}   from "../src/AaveV3Adapter.sol";
-import {IPoolAddressesProvider} from "../src/interfaces/IPoolAddressesProvider.sol";
-import {IAaveV3Pool, ReserveData} from "../src/interfaces/IAaveV3Pool.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { AaveV3Adapter } from "../src/AaveV3Adapter.sol";
+import { IPoolAddressesProvider } from "../src/interfaces/IPoolAddressesProvider.sol";
+import { IAaveV3Pool, ReserveData } from "../src/interfaces/IAaveV3Pool.sol";
 
 contract ForkPhase1bTest is Test {
     // ── Mantle mainnet addresses ──────────────────────────────────────────────
@@ -35,18 +35,18 @@ contract ForkPhase1bTest is Test {
 
     // ── Actors ────────────────────────────────────────────────────────────────
 
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
-    address internal guardian  = makeAddr("guardian");
-    address internal user      = makeAddr("user");
+    address internal guardian = makeAddr("guardian");
+    address internal user = makeAddr("user");
 
     // ── Contracts ─────────────────────────────────────────────────────────────
 
     address internal aavePool;
     address internal aUsdc;
-    AaveV3Adapter  internal adapter;
-    Guardrails     internal gr;
-    YieldVault     internal vault;
+    AaveV3Adapter internal adapter;
+    Guardrails internal gr;
+    YieldVault internal vault;
 
     uint256 constant DEPOSIT = 1_000e6; // $1k USDC
 
@@ -63,13 +63,13 @@ contract ForkPhase1bTest is Test {
         assertTrue(aUsdc != address(0), "aUSDC not resolved");
 
         // Deploy vault stack.
-        gr    = new Guardrails(admin);
+        gr = new Guardrails(admin);
         vault = new YieldVault(USDC, admin, address(gr));
         adapter = new AaveV3Adapter(aavePool, USDC, aUsdc, address(vault));
 
         vm.startPrank(admin);
         vault.grantRole(Roles.ALLOCATOR, allocator);
-        vault.grantRole(Roles.GUARDIAN,  guardian);
+        vault.grantRole(Roles.GUARDIAN, guardian);
 
         // Queue + activate Aave adapter (bucket 1) with warp.
         vault.addStrategy(1, address(adapter));
@@ -97,7 +97,9 @@ contract ForkPhase1bTest is Test {
         // 2. Rebalance: 20% idle (minIdle=2%, use 20% for safety), 80% Aave.
         //    Move from 100% idle: delta = 80%, which exceeds maxRebalanceMoveBps=50%.
         //    Use 50% idle -> 50% Aave instead (right at cap).
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
@@ -133,7 +135,9 @@ contract ForkPhase1bTest is Test {
         vault.deposit(DEPOSIT, user);
         vm.stopPrank();
 
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);

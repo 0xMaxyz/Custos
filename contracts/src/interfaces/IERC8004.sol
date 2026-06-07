@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 /**
- * @title IERC8004 — Trustless Agents registry subset (the part Custos uses)
+ * @title IERC8004 — Trustless Agents registry subset
  * @notice ERC-8004 defines on-chain registries that give an autonomous agent a
  *         verifiable identity (an ERC-721 token whose `tokenURI` resolves to the
  *         agent card) plus an append-only reputation surface.

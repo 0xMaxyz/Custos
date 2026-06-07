@@ -30,36 +30,35 @@ pragma solidity 0.8.28;
  *   TESTNET_AUSDC          - (testnet only) aUSDC token (skip adapter if blank)
  */
 
-import {Script, console2} from "forge-std/Script.sol";
+import { Script, console2 } from "forge-std/Script.sol";
 
-import {Roles}         from "../src/Roles.sol";
-import {Guardrails}    from "../src/Guardrails.sol";
-import {YieldVault}    from "../src/YieldVault.sol";
-import {AaveV3Adapter} from "../src/AaveV3Adapter.sol";
-import {UsdyAdapter}   from "../src/UsdyAdapter.sol";
-import {AusdAdapter}   from "../src/AusdAdapter.sol";
-import {AgentBenchmark} from "../src/AgentBenchmark.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { AaveV3Adapter } from "../src/AaveV3Adapter.sol";
+import { UsdyAdapter } from "../src/UsdyAdapter.sol";
+import { AusdAdapter } from "../src/AusdAdapter.sol";
+import { AgentBenchmark } from "../src/AgentBenchmark.sol";
 
-import {Addresses}               from "./helpers/Addresses.sol";
-import {IPoolAddressesProvider}  from "./helpers/IPoolAddressesProvider.sol";
-import {IAaveV3Pool, ReserveData} from "../src/interfaces/IAaveV3Pool.sol";
+import { Addresses } from "./helpers/Addresses.sol";
+import { IPoolAddressesProvider } from "./helpers/IPoolAddressesProvider.sol";
+import { IAaveV3Pool, ReserveData } from "../src/interfaces/IAaveV3Pool.sol";
 
 contract Deploy is Script {
-
     // ── Outputs printed after deploy ──────────────────────────────────────────
 
-    Guardrails    public guardrails;
-    YieldVault    public vault;
+    Guardrails public guardrails;
+    YieldVault public vault;
     AaveV3Adapter public aaveAdapter;
-    UsdyAdapter   public usdyAdapter;
-    AusdAdapter   public ausdAdapter;
+    UsdyAdapter public usdyAdapter;
+    AusdAdapter public ausdAdapter;
     AgentBenchmark public benchmark;
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
-        address allocator   = vm.envOr("ALLOCATOR_ADDRESS", deployer);
-        address guardian    = vm.envOr("GUARDIAN_ADDRESS",  deployer);
+        address deployer = vm.addr(deployerKey);
+        address allocator = vm.envOr("ALLOCATOR_ADDRESS", deployer);
+        address guardian = vm.envOr("GUARDIAN_ADDRESS", deployer);
 
         bool isMainnet = block.chainid == 5000;
         console2.log("=== Custos deploy ===");
@@ -79,12 +78,12 @@ contract Deploy is Script {
         address aUsdc;
 
         if (isMainnet) {
-            usdc       = Addresses.MAINNET_USDC;
-            usdy       = Addresses.MAINNET_USDY;
-            musd       = Addresses.MAINNET_MUSD;
+            usdc = Addresses.MAINNET_USDC;
+            usdy = Addresses.MAINNET_USDY;
+            musd = Addresses.MAINNET_MUSD;
             usdyOracle = Addresses.MAINNET_USDY_ORACLE;
             usdyRouter = Addresses.MAINNET_USDY_ROUTER;
-            ausd       = Addresses.MAINNET_AUSD;
+            ausd = Addresses.MAINNET_AUSD;
 
             // Resolve Aave pool + aUSDC from the PoolAddressesProvider.
             IPoolAddressesProvider provider =
@@ -96,14 +95,14 @@ contract Deploy is Script {
             console2.log("aUSDC:", aUsdc);
         } else {
             // Testnet: read from env; deployer must supply mocks or real testnet tokens.
-            usdc       = vm.envOr("TESTNET_USDC",        address(0));
-            usdy       = vm.envOr("TESTNET_USDY",        address(0));
-            musd       = vm.envOr("TESTNET_MUSD",        address(0));
+            usdc = vm.envOr("TESTNET_USDC", address(0));
+            usdy = vm.envOr("TESTNET_USDY", address(0));
+            musd = vm.envOr("TESTNET_MUSD", address(0));
             usdyOracle = vm.envOr("TESTNET_USDY_ORACLE", address(0));
             usdyRouter = vm.envOr("TESTNET_USDY_ROUTER", address(0));
-            ausd       = vm.envOr("TESTNET_AUSD",         address(0));
-            aavePool   = vm.envOr("TESTNET_AAVE_POOL",   address(0));
-            aUsdc      = vm.envOr("TESTNET_AUSDC",        address(0));
+            ausd = vm.envOr("TESTNET_AUSD", address(0));
+            aavePool = vm.envOr("TESTNET_AAVE_POOL", address(0));
+            aUsdc = vm.envOr("TESTNET_AUSDC", address(0));
 
             require(usdc != address(0), "TESTNET_USDC not set");
         }
@@ -150,7 +149,10 @@ contract Deploy is Script {
                 // Timelock was zeroed above for testnet, so activate immediately.
                 vault.activateStrategy(1);
             }
-            console2.log("AaveV3Adapter queued in bucket 1", isMainnet ? "(awaiting timelock)" : "(activated)");
+            console2.log(
+                "AaveV3Adapter queued in bucket 1",
+                isMainnet ? "(awaiting timelock)" : "(activated)"
+            );
         } else {
             console2.log("AaveV3Adapter SKIPPED - no Aave pool address");
         }
@@ -167,7 +169,7 @@ contract Deploy is Script {
                 musd,
                 usdyOracle,
                 address(vault),
-                50  // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
+                50 // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
             );
             console2.log("UsdyAdapter:", address(usdyAdapter));
             console2.log("  mUSD leg:", musd == address(0) ? address(0) : musd);
@@ -176,7 +178,9 @@ contract Deploy is Script {
             if (!isMainnet) {
                 vault.activateStrategy(2);
             }
-            console2.log("UsdyAdapter queued in bucket 2", isMainnet ? "(awaiting timelock)" : "(activated)");
+            console2.log(
+                "UsdyAdapter queued in bucket 2", isMainnet ? "(awaiting timelock)" : "(activated)"
+            );
         } else {
             console2.log("UsdyAdapter SKIPPED - missing USDY/oracle/router address");
         }
@@ -189,7 +193,7 @@ contract Deploy is Script {
                 usdc,
                 ausd,
                 address(vault),
-                50  // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
+                50 // 0.5% max slippage — mirrors MAX_SLIPPAGE_BPS in packages/shared/guardrails.ts
             );
             console2.log("AusdAdapter:", address(ausdAdapter));
 
@@ -197,14 +201,16 @@ contract Deploy is Script {
             if (!isMainnet) {
                 vault.activateStrategy(3);
             }
-            console2.log("AusdAdapter queued in bucket 3", isMainnet ? "(awaiting timelock)" : "(activated)");
+            console2.log(
+                "AusdAdapter queued in bucket 3", isMainnet ? "(awaiting timelock)" : "(activated)"
+            );
         } else {
             console2.log("AusdAdapter SKIPPED - missing AUSD/router address");
         }
 
         // ── 6. Roles ──────────────────────────────────────────────────────────
         vault.grantRole(Roles.ALLOCATOR, allocator);
-        vault.grantRole(Roles.GUARDIAN,  guardian);
+        vault.grantRole(Roles.GUARDIAN, guardian);
         console2.log("ALLOCATOR granted to:", allocator);
         console2.log("GUARDIAN granted to:", guardian);
 

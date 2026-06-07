@@ -17,50 +17,62 @@ pragma solidity 0.8.28;
  *   MockRouter rate USDC↔AUSD: num=1, denom=1 (amountOut == amountIn).
  */
 
-import {Test, console2} from "forge-std/Test.sol";
+import { Test, console2 } from "forge-std/Test.sol";
 
-import {Roles}        from "../src/Roles.sol";
-import {Guardrails}   from "../src/Guardrails.sol";
-import {YieldVault}   from "../src/YieldVault.sol";
-import {AusdAdapter}  from "../src/AusdAdapter.sol";
-import {UsdyAdapter}  from "../src/UsdyAdapter.sol";
-import {AggregatorSwapLib} from "../src/AggregatorSwapLib.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { AusdAdapter } from "../src/AusdAdapter.sol";
+import { UsdyAdapter } from "../src/UsdyAdapter.sol";
+import { AggregatorSwapLib } from "../src/AggregatorSwapLib.sol";
 
-import {MockAggregatorRouter}  from "./mocks/MockAggregatorRouter.sol";
-import {MockRWADynamicOracle}  from "./mocks/MockRWADynamicOracle.sol";
+import { MockAggregatorRouter } from "./mocks/MockAggregatorRouter.sol";
+import { MockRWADynamicOracle } from "./mocks/MockRWADynamicOracle.sol";
 
 // ── Minimal ERC-20 with mint (mirrors Phase2a.t.sol ERC20Mock) ────────────────
 
 contract ERC20Mock {
-    string  public name;
-    string  public symbol;
-    uint8   public decimals;
+    string public name;
+    string public symbol;
+    uint8 public decimals;
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
     constructor(string memory _name, string memory _sym, uint8 _dec) {
-        name = _name; symbol = _sym; decimals = _dec;
+        name = _name;
+        symbol = _sym;
+        decimals = _dec;
     }
 
-    function mint(address to, uint256 amt) external { balanceOf[to] += amt; totalSupply += amt; }
+    function mint(address to, uint256 amt) external {
+        balanceOf[to] += amt;
+        totalSupply += amt;
+    }
 
     function transfer(address to, uint256 amt) external returns (bool) {
-        balanceOf[msg.sender] -= amt; balanceOf[to] += amt; return true;
+        balanceOf[msg.sender] -= amt;
+        balanceOf[to] += amt;
+        return true;
     }
 
     function transferFrom(address from, address to, uint256 amt) external returns (bool) {
-        if (allowance[from][msg.sender] != type(uint256).max)
+        if (allowance[from][msg.sender] != type(uint256).max) {
             allowance[from][msg.sender] -= amt;
-        balanceOf[from] -= amt; balanceOf[to] += amt; return true;
+        }
+        balanceOf[from] -= amt;
+        balanceOf[to] += amt;
+        return true;
     }
 
     function approve(address spender, uint256 amt) external returns (bool) {
-        allowance[msg.sender][spender] = amt; return true;
+        allowance[msg.sender][spender] = amt;
+        return true;
     }
 
     function forceApprove(address spender, uint256 amt) external returns (bool) {
-        allowance[msg.sender][spender] = amt; return true;
+        allowance[msg.sender][spender] = amt;
+        return true;
     }
 }
 
@@ -68,19 +80,19 @@ contract ERC20Mock {
 
 contract AusdAdapterTest is Test {
     // ── Actors ────────────────────────────────────────────────────────────────
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
-    address internal guardian  = makeAddr("guardian");
-    address internal user      = makeAddr("user");
-    address internal rando     = makeAddr("rando");
+    address internal guardian = makeAddr("guardian");
+    address internal user = makeAddr("user");
+    address internal rando = makeAddr("rando");
 
     // ── Contracts ─────────────────────────────────────────────────────────────
-    ERC20Mock              internal usdc;
-    ERC20Mock              internal ausd;
-    MockAggregatorRouter   internal router;
-    Guardrails             internal gr;
-    YieldVault             internal vault;
-    AusdAdapter            internal adapter;
+    ERC20Mock internal usdc;
+    ERC20Mock internal ausd;
+    MockAggregatorRouter internal router;
+    Guardrails internal gr;
+    YieldVault internal vault;
+    AusdAdapter internal adapter;
 
     // ── Constants ─────────────────────────────────────────────────────────────
     uint256 constant DEPOSIT = 1_000e6; // $1k USDC; 1:1 → 1_000e6 AUSD
@@ -90,15 +102,15 @@ contract AusdAdapterTest is Test {
     function setUp() public {
         vm.warp(100_000); // avoid underflow in guardrail interval check
 
-        usdc   = new ERC20Mock("USD Coin",  "USDC", 6);
-        ausd   = new ERC20Mock("Agora USD",  "AUSD", 6);
+        usdc = new ERC20Mock("USD Coin", "USDC", 6);
+        ausd = new ERC20Mock("Agora USD", "AUSD", 6);
         router = new MockAggregatorRouter();
 
         // Both 6-dec stablecoins → 1:1 swap (num=1, denom=1).
         router.setRate(address(usdc), address(ausd), 1, 1);
         router.setRate(address(ausd), address(usdc), 1, 1);
 
-        gr    = new Guardrails(admin);
+        gr = new Guardrails(admin);
         vault = new YieldVault(address(usdc), admin, address(gr));
 
         adapter = new AusdAdapter(
@@ -106,12 +118,12 @@ contract AusdAdapterTest is Test {
             address(usdc),
             address(ausd),
             address(vault),
-            50    // maxSlippageBps (0.5%)
+            50 // maxSlippageBps (0.5%)
         );
 
         vm.startPrank(admin);
         vault.grantRole(Roles.ALLOCATOR, allocator);
-        vault.grantRole(Roles.GUARDIAN,  guardian);
+        vault.grantRole(Roles.GUARDIAN, guardian);
         vault.addStrategy(3, address(adapter)); // AUSD = bucket 3
         vm.stopPrank();
 
@@ -130,6 +142,7 @@ contract AusdAdapterTest is Test {
             MockAggregatorRouter.swap, (address(usdc), address(ausd), usdcIn, address(adapter))
         );
     }
+
     function _sellAusd(uint256 ausdIn) internal view returns (bytes memory) {
         return abi.encodeCall(
             MockAggregatorRouter.swap, (address(ausd), address(usdc), ausdIn, address(adapter))
@@ -236,8 +249,9 @@ contract AusdAdapterTest is Test {
         vm.prank(address(vault));
         usdc.approve(address(adapter), DEPOSIT);
         // Calldata pays `rando`, not the adapter → measured delta is 0 → revert.
-        bytes memory evil =
-            abi.encodeCall(MockAggregatorRouter.swap, (address(usdc), address(ausd), DEPOSIT, rando));
+        bytes memory evil = abi.encodeCall(
+            MockAggregatorRouter.swap, (address(usdc), address(ausd), DEPOSIT, rando)
+        );
         vm.prank(address(vault));
         vm.expectRevert(); // AggregatorSwapLib.InsufficientOutput
         adapter.deposit(DEPOSIT, evil);
@@ -304,7 +318,9 @@ contract AusdAdapterTest is Test {
         vm.warp(block.timestamp + 2 hours); // clear rebalance-frequency gate
 
         // 50% idle (bucket 0), 50% AUSD (bucket 3) — exactly at the 5000 bps move cap.
-        uint16[4] memory target; target[0] = 5_000; target[3] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[3] = 5_000;
         bytes[] memory sd = new bytes[](4);
         sd[3] = _buyAusd(DEPOSIT / 2);
         vm.prank(allocator);
@@ -326,7 +342,13 @@ contract AusdAdapterTest is Test {
         ERC20Mock usdy = new ERC20Mock("USDY", "USDY", 18);
         MockRWADynamicOracle oracle = new MockRWADynamicOracle(1e18, type(uint32).max);
         UsdyAdapter usdyAdapter = new UsdyAdapter(
-            address(router), address(usdc), address(usdy), address(0), address(oracle), address(vault), 50
+            address(router),
+            address(usdc),
+            address(usdy),
+            address(0),
+            address(oracle),
+            address(vault),
+            50
         );
         // Router rates for USDY (18-dec) ↔ USDC (6-dec): 1:1 at NAV=1e18.
         router.setRate(address(usdc), address(usdy), 1e12, 1);
@@ -347,9 +369,14 @@ contract AusdAdapterTest is Test {
         vm.stopPrank();
 
         vm.warp(block.timestamp + 2 hours);
-        uint16[4] memory target; target[0] = 5_000; target[2] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[2] = 5_000;
         bytes[] memory sd = new bytes[](4);
-        sd[2] = abi.encodeCall(MockAggregatorRouter.swap, (address(usdc), address(usdy), DEPOSIT / 2, address(usdyAdapter)));
+        sd[2] = abi.encodeCall(
+            MockAggregatorRouter.swap,
+            (address(usdc), address(usdy), DEPOSIT / 2, address(usdyAdapter))
+        );
         vm.prank(allocator);
         vault.rebalance(target, sd, "ipfs://pre-derisk", bytes32(0), 1e18);
 
@@ -359,7 +386,10 @@ contract AusdAdapterTest is Test {
         // swapData[3] buys AUSD with the freed USDC.
         uint256 usdyHeld = usdy.balanceOf(address(usdyAdapter));
         bytes[] memory exit = new bytes[](4);
-        exit[2] = abi.encodeCall(MockAggregatorRouter.swap, (address(usdy), address(usdc), usdyHeld, address(usdyAdapter)));
+        exit[2] = abi.encodeCall(
+            MockAggregatorRouter.swap,
+            (address(usdy), address(usdc), usdyHeld, address(usdyAdapter))
+        );
         exit[3] = _buyAusd(DEPOSIT / 2);
         vm.prank(guardian);
         vault.deRisk(3, exit, "depeg de-risk", bytes32("evidence"), 0);

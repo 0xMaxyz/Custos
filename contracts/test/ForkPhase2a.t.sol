@@ -23,15 +23,15 @@ pragma solidity 0.8.28;
  *   client tests. This fork suite covers only the live oracle + blocklist gates.
  */
 
-import {Test, console2} from "forge-std/Test.sol";
-import {IERC20}         from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Roles}              from "../src/Roles.sol";
-import {Guardrails}         from "../src/Guardrails.sol";
-import {YieldVault}         from "../src/YieldVault.sol";
-import {UsdyAdapter}        from "../src/UsdyAdapter.sol";
-import {IUsdyAdapter}       from "../src/interfaces/IUsdyAdapter.sol";
-import {IRWADynamicOracle}  from "../src/interfaces/IRWADynamicOracle.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { UsdyAdapter } from "../src/UsdyAdapter.sol";
+import { IUsdyAdapter } from "../src/interfaces/IUsdyAdapter.sol";
+import { IRWADynamicOracle } from "../src/interfaces/IRWADynamicOracle.sol";
 
 contract ForkPhase2aTest is Test {
     // ── Mantle mainnet — verified addresses ───────────────────────────────────
@@ -58,16 +58,16 @@ contract ForkPhase2aTest is Test {
 
     // ── Actors ────────────────────────────────────────────────────────────────
 
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
-    address internal guardian  = makeAddr("guardian");
-    address internal user      = makeAddr("user");
+    address internal guardian = makeAddr("guardian");
+    address internal user = makeAddr("user");
 
     // ── Contracts ─────────────────────────────────────────────────────────────
 
-    Guardrails    internal gr;
-    YieldVault    internal vault;
-    UsdyAdapter   internal adapter;
+    Guardrails internal gr;
+    YieldVault internal vault;
+    UsdyAdapter internal adapter;
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ contract ForkPhase2aTest is Test {
         require(sz > 0, "USDY oracle has no code at documented address");
         console2.log("[2a] USDY oracle:", USDY_ORACLE);
 
-        gr    = new Guardrails(admin);
+        gr = new Guardrails(admin);
         vault = new YieldVault(USDC, admin, address(gr));
 
         adapter = new UsdyAdapter(
@@ -93,7 +93,7 @@ contract ForkPhase2aTest is Test {
 
         vm.startPrank(admin);
         vault.grantRole(Roles.ALLOCATOR, allocator);
-        vault.grantRole(Roles.GUARDIAN,  guardian);
+        vault.grantRole(Roles.GUARDIAN, guardian);
         vault.addStrategy(2, address(adapter)); // bucket 2 = USDY
         vm.stopPrank();
 
@@ -144,20 +144,25 @@ contract ForkPhase2aTest is Test {
     ///         to revert silently. This gate must pass before activating the adapter
     ///         in any deployment (mainnet or testnet).
     function testForkUsdyAdapterNotBlocklisted() public view {
-        _assertNotBlocked(address(vault),   "vault");
+        _assertNotBlocked(address(vault), "vault");
         _assertNotBlocked(address(adapter), "adapter");
     }
 
     function _assertNotBlocked(address target, string memory label) internal view {
-        (bool ok, bytes memory data) = USDY.staticcall(
-            abi.encodeWithSignature("isBlocked(address)", target)
-        );
+        (bool ok, bytes memory data) =
+            USDY.staticcall(abi.encodeWithSignature("isBlocked(address)", target));
         if (ok && data.length == 32) {
             bool blocked = abi.decode(data, (bool));
             assertFalse(blocked, string.concat("USDY blocklist: ", label, " is blocked"));
             console2.log(string.concat("[0.5] USDY.isBlocked(", label, "):"), blocked);
         } else {
-            console2.log(string.concat("[0.5] USDY.isBlocked not accessible for ", label, " (transfer test covers this)"));
+            console2.log(
+                string.concat(
+                    "[0.5] USDY.isBlocked not accessible for ",
+                    label,
+                    " (transfer test covers this)"
+                )
+            );
         }
     }
 }

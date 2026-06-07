@@ -36,6 +36,10 @@ contract MockStrategyAdapter is IStrategyAdapter {
         return this.totalAssets();
     }
 
+    function hasAssets() external view override returns (bool) {
+        return IERC20(usdc).balanceOf(address(this)) > 0;
+    }
+
     function deposit(uint256 usdcAmount, bytes calldata)
         external
         override

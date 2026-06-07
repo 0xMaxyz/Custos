@@ -489,4 +489,26 @@ contract Phase2aTest is Test {
         vm.expectRevert(YieldVault.DeRiskConditionNotMet.selector);
         vault.deRisk(0, sd, "premature", bytes32(0), 0);
     }
+
+    // ── M1 — removeStrategy uses a balance-based presence check ────────────────
+
+    function test_RemoveStrategyBlockedWhenUsdyHeldDuringOracleOutage() public {
+        // Adapter holds USDY; oracle is down so totalAssets() reads 0 (the M1 orphan
+        // risk: a value-based guard would let admin remove the adapter and strand USDY).
+        usdy.mint(address(adapter), USDY_EQUIV);
+        oracle.setShouldRevert(true);
+        assertEq(adapter.totalAssets(), 0); // valuation degrades to 0…
+        assertTrue(adapter.hasAssets()); // …but the position is still there.
+
+        vm.prank(admin);
+        vm.expectRevert(YieldVault.AdapterStillHasAssets.selector);
+        vault.removeStrategy(2);
+    }
+
+    function test_RemoveStrategySucceedsWhenAdapterEmpty() public {
+        assertFalse(adapter.hasAssets());
+        vm.prank(admin);
+        vault.removeStrategy(2);
+        assertEq(address(vault.adapters(2)), address(0));
+    }
 }

@@ -113,6 +113,11 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
         return IERC20(AUSD).balanceOf(address(this));
     }
 
+    /// @inheritdoc IStrategyAdapter
+    function hasAssets() external view override returns (bool) {
+        return IERC20(AUSD).balanceOf(address(this)) > 0;
+    }
+
     /**
      * @notice Swap vault's USDC into AUSD via the pinned aggregator.
      * @dev Vault must approve this adapter before calling. `swapData` is the

@@ -73,10 +73,24 @@ contract AaveV3Adapter is IStrategyAdapter, ReentrancyGuard {
     }
 
     /// @notice Minimum of our aUSDC balance and Aave's available pool liquidity.
+    /// @dev Returns 0 when the USDC reserve is inactive or paused — a withdraw would
+    ///      revert in those states, so reporting liquidity would over-state what the
+    ///      vault can actually pull (mirrors the Aave v3 ReserveConfiguration bitmap:
+    ///      bit 56 = active, bit 60 = paused; frozen (bit 57) still permits withdrawal).
     function maxWithdrawable() external view override returns (uint256) {
+        uint256 cfg = POOL.getReserveData(underlying).configuration;
+        bool isActive = (cfg >> 56) & 1 == 1;
+        bool isPaused = (cfg >> 60) & 1 == 1;
+        if (!isActive || isPaused) return 0;
+
         uint256 balance = IERC20(A_USDC).balanceOf(address(this));
         uint256 poolLiquidity = IERC20(underlying).balanceOf(A_USDC);
         return balance < poolLiquidity ? balance : poolLiquidity;
+    }
+
+    /// @inheritdoc IStrategyAdapter
+    function hasAssets() external view override returns (bool) {
+        return IERC20(A_USDC).balanceOf(address(this)) > 0;
     }
 
     /**

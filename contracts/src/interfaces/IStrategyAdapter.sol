@@ -14,6 +14,11 @@ interface IStrategyAdapter {
     /// @notice USDC amount currently withdrawable right now (liquidity-aware).
     function maxWithdrawable() external view returns (uint256 usdcValue);
 
+    /// @notice Whether the adapter still holds any underlying tokens, independent of
+    ///         valuation. Used by the vault to gate strategy removal so a position is
+    ///         never orphaned by a `totalAssets()` that reads 0 during an oracle outage.
+    function hasAssets() external view returns (bool);
+
     /// @notice Deploy `usdcAmount` of USDC from the vault into the strategy.
     /// @param swapData Optional route hint (e.g. from 1delta); on-chain minOut enforced.
     /// @return deployedUsdcValue Estimated USDC value deployed (oracle-denominated).

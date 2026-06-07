@@ -470,7 +470,7 @@ guardrails own all hard limits.
 ### 3.3 Validation & clamping (TS, before anything is signed)
 - Reject if JSON fails the zod schema → **fall back to the deterministic allocation**.
 - `usdyMaxWeightBps = min(model.usdyMaxWeightBps, deterministic.maxUsdyWeightBpsAllowed)`.
-- If `deRisk == true`, require ≥1 `signals[*]` with a resolvable `evidenceId`; else ignore the de-risk request.
+- If `deRisk == true`, require ≥1 `signals[*]` with a resolvable `evidenceId` **whose evidence `source` is on the trusted allow-list** (`CURATED_EVIDENCE_SOURCES`, the vetted first-party RWA feeds); else ignore the de-risk request. Un-vetted/scraped sources can inform the model as context but cannot, on their own, unlock a de-risk (N2).
 - The model may only **tighten**: final USDY weight = `min(deterministic.candidate.USDY, model.usdyMaxWeightBps)`. It can never increase USDY or any bucket above the deterministic candidate.
 - `rationale` + `signals` (with resolved evidence URLs) are hashed (`rationaleHash`) and bundled to IPFS (`decisionURI`) before calling `rebalance`/`deRisk`.
 

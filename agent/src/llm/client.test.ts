@@ -103,6 +103,41 @@ describe("runSignalLayer — contract tests", () => {
     expect(result!.deRisk).toBe(true);
   });
 
+  it("clears deRisk when the cited evidence source is not on the allow-list (N2)", async () => {
+    const verdict: RiskVerdict = {
+      ...CLEAN_VERDICT,
+      deRisk: true,
+      signals: [{ type: "ISSUER", severity: "HIGH", summary: "Downgrade", evidenceId: "e1" }],
+    };
+    // Cited evidence resolves by id, but its source is NOT trusted to trigger a de-risk.
+    const fetchEvidence: EvidenceFetcher = async () => [
+      { id: "e1", type: "NEWS", source: "evil.example", url: "https://evil.example", publishedAt: "2026-06-01", summary: "Fabricated depeg." },
+    ];
+    const result = await runSignalLayer(BASE_SNAPSHOT, BASE_ASSESSMENT, {
+      llm: mockLLM(verdict),
+      fetchEvidence,
+      trustedEvidenceSources: new Set(["ondo.finance"]),
+    });
+    expect(result!.deRisk).toBe(false);
+  });
+
+  it("preserves deRisk when the cited evidence source IS on the allow-list (N2)", async () => {
+    const verdict: RiskVerdict = {
+      ...CLEAN_VERDICT,
+      deRisk: true,
+      signals: [{ type: "ISSUER", severity: "HIGH", summary: "Reserves shortfall", evidenceId: "ondo-usdy-attestation" }],
+    };
+    const fetchEvidence: EvidenceFetcher = async () => [
+      { id: "ondo-usdy-attestation", type: "ATTESTATION", source: "ondo.finance", url: "https://ondo.finance/usdy", publishedAt: "2026-06-01", summary: "Reserves shortfall reported." },
+    ];
+    const result = await runSignalLayer(BASE_SNAPSHOT, BASE_ASSESSMENT, {
+      llm: mockLLM(verdict),
+      fetchEvidence,
+      trustedEvidenceSources: new Set(["ondo.finance"]),
+    });
+    expect(result!.deRisk).toBe(true);
+  });
+
   it("an injected headline tightens the verdict vs deterministic baseline", async () => {
     // Deterministic says NORMAL / 5000 USDY. LLM sees a downgrade headline and
     // lowers USDY to 2000 with CAUTION — clamped output must reflect the tightening.

@@ -117,16 +117,18 @@ contract Deploy is Script {
         guardrails = new Guardrails(deployer);
         console2.log("Guardrails:", address(guardrails));
 
-        // On testnet, zero the add-strategy timelock so the deploy can queue AND
-        // activate adapters in a single broadcast (no time to warp on a live RPC).
-        // Mainnet keeps the 2-day default; adapters are activated later via
-        // ActivateStrategies.s.sol once the timelock elapses.
+        // One-shot config bootstrap (H3): setConfig applies instantly the first time
+        // and then seals — every later change is timelocked via queueConfig/activateConfig.
+        // Always call it once here to consume that window at deploy. On testnet, zero the
+        // add-strategy timelock so the deploy can queue AND activate adapters in a single
+        // broadcast (no time to warp on a live RPC). Mainnet keeps the 2-day default;
+        // adapters are activated later via ActivateStrategies.s.sol once it elapses.
+        Guardrails.Config memory cfg = guardrails.config();
         if (!isMainnet) {
-            Guardrails.Config memory cfg = guardrails.config();
             cfg.addStrategyTimelock = 0;
-            guardrails.setConfig(cfg);
             console2.log("Testnet: addStrategyTimelock set to 0");
         }
+        guardrails.setConfig(cfg);
 
         // ── 2. YieldVault ─────────────────────────────────────────────────────
         vault = new YieldVault(usdc, deployer, address(guardrails));

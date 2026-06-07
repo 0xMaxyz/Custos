@@ -43,6 +43,8 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
   error NotAllocatorOrGuardian();
   error AdapterStillHasAssets();
   error RwaAdapterNotSet();
+  error NoPendingGuardrails();
+  error GuardrailsTimelockNotElapsed();
 
   // ── Events ────────────────────────────────────────────────────────────────
 
@@ -51,6 +53,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
   event StrategyActivated(uint8 indexed bucket, address adapter);
   event StrategyRemoved(uint8 indexed bucket);
   event GuardrailsUpdated(address indexed newGuardrails);
+  event GuardrailsQueued(address indexed newGuardrails, uint256 unlocksAt);
   event BenchmarkUpdated(address indexed newBenchmark);
   event DecisionRecorded(uint256 indexed id, uint8 kind, bytes32 rationaleHash, string decisionURI);
   event Rebalanced(uint256 indexed id, uint16[4] postWeightsBps);
@@ -75,6 +78,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
   // ── State ─────────────────────────────────────────────────────────────────
 
   Guardrails public guardrails;
+
+  /// Pending timelocked Guardrails swap (H3). address(0) = none queued.
+  address public pendingGuardrails;
+  uint256 public guardrailsUnlocksAt;
 
   /// Optional benchmark ledger (may be address(0) before Phase 2b is configured).
   IAgentBenchmark public benchmark;
@@ -248,10 +255,23 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     emit StrategyRemoved(bucket);
   }
 
-  /// @notice Point the vault at a new Guardrails contract. Only ADMIN.
-  function setGuardrails(address _guardrails) external onlyRole(Roles.ADMIN) {
-    guardrails = Guardrails(_guardrails);
-    emit GuardrailsUpdated(_guardrails);
+  /// @notice Queue a new Guardrails contract behind the addStrategyTimelock. Swapping
+  ///         the guardrail brain is the single most sensitive admin action, so it is
+  ///         timelocked rather than instant (H3). Only ADMIN.
+  function queueGuardrails(address _guardrails) external onlyRole(Roles.ADMIN) {
+    pendingGuardrails = _guardrails;
+    guardrailsUnlocksAt = block.timestamp + guardrails.config().addStrategyTimelock;
+    emit GuardrailsQueued(_guardrails, guardrailsUnlocksAt);
+  }
+
+  /// @notice Activate the queued Guardrails once its timelock has elapsed. Only ADMIN.
+  function activateGuardrails() external onlyRole(Roles.ADMIN) {
+    if (pendingGuardrails == address(0)) revert NoPendingGuardrails();
+    if (block.timestamp < guardrailsUnlocksAt) revert GuardrailsTimelockNotElapsed();
+    guardrails = Guardrails(pendingGuardrails);
+    emit GuardrailsUpdated(pendingGuardrails);
+    pendingGuardrails = address(0);
+    guardrailsUnlocksAt = 0;
   }
 
   /// @notice Set (or clear) the AgentBenchmark ledger. Only ADMIN.

@@ -12,21 +12,31 @@ pragma solidity 0.8.28;
  *     --private-key $DEPLOYER_PRIVATE_KEY --broadcast -vvv
  */
 
-import {Script, console2} from "forge-std/Script.sol";
-import {ERC20}            from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockERC20 is ERC20 {
     uint8 private _dec;
+
     constructor(string memory name_, string memory sym_, uint8 dec_) ERC20(name_, sym_) {
         _dec = dec_;
     }
-    function decimals() public view override returns (uint8) { return _dec; }
-    function mint(address to, uint256 amount) external { _mint(to, amount); }
+
+    function decimals() public view override returns (uint8) {
+        return _dec;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
 }
 
 /// Minimal mock oracle returning a fixed $1.00 USDY NAV (18-dec).
 contract MockUsdyOracle {
-    function getPrice() external pure returns (uint256) { return 1e18; }
+    function getPrice() external pure returns (uint256) {
+        return 1e18;
+    }
+
     /// Stub - UsdyAdapter calls this with a try/catch; reverting is fine here.
     function currentRange() external pure returns (uint256, uint256, uint256) {
         revert("MockUsdyOracle: no range");
@@ -45,8 +55,8 @@ contract DeployMocks is Script {
         MockUsdyOracle oracle = new MockUsdyOracle();
 
         // Mint initial supply to deployer for smoke tests.
-        usdc.mint(deployer, 1_000_000 * 1e6);  // $1M USDC
-        usdy.mint(deployer, 500_000 * 1e18);   // 500k USDY
+        usdc.mint(deployer, 1_000_000 * 1e6); // $1M USDC
+        usdy.mint(deployer, 500_000 * 1e18); // 500k USDY
 
         vm.stopBroadcast();
 
@@ -54,7 +64,11 @@ contract DeployMocks is Script {
         console2.log("TESTNET_USDC=%s", address(usdc));
         console2.log("TESTNET_USDY=%s", address(usdy));
         console2.log("TESTNET_USDY_ORACLE=%s", address(oracle));
-        console2.log("TESTNET_USDY_ROUTER=%s (set to any non-zero addr; swaps are mocked)", address(0));
-        console2.log("TESTNET_AAVE_POOL=  (leave blank - AaveV3Adapter skipped on testnet without pool)");
+        console2.log(
+            "TESTNET_USDY_ROUTER=%s (set to any non-zero addr; swaps are mocked)", address(0)
+        );
+        console2.log(
+            "TESTNET_AAVE_POOL=  (leave blank - AaveV3Adapter skipped on testnet without pool)"
+        );
     }
 }

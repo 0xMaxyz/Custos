@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20}        from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20}     from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {IUsdyAdapter}       from "./interfaces/IUsdyAdapter.sol";
-import {IRWADynamicOracle}  from "./interfaces/IRWADynamicOracle.sol";
-import {IMusd}              from "./interfaces/IMusd.sol";
-import {AggregatorSwapLib}  from "./AggregatorSwapLib.sol";
+import { IUsdyAdapter } from "./interfaces/IUsdyAdapter.sol";
+import { IRWADynamicOracle } from "./interfaces/IRWADynamicOracle.sol";
+import { IMusd } from "./interfaces/IMusd.sol";
+import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
 
 /**
  * @title UsdyAdapter
@@ -115,17 +115,19 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
         address musd,
         address oracle,
         address vault,
-        uint16  maxSlippageBps
+        uint16 maxSlippageBps
     ) {
-        if (aggregator == address(0) || usdc == address(0) || usdy == address(0) ||
-            oracle == address(0) || vault == address(0)) revert ZeroAddress();
+        if (
+            aggregator == address(0) || usdc == address(0) || usdy == address(0)
+                || oracle == address(0) || vault == address(0)
+        ) revert ZeroAddress();
 
-        AGGREGATOR      = aggregator;
-        underlying      = usdc;
-        USDY            = usdy;
-        MUSD            = musd;
-        ORACLE          = IRWADynamicOracle(oracle);
-        VAULT           = vault;
+        AGGREGATOR = aggregator;
+        underlying = usdc;
+        USDY = usdy;
+        MUSD = musd;
+        ORACLE = IRWADynamicOracle(oracle);
+        VAULT = vault;
         MAX_SLIPPAGE_BPS = maxSlippageBps;
 
         // Pre-approve the pinned aggregator for both swap directions (max

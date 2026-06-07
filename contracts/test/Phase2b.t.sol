@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {YieldVault}      from "../src/YieldVault.sol";
-import {Guardrails}      from "../src/Guardrails.sol";
-import {AgentBenchmark}   from "../src/AgentBenchmark.sol";
-import {IAgentBenchmark}  from "../src/interfaces/IAgentBenchmark.sol";
-import {Roles}           from "../src/Roles.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { AgentBenchmark } from "../src/AgentBenchmark.sol";
+import { IAgentBenchmark } from "../src/interfaces/IAgentBenchmark.sol";
+import { Roles } from "../src/Roles.sol";
 
-import {ERC20Mock}            from "./Phase2a.t.sol";
-import {MockRWADynamicOracle} from "./mocks/MockRWADynamicOracle.sol";
-import {MockAggregatorRouter} from "./mocks/MockAggregatorRouter.sol";
-import {UsdyAdapter}          from "../src/UsdyAdapter.sol";
+import { ERC20Mock } from "./Phase2a.t.sol";
+import { MockRWADynamicOracle } from "./mocks/MockRWADynamicOracle.sol";
+import { MockAggregatorRouter } from "./mocks/MockAggregatorRouter.sol";
+import { UsdyAdapter } from "../src/UsdyAdapter.sol";
 
 /**
  * @title Phase2b Tests
@@ -24,31 +24,31 @@ import {UsdyAdapter}          from "../src/UsdyAdapter.sol";
 contract Phase2bTest is Test {
     // ── Roles ─────────────────────────────────────────────────────────────────
 
-    address admin     = makeAddr("admin");
+    address admin = makeAddr("admin");
     address allocator = makeAddr("allocator");
-    address guardian  = makeAddr("guardian");
+    address guardian = makeAddr("guardian");
 
     // ── Contracts ─────────────────────────────────────────────────────────────
 
-    ERC20Mock             usdc;
-    ERC20Mock             usdy;
-    MockRWADynamicOracle  oracle;
-    MockAggregatorRouter  router;
-    UsdyAdapter           usdyAdapter;
-    Guardrails            gr;
-    YieldVault            vault;
-    AgentBenchmark        bm;
+    ERC20Mock usdc;
+    ERC20Mock usdy;
+    MockRWADynamicOracle oracle;
+    MockAggregatorRouter router;
+    UsdyAdapter usdyAdapter;
+    Guardrails gr;
+    YieldVault vault;
+    AgentBenchmark bm;
 
-    uint256 constant NAV      = 1e18;      // $1.00 USDC per USDY (1:1 for simple math)
-    uint256 constant DEPOSIT  = 100_000e6; // $100k USDC
+    uint256 constant NAV = 1e18; // $1.00 USDC per USDY (1:1 for simple math)
+    uint256 constant DEPOSIT = 100_000e6; // $100k USDC
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     function setUp() public {
         vm.warp(1_000_000); // ensure block.timestamp >> 0 so staleness checks work
 
-        usdc   = new ERC20Mock("USD Coin", "USDC", 6);
-        usdy   = new ERC20Mock("Ondo USDY", "USDY", 18);
+        usdc = new ERC20Mock("USD Coin", "USDC", 6);
+        usdy = new ERC20Mock("Ondo USDY", "USDY", 18);
         oracle = new MockRWADynamicOracle(NAV, block.timestamp + 365 days);
         router = new MockAggregatorRouter();
         // 1:1 NAV: USDC (6-dec) → USDY (18-dec) requires ×1e12; reverse requires ÷1e12.
@@ -57,20 +57,20 @@ contract Phase2bTest is Test {
 
         // Deploy vault with generous TVL cap to accommodate tests
         Guardrails.Config memory cfg;
-        cfg.maxWeightBps           = [uint16(10_000), uint16(9_000), uint16(6_000), uint16(10_000)];
-        cfg.minIdleBps             = 200;
+        cfg.maxWeightBps = [uint16(10_000), uint16(9_000), uint16(6_000), uint16(10_000)];
+        cfg.minIdleBps = 200;
         cfg.minInstantLiquidityBps = 1_500;
-        cfg.maxSlippageBps         = 200; // 2% slippage for test
-        cfg.maxRebalanceMoveBps    = 10_000;
-        cfg.minRebalanceInterval   = 0; // disable frequency cap for tests
-        cfg.tvlCap                 = 10_000_000e6; // $10M
-        cfg.perTxDepositCap        = 1_000_000e6;  // $1M
-        cfg.addStrategyTimelock    = 0;
-        cfg.pegWarnBps             = 30;
-        cfg.pegBlockBps            = 50;
-        cfg.pegDeRiskBps           = 100;
-        cfg.oracleMaxAge           = 100_800;
-        cfg.oracleRangeEndBuffer   = 86_400;
+        cfg.maxSlippageBps = 200; // 2% slippage for test
+        cfg.maxRebalanceMoveBps = 10_000;
+        cfg.minRebalanceInterval = 0; // disable frequency cap for tests
+        cfg.tvlCap = 10_000_000e6; // $10M
+        cfg.perTxDepositCap = 1_000_000e6; // $1M
+        cfg.addStrategyTimelock = 0;
+        cfg.pegWarnBps = 30;
+        cfg.pegBlockBps = 50;
+        cfg.pegDeRiskBps = 100;
+        cfg.oracleMaxAge = 100_800;
+        cfg.oracleRangeEndBuffer = 86_400;
 
         gr = new Guardrails(admin);
         vm.prank(admin);
@@ -82,7 +82,7 @@ contract Phase2bTest is Test {
             address(router),
             address(usdc),
             address(usdy),
-            address(0),   // mUSD leg not used by the depeg/de-risk tests here
+            address(0), // mUSD leg not used by the depeg/de-risk tests here
             address(oracle),
             address(vault),
             200 // 2% maxSlippageBps
@@ -119,6 +119,7 @@ contract Phase2bTest is Test {
             MockAggregatorRouter.swap, (address(usdc), address(usdy), usdcIn, address(usdyAdapter))
         );
     }
+
     function _sellUsdy(uint256 usdyIn) internal view returns (bytes memory) {
         return abi.encodeCall(
             MockAggregatorRouter.swap, (address(usdy), address(usdc), usdyIn, address(usdyAdapter))
@@ -137,7 +138,9 @@ contract Phase2bTest is Test {
 
         vm.prank(allocator);
         vm.expectRevert(
-            abi.encodeWithSelector(YieldVault.GuardrailsRejected.selector, Guardrails.UsdyAllocationBlocked.selector)
+            abi.encodeWithSelector(
+                YieldVault.GuardrailsRejected.selector, Guardrails.UsdyAllocationBlocked.selector
+            )
         );
         vault.rebalance(target, sd, "ipfs://test", bytes32(0), depeggedSpot);
     }
@@ -159,7 +162,9 @@ contract Phase2bTest is Test {
 
         vm.prank(allocator);
         vm.expectRevert(
-            abi.encodeWithSelector(YieldVault.GuardrailsRejected.selector, Guardrails.UsdySpotRequired.selector)
+            abi.encodeWithSelector(
+                YieldVault.GuardrailsRejected.selector, Guardrails.UsdySpotRequired.selector
+            )
         );
         vault.rebalance(target, sd, "ipfs://no-spot", bytes32(0), 0);
     }
@@ -235,10 +240,10 @@ contract Phase2bTest is Test {
         uint256 did = vault.rebalance(target, sd, "ipfs://bm2", bytes32(0), NAV);
 
         IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
-            realizedYieldBps:    120,
+            realizedYieldBps: 120,
             drawdownAvoidedUsdc: 5000e6,
-            passiveDeltaBps:     -30,
-            measuredAt:          uint64(block.timestamp)
+            passiveDeltaBps: -30,
+            measuredAt: uint64(block.timestamp)
         });
 
         vm.prank(allocator);
@@ -260,10 +265,10 @@ contract Phase2bTest is Test {
         uint256 did = vault.rebalance(target, sd, "ipfs://bm3", bytes32(0), NAV);
 
         IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
-            realizedYieldBps:    50,
+            realizedYieldBps: 50,
             drawdownAvoidedUsdc: 0,
-            passiveDeltaBps:     50,
-            measuredAt:          uint64(block.timestamp)
+            passiveDeltaBps: 50,
+            measuredAt: uint64(block.timestamp)
         });
 
         vm.expectRevert();
@@ -272,10 +277,10 @@ contract Phase2bTest is Test {
 
     function test_BenchmarkDecisionNotFoundReverts() public {
         IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
-            realizedYieldBps:    0,
+            realizedYieldBps: 0,
             drawdownAvoidedUsdc: 0,
-            passiveDeltaBps:     0,
-            measuredAt:          uint64(block.timestamp)
+            passiveDeltaBps: 0,
+            measuredAt: uint64(block.timestamp)
         });
 
         vm.prank(allocator);
@@ -335,10 +340,10 @@ contract Phase2bTest is Test {
         uint256 did = vault.rebalance(target, sd, "ipfs://bm-dup", bytes32(0), NAV);
 
         IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
-            realizedYieldBps:    10,
+            realizedYieldBps: 10,
             drawdownAvoidedUsdc: 0,
-            passiveDeltaBps:     10,
-            measuredAt:          uint64(block.timestamp)
+            passiveDeltaBps: 10,
+            measuredAt: uint64(block.timestamp)
         });
 
         vm.prank(allocator);

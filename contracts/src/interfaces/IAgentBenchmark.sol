@@ -4,14 +4,14 @@ pragma solidity 0.8.28;
 /**
  * @title IAgentBenchmark
  * @notice On-chain ledger of agent decisions, realized outcomes, and the
- *         passive-USDY baseline delta (the Turing Test answer on-chain).
+ *         passive-USDY baseline delta
  */
 interface IAgentBenchmark {
     struct Outcome {
-        int256  realizedYieldBps;     // agent yield vs prior decision (bps)
-        uint256 drawdownAvoidedUsdc;  // estimated loss avoided on de-risk events (6-dec USDC)
-        int256  passiveDeltaBps;      // Custos outperformance vs 100%-USDY passive holder (bps)
-        uint64  measuredAt;           // unix timestamp of outcome measurement
+        int256 realizedYieldBps; // agent yield vs prior decision (bps)
+        uint256 drawdownAvoidedUsdc; // estimated loss avoided on de-risk events (6-dec USDC)
+        int256 passiveDeltaBps; // Custos outperformance vs 100%-USDY passive holder (bps)
+        uint64 measuredAt; // unix timestamp of outcome measurement
     }
 
     /**
@@ -25,7 +25,7 @@ interface IAgentBenchmark {
     function recordDecision(
         uint256 decisionId,
         bytes32 rationaleHash,
-        string  calldata decisionURI,
+        string calldata decisionURI,
         uint256 usdyNavAtDecision
     ) external;
 
@@ -41,13 +41,13 @@ interface IAgentBenchmark {
     event DecisionRecorded(
         uint256 indexed decisionId,
         bytes32 rationaleHash,
-        string  decisionURI,
+        string decisionURI,
         uint256 usdyNavAtDecision
     );
     event OutcomeUpdated(
         uint256 indexed decisionId,
-        int256  realizedYieldBps,
+        int256 realizedYieldBps,
         uint256 drawdownAvoidedUsdc,
-        int256  passiveDeltaBps
+        int256 passiveDeltaBps
     );
 }

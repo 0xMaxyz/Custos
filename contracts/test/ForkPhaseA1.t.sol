@@ -25,13 +25,13 @@ pragma solidity 0.8.28;
  *   ForkPhase2a.t.sol for USDY).
  */
 
-import {Test, console2} from "forge-std/Test.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {Roles}        from "../src/Roles.sol";
-import {Guardrails}   from "../src/Guardrails.sol";
-import {YieldVault}   from "../src/YieldVault.sol";
-import {AusdAdapter}  from "../src/AusdAdapter.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { AusdAdapter } from "../src/AusdAdapter.sol";
 
 contract ForkPhaseA1Test is Test {
     // ── Mantle mainnet — verified addresses ───────────────────────────────────
@@ -49,20 +49,20 @@ contract ForkPhaseA1Test is Test {
 
     // ── Actors ────────────────────────────────────────────────────────────────
 
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
-    address internal guardian  = makeAddr("guardian");
+    address internal guardian = makeAddr("guardian");
 
     // ── Contracts ─────────────────────────────────────────────────────────────
 
-    Guardrails  internal gr;
-    YieldVault  internal vault;
+    Guardrails internal gr;
+    YieldVault internal vault;
     AusdAdapter internal adapter;
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     function setUp() public {
-        gr    = new Guardrails(admin);
+        gr = new Guardrails(admin);
         vault = new YieldVault(USDC, admin, address(gr));
 
         adapter = new AusdAdapter(
@@ -75,7 +75,7 @@ contract ForkPhaseA1Test is Test {
 
         vm.startPrank(admin);
         vault.grantRole(Roles.ALLOCATOR, allocator);
-        vault.grantRole(Roles.GUARDIAN,  guardian);
+        vault.grantRole(Roles.GUARDIAN, guardian);
         vault.addStrategy(3, address(adapter)); // bucket 3 = AUSD
         vm.stopPrank();
 
@@ -87,8 +87,8 @@ contract ForkPhaseA1Test is Test {
     // ── Live token + router presence ─────────────────────────────────────────
 
     function testForkAusdAndRouterHaveCode() public view {
-        assertGt(_codeSize(USDC),        0, "USDC has no code");
-        assertGt(_codeSize(AUSD),        0, "AUSD has no code");
+        assertGt(_codeSize(USDC), 0, "USDC has no code");
+        assertGt(_codeSize(AUSD), 0, "AUSD has no code");
         assertGt(_codeSize(ODOS_ROUTER), 0, "Odos router has no code");
         console2.log("[A1.1] USDC/AUSD/Odos all present on-chain");
     }
@@ -103,9 +103,9 @@ contract ForkPhaseA1Test is Test {
     // ── Construction + empty-position valuation ───────────────────────────────
 
     function testForkAdapterWiring() public view {
-        assertEq(adapter.underlying(), USDC,         "underlying should be USDC");
-        assertEq(adapter.AUSD(),       AUSD,         "AUSD address mismatch");
-        assertEq(adapter.AGGREGATOR(), ODOS_ROUTER,  "aggregator should be pinned Odos");
+        assertEq(adapter.underlying(), USDC, "underlying should be USDC");
+        assertEq(adapter.AUSD(), AUSD, "AUSD address mismatch");
+        assertEq(adapter.AGGREGATOR(), ODOS_ROUTER, "aggregator should be pinned Odos");
         assertEq(address(vault.adapters(3)), address(adapter), "adapter not registered in bucket 3");
     }
 

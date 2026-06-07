@@ -100,7 +100,13 @@ contract PhaseA4Test is Test {
         ERC20Mock usdy = new ERC20Mock();
         oracle = new MockRWADynamicOracle(1e18, type(uint32).max);
         usdyAdapter = new UsdyAdapter(
-            makeAddr("aggregator"), address(usdc), address(usdy), address(0), address(oracle), makeAddr("usdyVault"), 50
+            makeAddr("aggregator"),
+            address(usdc),
+            address(usdy),
+            address(0),
+            address(oracle),
+            makeAddr("usdyVault"),
+            50
         );
         evaluator = new CustosDeRiskEvaluator(
             address(gr), address(reputation), address(usdyAdapter), agentId, admin
@@ -119,7 +125,11 @@ contract PhaseA4Test is Test {
     function _openFundedSubmittedJob() internal returns (uint256 jobId) {
         vm.prank(client);
         jobId = escrow.createJob(
-            provider, address(evaluator), block.timestamp + 1 days, "de-risk USDY -> AUSD", address(0)
+            provider,
+            address(evaluator),
+            block.timestamp + 1 days,
+            "de-risk USDY -> AUSD",
+            address(0)
         );
         vm.prank(client);
         escrow.setBudget(jobId, BUDGET, "");
@@ -138,7 +148,8 @@ contract PhaseA4Test is Test {
         assertEq(usdc.balanceOf(address(escrow)), BUDGET, "budget escrowed");
 
         vm.prank(keeper);
-        bool completed = evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 610, "ipfs://evidence", "depeg-200bps");
+        bool completed =
+            evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 610, "ipfs://evidence", "depeg-200bps");
 
         assertTrue(completed, "guardrail justified -> completed");
         assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Completed));
@@ -159,7 +170,8 @@ contract PhaseA4Test is Test {
         uint256 jobId = _openFundedSubmittedJob();
 
         vm.prank(keeper);
-        bool completed = evaluator.evaluate(escrow, jobId, HEALTHY_SPOT, 0, "ipfs://evidence", "on-peg");
+        bool completed =
+            evaluator.evaluate(escrow, jobId, HEALTHY_SPOT, 0, "ipfs://evidence", "on-peg");
 
         assertFalse(completed, "no de-risk justified -> rejected");
         assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Rejected));
@@ -194,7 +206,11 @@ contract PhaseA4Test is Test {
         vm.prank(keeper);
         vm.expectRevert(CustosDeRiskEvaluator.OracleUnavailable.selector);
         evaluator.evaluate(escrow, jobId, DEPEG_SPOT, 0, "ipfs://e", "oracle-down");
-        assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Submitted), "job not stranded-settled");
+        assertEq(
+            uint8(escrow.getJob(jobId).status),
+            uint8(IERC8183.JobStatus.Submitted),
+            "job not stranded-settled"
+        );
     }
 
     // ── Expiry refund ────────────────────────────────────────────────────────────
@@ -220,8 +236,9 @@ contract PhaseA4Test is Test {
 
     function test_RejectWhileOpen_ByClient() public {
         vm.prank(client);
-        uint256 jobId =
-            escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "draft", address(0));
+        uint256 jobId = escrow.createJob(
+            provider, address(evaluator), block.timestamp + 1 days, "draft", address(0)
+        );
         vm.prank(client);
         escrow.reject(jobId, "withdrawn", "");
         assertEq(uint8(escrow.getJob(jobId).status), uint8(IERC8183.JobStatus.Rejected));
@@ -231,8 +248,9 @@ contract PhaseA4Test is Test {
 
     function test_OnlyClientCanFundAndSetBudget() public {
         vm.prank(client);
-        uint256 jobId =
-            escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
+        uint256 jobId = escrow.createJob(
+            provider, address(evaluator), block.timestamp + 1 days, "j", address(0)
+        );
 
         vm.prank(rando);
         vm.expectRevert(CustosJobEscrow.NotClient.selector);
@@ -247,8 +265,9 @@ contract PhaseA4Test is Test {
 
     function test_OnlyProviderCanSubmit() public {
         vm.prank(client);
-        uint256 jobId =
-            escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
+        uint256 jobId = escrow.createJob(
+            provider, address(evaluator), block.timestamp + 1 days, "j", address(0)
+        );
         vm.prank(client);
         escrow.setBudget(jobId, BUDGET, "");
         vm.startPrank(client);
@@ -263,12 +282,15 @@ contract PhaseA4Test is Test {
 
     function test_SubmitBeforeFundReverts() public {
         vm.prank(client);
-        uint256 jobId =
-            escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
+        uint256 jobId = escrow.createJob(
+            provider, address(evaluator), block.timestamp + 1 days, "j", address(0)
+        );
         vm.prank(provider);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CustosJobEscrow.WrongStatus.selector, IERC8183.JobStatus.Funded, IERC8183.JobStatus.Open
+                CustosJobEscrow.WrongStatus.selector,
+                IERC8183.JobStatus.Funded,
+                IERC8183.JobStatus.Open
             )
         );
         escrow.submit(jobId, DELIVERABLE, "");
@@ -303,8 +325,9 @@ contract PhaseA4Test is Test {
 
     function test_SetProviderRevertsZeroAddress() public {
         vm.prank(client);
-        uint256 jobId =
-            escrow.createJob(provider, address(evaluator), block.timestamp + 1 days, "j", address(0));
+        uint256 jobId = escrow.createJob(
+            provider, address(evaluator), block.timestamp + 1 days, "j", address(0)
+        );
         vm.prank(client);
         vm.expectRevert(CustosJobEscrow.ZeroAddress.selector);
         escrow.setProvider(jobId, address(0));

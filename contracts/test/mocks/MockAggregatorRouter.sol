@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20}    from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @notice Mock DEX aggregator router for unit tests. Stands in for the pinned
@@ -25,11 +25,13 @@ contract MockAggregatorRouter {
     bool public shouldUnderpay;
 
     function setRate(address tokenIn, address tokenOut, uint256 num, uint256 denom) external {
-        numerator[tokenIn][tokenOut]   = num;
+        numerator[tokenIn][tokenOut] = num;
         denominator[tokenIn][tokenOut] = denom;
     }
 
-    function setShouldUnderpay(bool v) external { shouldUnderpay = v; }
+    function setShouldUnderpay(bool v) external {
+        shouldUnderpay = v;
+    }
 
     /**
      * @param tokenIn   Token pulled from the caller.
@@ -43,9 +45,9 @@ contract MockAggregatorRouter {
     {
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
-        uint256 num   = numerator[tokenIn][tokenOut];
+        uint256 num = numerator[tokenIn][tokenOut];
         uint256 denom = denominator[tokenIn][tokenOut];
-        if (num == 0)   num = 1;
+        if (num == 0) num = 1;
         if (denom == 0) denom = 1;
 
         amountOut = (amountIn * num) / denom;

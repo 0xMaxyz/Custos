@@ -11,13 +11,13 @@ pragma solidity 0.8.28;
  *   1.4  Strategy adapter interface + registry (mock adapter, timelock)
  */
 
-import {Test, console2} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Roles}              from "../src/Roles.sol";
-import {Guardrails}         from "../src/Guardrails.sol";
-import {YieldVault}         from "../src/YieldVault.sol";
-import {MockStrategyAdapter} from "./mocks/MockStrategyAdapter.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { MockStrategyAdapter } from "./mocks/MockStrategyAdapter.sol";
 
 // Minimal ERC-20 for testing (no fork needed).
 contract MockUSDC is Test {
@@ -25,10 +25,12 @@ contract MockUSDC is Test {
     mapping(address => mapping(address => uint256)) public allowance;
 
     uint8 public constant decimals = 6;
-    string public constant name   = "USD Coin";
+    string public constant name = "USD Coin";
     string public constant symbol = "USDC";
 
-    function mint(address to, uint256 amount) external { balanceOf[to] += amount; }
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
 
     function transfer(address to, uint256 amount) external returns (bool) {
         balanceOf[msg.sender] -= amount;
@@ -48,29 +50,31 @@ contract MockUSDC is Test {
         return true;
     }
 
-    function totalSupply() external pure returns (uint256) { return 0; }
+    function totalSupply() external pure returns (uint256) {
+        return 0;
+    }
 }
 
 contract Phase1Test is Test {
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
-    address internal guardian  = makeAddr("guardian");
-    address internal user      = makeAddr("user");
-    address internal user2     = makeAddr("user2");
-    address internal attacker  = makeAddr("attacker");
+    address internal guardian = makeAddr("guardian");
+    address internal user = makeAddr("user");
+    address internal user2 = makeAddr("user2");
+    address internal attacker = makeAddr("attacker");
 
-    MockUSDC   internal usdc;
+    MockUSDC internal usdc;
     Guardrails internal gr;
     YieldVault internal vault;
     MockStrategyAdapter internal mockAdapter;
 
-    uint256 constant USDC_1K  = 1_000e6;
+    uint256 constant USDC_1K = 1_000e6;
     uint256 constant USDC_10K = 10_000e6;
     uint256 constant USDC_50K = 50_000e6;
 
     function setUp() public {
         usdc = new MockUSDC();
-        gr   = new Guardrails(admin);
+        gr = new Guardrails(admin);
         vault = new YieldVault(address(usdc), admin, address(gr));
         mockAdapter = new MockStrategyAdapter(address(usdc));
 
@@ -81,7 +85,7 @@ contract Phase1Test is Test {
         vm.stopPrank();
 
         // Fund users
-        usdc.mint(user,  USDC_50K);
+        usdc.mint(user, USDC_50K);
         usdc.mint(user2, USDC_10K);
     }
 
@@ -90,10 +94,10 @@ contract Phase1Test is Test {
     // =========================================================================
 
     function test_RolesGranted() public view {
-        assertTrue(vault.hasRole(Roles.ADMIN,     admin));
+        assertTrue(vault.hasRole(Roles.ADMIN, admin));
         assertTrue(vault.hasRole(Roles.ALLOCATOR, allocator));
-        assertTrue(vault.hasRole(Roles.GUARDIAN,  guardian));
-        assertFalse(vault.hasRole(Roles.ADMIN,    attacker));
+        assertTrue(vault.hasRole(Roles.GUARDIAN, guardian));
+        assertFalse(vault.hasRole(Roles.ADMIN, attacker));
     }
 
     function test_PausePreventsDeposit() public {
@@ -173,8 +177,16 @@ contract Phase1Test is Test {
         Guardrails.MarketState memory s = _normalMarket(USDC_10K);
 
         // Pre: already mostly deployed. Post: small rebalance well within 50% move cap.
-        uint16[4] memory pre;  pre[0]  = 3_500; pre[1] = 4_500; pre[2] = 2_000; pre[3] = 0;
-        uint16[4] memory post; post[0] = 3_000; post[1] = 5_000; post[2] = 2_000; post[3] = 0;
+        uint16[4] memory pre;
+        pre[0] = 3_500;
+        pre[1] = 4_500;
+        pre[2] = 2_000;
+        pre[3] = 0;
+        uint16[4] memory post;
+        post[0] = 3_000;
+        post[1] = 5_000;
+        post[2] = 2_000;
+        post[3] = 0;
         // Move = (|3500-3000| + |4500-5000| + 0 + 0) / 2 = 500 bps — within 5000 cap
 
         (bool ok, bytes4 reason) = gr.validateRebalance(pre, post, s);
@@ -183,8 +195,11 @@ contract Phase1Test is Test {
 
     function test_GuardrailsRejectWeightSumNot10000() public view {
         Guardrails.MarketState memory s = _normalMarket(USDC_10K);
-        uint16[4] memory pre;  pre[0] = 10_000;
-        uint16[4] memory post; post[0] = 5_000; post[1] = 3_000; // sums to 8000
+        uint16[4] memory pre;
+        pre[0] = 10_000;
+        uint16[4] memory post; // sums to 8000
+        post[0] = 5_000;
+        post[1] = 3_000;
 
         (bool ok, bytes4 reason) = gr.validateRebalance(pre, post, s);
         assertFalse(ok);
@@ -193,9 +208,14 @@ contract Phase1Test is Test {
 
     function test_GuardrailsRejectExceedUsdyCap() public view {
         Guardrails.MarketState memory s = _normalMarket(USDC_10K);
-        uint16[4] memory pre;  pre[0] = 10_000;
+        uint16[4] memory pre;
+        pre[0] = 10_000;
         // 70% USDY exceeds 60% cap
-        uint16[4] memory post; post[0] = 2_000; post[1] = 1_000; post[2] = 7_000; post[3] = 0;
+        uint16[4] memory post;
+        post[0] = 2_000;
+        post[1] = 1_000;
+        post[2] = 7_000;
+        post[3] = 0;
 
         (bool ok, bytes4 reason) = gr.validateRebalance(pre, post, s);
         assertFalse(ok);
@@ -204,9 +224,14 @@ contract Phase1Test is Test {
 
     function test_GuardrailsRejectBelowIdleBuffer() public view {
         Guardrails.MarketState memory s = _normalMarket(USDC_10K);
-        uint16[4] memory pre;  pre[0] = 10_000;
+        uint16[4] memory pre;
+        pre[0] = 10_000;
         // 1% idle < 2% minimum
-        uint16[4] memory post; post[0] = 100; post[1] = 9_000; post[2] = 900; post[3] = 0;
+        uint16[4] memory post;
+        post[0] = 100;
+        post[1] = 9_000;
+        post[2] = 900;
+        post[3] = 0;
 
         (bool ok, bytes4 reason) = gr.validateRebalance(pre, post, s);
         assertFalse(ok);
@@ -218,8 +243,13 @@ contract Phase1Test is Test {
         Guardrails.MarketState memory s = _normalMarket(USDC_10K);
         s.lastRebalanceAt = uint64(block.timestamp - 100); // only 100s ago, need 3600s
 
-        uint16[4] memory pre;  pre[0] = 10_000;
-        uint16[4] memory post; post[0] = 3_000; post[1] = 5_000; post[2] = 2_000; post[3] = 0;
+        uint16[4] memory pre;
+        pre[0] = 10_000;
+        uint16[4] memory post;
+        post[0] = 3_000;
+        post[1] = 5_000;
+        post[2] = 2_000;
+        post[3] = 0;
 
         (bool ok, bytes4 reason) = gr.validateRebalance(pre, post, s);
         assertFalse(ok);
@@ -229,9 +259,14 @@ contract Phase1Test is Test {
     function test_GuardrailsRejectMoveTooLarge() public view {
         Guardrails.MarketState memory s = _normalMarket(USDC_10K);
 
-        uint16[4] memory pre;  pre[0] = 10_000;
+        uint16[4] memory pre;
+        pre[0] = 10_000;
         // Move 90% of TVL from idle to Aave — exceeds 50% maxRebalanceMoveBps
-        uint16[4] memory post; post[0] = 1_000; post[1] = 8_000; post[2] = 1_000; post[3] = 0;
+        uint16[4] memory post;
+        post[0] = 1_000;
+        post[1] = 8_000;
+        post[2] = 1_000;
+        post[3] = 0;
 
         (bool ok, bytes4 reason) = gr.validateRebalance(pre, post, s);
         assertFalse(ok);
@@ -532,22 +567,23 @@ contract Phase1Test is Test {
     function _normalMarket(uint256 tvl) internal view returns (Guardrails.MarketState memory s) {
         uint256 nav = 1.05e18; // ~$1.05 USDY NAV
         s = Guardrails.MarketState({
-            usdyOracleNav:   nav,
-            usdyDexSpot:     nav, // no deviation
+            usdyOracleNav: nav,
+            usdyDexSpot: nav, // no deviation
             oracleUpdatedAt: uint64(block.timestamp),
-            oracleRangeEnd:  uint64(block.timestamp + 7 days),
+            oracleRangeEnd: uint64(block.timestamp + 7 days),
             aaveWithdrawable: tvl * 50 / 100, // 50% of TVL withdrawable from Aave
-            totalAssets:      tvl,
-            lastRebalanceAt:  0 // first rebalance
+            totalAssets: tvl,
+            lastRebalanceAt: 0 // first rebalance
         });
     }
 
     function _bytes4ToString(bytes4 b) internal pure returns (string memory) {
         bytes memory result = new bytes(10);
-        result[0] = "0"; result[1] = "x";
+        result[0] = "0";
+        result[1] = "x";
         for (uint256 i = 0; i < 4; i++) {
-            result[2 + i*2]   = _nibble(uint8(b[i]) >> 4);
-            result[3 + i*2]   = _nibble(uint8(b[i]) & 0xf);
+            result[2 + i * 2] = _nibble(uint8(b[i]) >> 4);
+            result[3 + i * 2] = _nibble(uint8(b[i]) & 0xf);
         }
         return string(result);
     }

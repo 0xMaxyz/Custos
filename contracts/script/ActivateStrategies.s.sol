@@ -10,12 +10,12 @@ pragma solidity 0.8.28;
  *     --private-key $DEPLOYER_PRIVATE_KEY --broadcast -vvv
  */
 
-import {Script, console2} from "forge-std/Script.sol";
-import {YieldVault}        from "../src/YieldVault.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { YieldVault } from "../src/YieldVault.sol";
 
 contract ActivateStrategies is Script {
     function run() external {
-        uint256 key   = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 key = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address vaultAddr = vm.envAddress("VAULT_ADDRESS");
 
         YieldVault vault = YieldVault(vaultAddr);

@@ -17,30 +17,30 @@ pragma solidity 0.8.28;
  *     (totalAssets stable; USDY restored), proving wrap/unwrap behave as modeled.
  */
 
-import {Test, console2} from "forge-std/Test.sol";
-import {IERC20}         from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Roles}              from "../src/Roles.sol";
-import {Guardrails}         from "../src/Guardrails.sol";
-import {YieldVault}         from "../src/YieldVault.sol";
-import {UsdyAdapter}        from "../src/UsdyAdapter.sol";
-import {IMusd}              from "../src/interfaces/IMusd.sol";
-import {IRWADynamicOracle}  from "../src/interfaces/IRWADynamicOracle.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { UsdyAdapter } from "../src/UsdyAdapter.sol";
+import { IMusd } from "../src/interfaces/IMusd.sol";
+import { IRWADynamicOracle } from "../src/interfaces/IRWADynamicOracle.sol";
 
 contract ForkPhase2dTest is Test {
     // ── Mantle mainnet — verified addresses ───────────────────────────────────
 
-    address internal constant USDC        = 0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9;
-    address internal constant USDY        = 0x5bE26527e817998A7206475496fDE1E68957c5A6;
-    address internal constant MUSD        = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
+    address internal constant USDC = 0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9;
+    address internal constant USDY = 0x5bE26527e817998A7206475496fDE1E68957c5A6;
+    address internal constant MUSD = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
     address internal constant USDY_ORACLE = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
     address internal constant ODOS_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
 
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
 
-    Guardrails  internal gr;
-    YieldVault  internal vault;
+    Guardrails internal gr;
+    YieldVault internal vault;
     UsdyAdapter internal adapter;
 
     function setUp() public {
@@ -49,8 +49,8 @@ contract ForkPhase2dTest is Test {
         assembly { sz := extcodesize(MUSD) }
         require(sz > 0, "mUSD has no code at documented address");
 
-        gr      = new Guardrails(admin);
-        vault   = new YieldVault(USDC, admin, address(gr));
+        gr = new Guardrails(admin);
+        vault = new YieldVault(USDC, admin, address(gr));
         adapter = new UsdyAdapter(ODOS_ROUTER, USDC, USDY, MUSD, USDY_ORACLE, address(vault), 50);
 
         vm.startPrank(admin);
@@ -65,7 +65,7 @@ contract ForkPhase2dTest is Test {
     // ── mUSD converter wiring (verify, don't guess) ───────────────────────────
 
     function testForkMusdWiring() public view {
-        assertEq(IMusd(MUSD).usdy(),   USDY,        "mUSD.usdy() must be our USDY");
+        assertEq(IMusd(MUSD).usdy(), USDY, "mUSD.usdy() must be our USDY");
         assertEq(IMusd(MUSD).oracle(), USDY_ORACLE, "mUSD.oracle() must be the RWADynamicOracle");
 
         (bool ok, bytes memory data) = MUSD.staticcall(abi.encodeWithSignature("decimals()"));
@@ -101,14 +101,18 @@ contract ForkPhase2dTest is Test {
         uint256 musdOut = adapter.convertToMusd(amount, 0);
         assertGt(musdOut, 0, "received mUSD");
         assertEq(IERC20(USDY).balanceOf(address(adapter)), 0, "USDY fully wrapped");
-        assertApproxEqAbs(adapter.totalAssets(), taStart, 1e6, "totalAssets stable across wrap (<=$1)");
+        assertApproxEqAbs(
+            adapter.totalAssets(), taStart, 1e6, "totalAssets stable across wrap (<=$1)"
+        );
         console2.log("[2.7] wrapped 100 USDY -> mUSD:", musdOut);
 
         // mUSD -> USDY
         vm.prank(address(vault));
         uint256 usdyOut = adapter.convertToUsdy(musdOut, 0);
         assertApproxEqRel(usdyOut, amount, 1e15, "USDY restored within 0.1%");
-        assertApproxEqAbs(adapter.totalAssets(), taStart, 1e6, "totalAssets stable across full round-trip");
+        assertApproxEqAbs(
+            adapter.totalAssets(), taStart, 1e6, "totalAssets stable across full round-trip"
+        );
         console2.log("[2.7] unwrapped mUSD -> USDY:", usdyOut);
     }
 }

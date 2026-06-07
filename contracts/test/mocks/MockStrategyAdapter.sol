@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IStrategyAdapter} from "../../src/interfaces/IStrategyAdapter.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IStrategyAdapter } from "../../src/interfaces/IStrategyAdapter.sol";
 
 /**
  * @title MockStrategyAdapter
@@ -26,7 +26,9 @@ contract MockStrategyAdapter is IStrategyAdapter {
         underlying = _usdc;
     }
 
-    function setYieldBps(uint16 bps) external { yieldBps = bps; }
+    function setYieldBps(uint16 bps) external {
+        yieldBps = bps;
+    }
 
     function totalAssets() external view override returns (uint256) {
         return _deposited + (_deposited * yieldBps) / 10_000;
@@ -40,11 +42,7 @@ contract MockStrategyAdapter is IStrategyAdapter {
         return IERC20(usdc).balanceOf(address(this)) > 0;
     }
 
-    function deposit(uint256 usdcAmount, bytes calldata)
-        external
-        override
-        returns (uint256)
-    {
+    function deposit(uint256 usdcAmount, bytes calldata) external override returns (uint256) {
         IERC20(usdc).safeTransferFrom(msg.sender, address(this), usdcAmount);
         _deposited += usdcAmount;
         return usdcAmount;

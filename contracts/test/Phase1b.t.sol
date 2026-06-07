@@ -16,14 +16,14 @@ pragma solidity 0.8.28;
  *         - large withdraw served from idle + adapter combined
  */
 
-import {Test, console2} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Roles}               from "../src/Roles.sol";
-import {Guardrails}          from "../src/Guardrails.sol";
-import {YieldVault}          from "../src/YieldVault.sol";
-import {AaveV3Adapter}       from "../src/AaveV3Adapter.sol";
-import {MockStrategyAdapter} from "./mocks/MockStrategyAdapter.sol";
+import { Roles } from "../src/Roles.sol";
+import { Guardrails } from "../src/Guardrails.sol";
+import { YieldVault } from "../src/YieldVault.sol";
+import { AaveV3Adapter } from "../src/AaveV3Adapter.sol";
+import { MockStrategyAdapter } from "./mocks/MockStrategyAdapter.sol";
 
 // ── Minimal MockUSDC (same as Phase1.t.sol) ───────────────────────────────────
 
@@ -33,7 +33,9 @@ contract MockUSDC2 {
 
     uint8 public constant DECIMALS = 6;
 
-    function mint(address to, uint256 amount) external { balanceOf[to] += amount; }
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
 
     function transfer(address to, uint256 amount) external returns (bool) {
         balanceOf[msg.sender] -= amount;
@@ -56,44 +58,55 @@ contract MockUSDC2 {
     }
 
     // forceApprove compatibility (OZ SafeERC20 calls approve directly on known ERC20s)
-    function decimals() external pure returns (uint8) { return DECIMALS; }
-    function totalSupply() external pure returns (uint256) { return 0; }
-    function name() external pure returns (string memory) { return "USD Coin"; }
-    function symbol() external pure returns (string memory) { return "USDC"; }
+    function decimals() external pure returns (uint8) {
+        return DECIMALS;
+    }
+
+    function totalSupply() external pure returns (uint256) {
+        return 0;
+    }
+
+    function name() external pure returns (string memory) {
+        return "USD Coin";
+    }
+
+    function symbol() external pure returns (string memory) {
+        return "USDC";
+    }
 }
 
 // ── Test harness ──────────────────────────────────────────────────────────────
 
 contract Phase1bTest is Test {
-    address internal admin     = makeAddr("admin");
+    address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
-    address internal guardian  = makeAddr("guardian");
-    address internal user      = makeAddr("user");
-    address internal attacker  = makeAddr("attacker");
+    address internal guardian = makeAddr("guardian");
+    address internal user = makeAddr("user");
+    address internal attacker = makeAddr("attacker");
 
-    MockUSDC2  internal usdc;
+    MockUSDC2 internal usdc;
     Guardrails internal gr;
     YieldVault internal vault;
 
     MockStrategyAdapter internal aaveAdapter; // bucket 1
     MockStrategyAdapter internal usdyAdapter; // bucket 2
 
-    uint256 constant USDC_1K  = 1_000e6;
-    uint256 constant USDC_5K  = 5_000e6;
+    uint256 constant USDC_1K = 1_000e6;
+    uint256 constant USDC_5K = 5_000e6;
     uint256 constant USDC_10K = 10_000e6;
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     function setUp() public {
         usdc = new MockUSDC2();
-        gr   = new Guardrails(admin);
+        gr = new Guardrails(admin);
         vault = new YieldVault(address(usdc), admin, address(gr));
         aaveAdapter = new MockStrategyAdapter(address(usdc));
         usdyAdapter = new MockStrategyAdapter(address(usdc));
 
         vm.startPrank(admin);
         vault.grantRole(Roles.ALLOCATOR, allocator);
-        vault.grantRole(Roles.GUARDIAN,  guardian);
+        vault.grantRole(Roles.GUARDIAN, guardian);
         vm.stopPrank();
 
         usdc.mint(user, USDC_10K);
@@ -165,7 +178,9 @@ contract Phase1bTest is Test {
 
         // Rebalance: 30% idle, 70% AAVE — valid (prev all-idle, move = 70% > 50% cap)
         // Use a smaller move: 50% idle, 50% AAVE (move = 50% exactly, at cap).
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
 
         vm.warp(block.timestamp + 2 hours); // past min interval
@@ -180,7 +195,9 @@ contract Phase1bTest is Test {
     function test_RebalanceEmitsEvents() public {
         _deposit(USDC_10K);
 
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
 
         vm.warp(block.timestamp + 2 hours);
@@ -193,13 +210,17 @@ contract Phase1bTest is Test {
 
     function test_RebalanceGuardrailsRejectWeightSumNot10000() public {
         _deposit(USDC_10K);
-        uint16[4] memory target; target[0] = 4_000; target[1] = 4_000; // sums 8000
+        uint16[4] memory target; // sums 8000
+        target[0] = 4_000;
+        target[1] = 4_000;
         bytes[] memory sd = new bytes[](4);
 
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);
         vm.expectRevert(
-            abi.encodeWithSelector(YieldVault.GuardrailsRejected.selector, Guardrails.WeightsSumNot10000.selector)
+            abi.encodeWithSelector(
+                YieldVault.GuardrailsRejected.selector, Guardrails.WeightsSumNot10000.selector
+            )
         );
         vault.rebalance(target, sd, "ipfs://bad", bytes32(0), 0);
     }
@@ -207,7 +228,9 @@ contract Phase1bTest is Test {
     function test_RebalanceGuardrailsRejectTooSoon() public {
         _deposit(USDC_10K);
 
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
 
         // First rebalance at block.timestamp (interval 0 since lastRebalanceAt == 0).
@@ -228,7 +251,9 @@ contract Phase1bTest is Test {
 
     function test_OnlyAllocatorCanRebalance() public {
         _deposit(USDC_10K);
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
 
         vm.warp(block.timestamp + 2 hours);
@@ -242,7 +267,9 @@ contract Phase1bTest is Test {
         vm.prank(guardian);
         vault.pause();
 
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
 
         vm.warp(block.timestamp + 2 hours);
@@ -267,7 +294,9 @@ contract Phase1bTest is Test {
         _deposit(USDC_10K);
 
         // Move 50% to adapter.
-        uint16[4] memory target; target[0] = 5_000; target[1] = 5_000;
+        uint16[4] memory target;
+        target[0] = 5_000;
+        target[1] = 5_000;
         bytes[] memory sd = new bytes[](4);
         vm.warp(block.timestamp + 2 hours);
         vm.prank(allocator);

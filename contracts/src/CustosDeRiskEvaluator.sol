@@ -62,8 +62,17 @@ contract CustosDeRiskEvaluator is AccessControl {
 
     // ── Constructor ────────────────────────────────────────────────────────────
 
-    constructor(address guardrails, address reputation, address rwaAdapter, uint256 agentId, address admin) {
-        if (guardrails == address(0) || reputation == address(0) || rwaAdapter == address(0) || admin == address(0)) {
+    constructor(
+        address guardrails,
+        address reputation,
+        address rwaAdapter,
+        uint256 agentId,
+        address admin
+    ) {
+        if (
+            guardrails == address(0) || reputation == address(0) || rwaAdapter == address(0)
+                || admin == address(0)
+        ) {
             revert ZeroAddress();
         }
         GUARDRAILS = Guardrails(guardrails);

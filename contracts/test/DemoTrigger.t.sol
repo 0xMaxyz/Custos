@@ -18,7 +18,7 @@ pragma solidity 0.8.28;
  *   forge test --fork-url $MANTLE_RPC_URL --match-contract DemoTriggerTest -vv
  */
 
-import {Test, console2} from "forge-std/Test.sol";
+import { Test, console2 } from "forge-std/Test.sol";
 
 // ── Mock oracle that returns a controllable price ─────────────────────────────
 
@@ -28,25 +28,33 @@ contract MockRWADynamicOracle {
     uint256 public rangeEnd;
 
     constructor(uint256 _price) {
-        price      = _price;
+        price = _price;
         rangeStart = block.timestamp;
-        rangeEnd   = block.timestamp + 30 days;
+        rangeEnd = block.timestamp + 30 days;
     }
 
-    function getPrice() external view returns (uint256) { return price; }
+    function getPrice() external view returns (uint256) {
+        return price;
+    }
 
     function currentRange() external view returns (uint256, uint256) {
         return (rangeStart, rangeEnd);
     }
 
     /// @notice Set an arbitrary price (used by injectDepeg).
-    function setPrice(uint256 _price) external { price = _price; }
+    function setPrice(uint256 _price) external {
+        price = _price;
+    }
 
     /// @notice Expire the oracle range (simulates oracle staleness).
-    function expireRange() external { rangeEnd = block.timestamp - 1; }
+    function expireRange() external {
+        rangeEnd = block.timestamp - 1;
+    }
 
     /// @notice Restore valid range.
-    function restoreRange() external { rangeEnd = block.timestamp + 30 days; }
+    function restoreRange() external {
+        rangeEnd = block.timestamp + 30 days;
+    }
 }
 
 // ── Demo trigger helper ───────────────────────────────────────────────────────

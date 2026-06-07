@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20}    from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title AggregatorSwapLib
@@ -46,19 +46,17 @@ library AggregatorSwapLib {
      * @param routerData Aggregator swap calldata from the off-chain quote (1delta).
      * @return received Actual `tokenOut` gained by `address(this)`.
      */
-    function swap(
-        address router,
-        address tokenOut,
-        uint256 minOut,
-        bytes calldata routerData
-    ) internal returns (uint256 received) {
+    function swap(address router, address tokenOut, uint256 minOut, bytes calldata routerData)
+        internal
+        returns (uint256 received)
+    {
         if (routerData.length == 0) revert EmptySwapData();
 
         uint256 balBefore = IERC20(tokenOut).balanceOf(address(this));
 
         // Single pinned router; output verified by balance delta below — the
         // router's own return data is intentionally ignored.
-        (bool ok, ) = router.call(routerData);
+        (bool ok,) = router.call(routerData);
         if (!ok) revert AggregatorCallReverted();
 
         uint256 balAfter = IERC20(tokenOut).balanceOf(address(this));

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IStrategyAdapter} from "./IStrategyAdapter.sol";
+import { IStrategyAdapter } from "./IStrategyAdapter.sol";
 
 /**
  * @title IUsdyAdapter

@@ -460,6 +460,88 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(swapData[3]).toBe("0x");
   });
 
+  it("withdraw path sizes the USDY sell with 1e30 scaling (regression for C1)", async () => {
+    // The executor→chain seam the C1 bug slipped through: the test above asserts the
+    // quote *calldata* lands in swapData[2] but never checked the *amountIn* the
+    // executor sized. Here we capture the 3rd positional arg of getSwapQuote on the
+    // USDY→USDC withdraw path and assert it uses 1e30 (6→18 dec scale + price
+    // inversion), mirroring UsdyAdapter.deposit's `usdcAmount * 1e30 / nav`.
+    const snap = baseSnapshot(); // USDY 5000bps, TVL 30_000e6, NAV 1.08e18
+
+    const ADAPTER_ADDR = "0xaabbccddaabbccddaabbccddaabbccddaabbccdd" as `0x${string}`;
+
+    const signalsMod = await import("../llm/signals.js");
+    const oneDeltaMod = await import("../data/oneDelta.js");
+    const evidenceMod = await import("../llm/evidence.js");
+
+    // Tighten USDY ceiling 5000 → 2000bps → withdraw path (USDY → USDC).
+    const runSignalLayerSpy = vi.spyOn(signalsMod, "runSignalLayer").mockResolvedValue({
+      riskLevel: "CAUTION",
+      usdyMaxWeightBps: 2_000,
+      deRisk: false,
+      rationale: "Reduce USDY exposure.",
+      signals: [],
+      confidence: 0.85,
+    });
+    const buildEvidenceFetcherSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
+      async () => [],
+    );
+    const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
+      .mockResolvedValue({
+        // Pinned Odos router so the quote is accepted and getSwapQuote is reached.
+        router: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745" as `0x${string}`,
+        calldata: "0xdeadbeef" as `0x${string}`,
+        amountOut: 9_000n * 10n ** 6n,
+      });
+
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+
+    const writeContract = vi.fn(async () => "0xabc123" as `0x${string}`);
+    const readContract = vi.fn(async (opts: { functionName: string }) => {
+      if (opts.functionName === "lastRebalanceAt") return 0n;
+      if (opts.functionName === "adapters") return ADAPTER_ADDR;
+      return 0n;
+    });
+    const publicClient = { readContract, waitForTransactionReceipt: vi.fn(async () => ({ logs: [] })) } as never;
+    const walletClient = {
+      writeContract,
+      chain: { id: 5000 },
+      account: { address: "0x1234" as `0x${string}` },
+    } as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      ANTHROPIC_API_KEY: "sk-test",
+    });
+
+    const executor = new Executor({
+      config,
+      clients: { publicClient, walletClient } as never,
+      snapshotter: makeSnapshotter(snap),
+    });
+
+    await executor.runCycle();
+
+    // Capture the spy's call BEFORE restoring — mockRestore() clears mock.calls.
+    // getSwapQuote(tokenIn, tokenOut, amountIn, to, slippageBps) — amountIn is arg[2].
+    expect(getSwapQuoteSpy).toHaveBeenCalledOnce();
+    const amountIn = (getSwapQuoteSpy.mock.calls[0] as unknown as [string, string, bigint])[2];
+
+    runSignalLayerSpy.mockRestore();
+    buildEvidenceFetcherSpy.mockRestore();
+    getSwapQuoteSpy.mockRestore();
+
+    // usdcValue = (5000-2000)bps × 30_000e6 / 10000 = 9_000e6.
+    const usdcValue = (3_000n * snap.totalAssetsUsdc) / 10_000n;
+    const expectedUsdyIn = (usdcValue * 10n ** 30n) / snap.usdyOracleNavUsdc;
+    expect(amountIn).toBe(expectedUsdyIn);
+    // Sanity: real USDY scale (~8333e18), not the ~8.3e9 dust the 1e18 bug produced.
+    expect(amountIn).toBeGreaterThan(1_000n * 10n ** 18n);
+  });
+
   it("rebalance: swapData[2] falls back to 0x when getSwapQuote fails (network error)", async () => {
     // Same scenario but getSwapQuote throws — swapData[2] must be "0x" (fail-closed).
     const snap = baseSnapshot(); // currentWeightsBps has 5000bps USDY

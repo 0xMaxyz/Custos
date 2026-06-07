@@ -374,10 +374,16 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             if (!forceDeRisk) revert DeRiskConditionNotMet();
         }
 
+        // Derive an oracle/spot-based USDC floor so the value-sensitive de-risk
+        // liquidation is NOT executed with minOut=0 (the router's own minOut is never
+        // trusted — see AggregatorSwapLib). Computed from current on-chain state, so a
+        // compromised allocator cannot relax it beyond the supplied spot.
+        uint256 minOut = _deRiskMinOut(usdyDexSpotUsdc);
+
         // Unwind the USDY bucket entirely, then (if target is AUSD) route the
         // freed USDC into the AUSD safety bucket. Extracted to a helper to keep
         // deRisk's stack within limits.
-        _unwindUsdyToAusd(toBucket, swapData);
+        _unwindUsdyToAusd(toBucket, swapData, minOut);
 
         decisionId = ++decisionCount;
         emit DecisionRecorded(decisionId, 1, evidenceHash, reason);
@@ -441,14 +447,16 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
      *         USDC is left liquid; only the amount freed from USDY is routed.
      * @dev Without an AUSD adapter or `swapData[BUCKET_AUSD]`, the freed USDC
      *      stays idle — still a safe state, just USDC instead of AUSD.
+     * @param minOutUsdc Oracle/spot-derived USDC floor for the USDY liquidation,
+     *      enforced by the adapter's balance-delta check (see {_deRiskMinOut}).
      */
-    function _unwindUsdyToAusd(uint8 toBucket, bytes[] calldata swapData) internal {
+    function _unwindUsdyToAusd(uint8 toBucket, bytes[] calldata swapData, uint256 minOutUsdc) internal {
         uint256 idleBefore = IERC20(asset()).balanceOf(address(this));
 
         IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
         if (address(usdyAdapter) != address(0) && usdyAdapter.totalAssets() > 0) {
             bytes memory sd = swapData.length > BUCKET_USDY ? swapData[BUCKET_USDY] : bytes("");
-            usdyAdapter.emergencyWithdrawAll(0, address(this), sd);
+            usdyAdapter.emergencyWithdrawAll(minOutUsdc, address(this), sd);
         }
 
         if (toBucket != BUCKET_AUSD) return;
@@ -462,6 +470,42 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             IERC20(asset()).forceApprove(address(ausdAdapter), freed);
             ausdAdapter.deposit(freed, ausdSd);
         }
+    }
+
+    /**
+     * @notice Oracle/spot-derived USDC floor for a full USDY-bucket de-risk exit.
+     * @dev Basis = min(oracle NAV, agent-supplied DEX spot), so the floor still clears
+     *      during a real depeg (the scenario de-risk exists for) while still blocking
+     *      gross MEV/slippage — a NAV-only floor would wrongly revert the exit exactly
+     *      when spot < NAV. Falls back to the NAV-based value when the spot is 0
+     *      (GUARDIAN path) or when the oracle read reverts. Returns 0 only when the
+     *      bucket is empty or unpriced (the swap then realizes 0 and reverts on its own
+     *      EmptySwapData / zero-delta path). The floor is enforced by the adapter's
+     *      balance-delta check; the router's reported output is never trusted.
+     * @param usdyDexSpotUsdc Agent-supplied USDY/USDC DEX spot (18-dec). 0 = use NAV.
+     * @return minOut USDC (6-dec) the de-risk liquidation must realize.
+     */
+    function _deRiskMinOut(uint256 usdyDexSpotUsdc) internal view returns (uint256 minOut) {
+        IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
+        if (address(usdyAdapter) == address(0)) return 0;
+
+        uint256 valueAtNav = usdyAdapter.totalAssets(); // 6-dec USDC, NAV-based
+        if (valueAtNav == 0) return 0;
+
+        // Discount the bucket value to the real exit price when a DEX spot below NAV
+        // is supplied. nav and usdyDexSpotUsdc are both 18-dec USDC-per-USDY, so the
+        // ratio is dimensionless and `basis` stays 6-dec USDC.
+        uint256 basis = valueAtNav;
+        try IUsdyAdapter(address(usdyAdapter)).oracleData() returns (uint256 nav, uint64) {
+            if (nav > 0 && usdyDexSpotUsdc > 0 && usdyDexSpotUsdc < nav) {
+                basis = (valueAtNav * usdyDexSpotUsdc) / nav;
+            }
+        } catch {
+            // Oracle down: keep the NAV-based value as the best available basis.
+        }
+
+        uint16 slippageBps = guardrails.config().maxSlippageBps;
+        minOut = (basis * (10_000 - slippageBps)) / 10_000;
     }
 
     /**

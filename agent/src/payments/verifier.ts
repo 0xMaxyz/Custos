@@ -75,6 +75,64 @@ export function signatureVerifyingVerifier(
   };
 }
 
+/**
+ * Off-chain replay guard for VERIFY-ONLY mode (N3).
+ *
+ * When `/risk-score` only verifies the EIP-712 signature and delegates settlement
+ * (`X402_SETTLE_ONCHAIN=false`), nothing consumes the EIP-3009 nonce on-chain, so the
+ * same `X-PAYMENT` could unlock the resource repeatedly without paying. This tracks
+ * spent `(from, nonce)` pairs in memory until their `validBefore`, after which the
+ * bounds check rejects them anyway. The on-chain settling verifier needs no guard —
+ * EIP-3009's own nonce makes settlement single-use.
+ */
+export interface NonceStore {
+  /**
+   * Returns true if `key` was already spent (and is still within its validity window)
+   * — i.e. a replay. Otherwise records it (expiring at `expiresAtSec`) and returns false.
+   */
+  checkAndRecord(key: string, expiresAtSec: number, nowSec: number): boolean;
+}
+
+/** Default in-memory {@link NonceStore}; prunes expired keys on each call (bounded memory). */
+export function createInMemoryNonceStore(): NonceStore {
+  const spent = new Map<string, number>(); // key -> expiresAtSec
+  return {
+    checkAndRecord(key, expiresAtSec, nowSec) {
+      // Drop entries past their validity window — an expired authorization is rejected
+      // by the bounds check, so its nonce can never be replayed once it lapses.
+      for (const [k, exp] of spent) {
+        if (exp <= nowSec) spent.delete(k);
+      }
+      const existing = spent.get(key);
+      if (existing !== undefined && existing > nowSec) return true; // replay
+      spent.set(key, expiresAtSec);
+      return false;
+    },
+  };
+}
+
+/**
+ * Wrap `inner` with the off-chain replay guard. A payment that verifies but whose
+ * `(from, nonce)` was already spent is rejected (null). Apply ONLY in verify-only mode;
+ * the on-chain settle path is already single-use via the consumed EIP-3009 nonce.
+ */
+export function replayGuardedVerifier(
+  inner: PaymentVerifier,
+  store: NonceStore = createInMemoryNonceStore(),
+  nowSec: () => number = () => Math.floor(Date.now() / 1000),
+): PaymentVerifier {
+  return async (payment, requirements) => {
+    const receipt = await inner(payment, requirements);
+    if (!receipt) return null; // only consume a nonce for a genuinely valid payment
+    const a = payment.payload.authorization;
+    const key = `${a.from.toLowerCase()}:${a.nonce.toLowerCase()}`;
+    if (store.checkAndRecord(key, Number(a.validBefore), nowSec())) {
+      return null; // replay — this authorization already unlocked the resource once
+    }
+    return receipt;
+  };
+}
+
 /** EIP-3009 `transferWithAuthorization` (bytes-signature variant, e.g. USDC v2). */
 export const transferWithAuthorizationAbi = [
   {

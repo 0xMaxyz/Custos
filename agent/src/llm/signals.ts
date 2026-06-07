@@ -17,6 +17,14 @@ export const noopEvidence: EvidenceFetcher = async () => [];
 export interface SignalLayerOptions {
   readonly llm: LLMClient;
   readonly fetchEvidence?: EvidenceFetcher;
+  /**
+   * Allow-list of evidence `source`s that may satisfy the de-risk citation gate (N2).
+   * When set, only cited evidence whose `source` is in this set can keep `deRisk=true`
+   * — un-vetted/scraped sources can still inform the model but can't unlock a de-risk.
+   * When omitted, every cited source is eligible (back-compat). The running agent always
+   * passes `CURATED_EVIDENCE_SOURCES`.
+   */
+  readonly trustedEvidenceSources?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -31,7 +39,7 @@ export async function runSignalLayer(
   assessment: RiskAssessment,
   options: SignalLayerOptions,
 ): Promise<RiskVerdict | null> {
-  const { llm, fetchEvidence = noopEvidence } = options;
+  const { llm, fetchEvidence = noopEvidence, trustedEvidenceSources } = options;
 
   let evidence: EvidenceItem[];
   try {
@@ -51,7 +59,7 @@ export async function runSignalLayer(
       return null;
     }
 
-    const clamped = clampVerdict(raw, assessment, evidence);
+    const clamped = clampVerdict(raw, assessment, evidence, trustedEvidenceSources);
     if (clamped !== null) return clamped;
     // clamped === null means schema/sanity rejection → retry once
   }
@@ -122,6 +130,7 @@ function clampVerdict(
   raw: RiskVerdict,
   assessment: RiskAssessment,
   evidence: EvidenceItem[],
+  trustedEvidenceSources?: ReadonlySet<string> | undefined,
 ): RiskVerdict | null {
   // Hard schema re-check (belt-and-suspenders — AnthropicClient already parsed).
   const parsed = RiskVerdictSchema.safeParse(raw);
@@ -131,10 +140,17 @@ function clampVerdict(
   // LLM may only tighten: USDY weight clamped to deterministic ceiling.
   const usdyMaxWeightBps = Math.min(v.usdyMaxWeightBps, assessment.maxUsdyWeightBpsAllowed);
 
-  // deRisk=true requires at least one signal whose evidenceId resolves in evidence[] (SPEC §3.3).
-  const evidenceIds = new Set(evidence.map((e) => e.id));
+  // deRisk=true requires at least one signal whose evidenceId resolves in evidence[]
+  // AND whose source is allow-listed (N2). An un-vetted/scraped source can inform the
+  // model but can't, on its own, satisfy the de-risk gate. With no allow-list, every
+  // cited source is eligible (back-compat). (SPEC §3.3)
+  const eligibleIds = new Set(
+    evidence
+      .filter((e) => trustedEvidenceSources === undefined || trustedEvidenceSources.has(e.source))
+      .map((e) => e.id),
+  );
   const deRisk =
-    v.deRisk && v.signals.some((s) => s.evidenceId !== undefined && evidenceIds.has(s.evidenceId))
+    v.deRisk && v.signals.some((s) => s.evidenceId !== undefined && eligibleIds.has(s.evidenceId))
       ? true
       : false;
 

@@ -223,10 +223,24 @@ export async function createPayment(args: {
   readonly signer: Eip3009Signer;
   readonly nowSec?: number | undefined;
   readonly nonce?: `0x${string}` | undefined;
+  /**
+   * Hard ceiling (base units) on what we'll authorize. `requirements.maxAmountRequired`
+   * comes from the counterparty's 402 response, so without a cap a malicious feed could
+   * demand an arbitrary amount and we'd sign it. Reject above the cap BEFORE signing (N1).
+   */
+  readonly maxAmountBaseUnits?: bigint | undefined;
 }): Promise<PaymentPayload> {
   const { requirements, from, signer } = args;
   if (requirements.scheme !== "exact") {
     throw new Error(`unsupported x402 scheme: ${requirements.scheme}`);
+  }
+  if (
+    args.maxAmountBaseUnits !== undefined &&
+    BigInt(requirements.maxAmountRequired) > args.maxAmountBaseUnits
+  ) {
+    throw new Error(
+      `x402: required amount ${requirements.maxAmountRequired} exceeds max-spend cap ${args.maxAmountBaseUnits}`,
+    );
   }
   const authorization = buildAuthorization(requirements, from, {
     nowSec: args.nowSec,
@@ -275,6 +289,8 @@ export async function payAndFetch<T = unknown>(args: {
   readonly signer: Eip3009Signer;
   readonly fetchImpl: FetchLike;
   readonly nowSec?: number;
+  /** Hard ceiling (base units) on what we'll pay; over-cap requirements throw before signing (N1). */
+  readonly maxAmountBaseUnits?: bigint | undefined;
 }): Promise<PaidResult<T>> {
   const { url, from, signer, fetchImpl } = args;
 
@@ -289,7 +305,13 @@ export async function payAndFetch<T = unknown>(args: {
     throw new Error("x402: no supported 'exact' payment requirement offered");
   }
 
-  const payment = await createPayment({ requirements, from, signer, nowSec: args.nowSec });
+  const payment = await createPayment({
+    requirements,
+    from,
+    signer,
+    nowSec: args.nowSec,
+    maxAmountBaseUnits: args.maxAmountBaseUnits,
+  });
   const retried = await fetchImpl(url, {
     headers: { [PAYMENT_HEADER]: encodePaymentHeader(payment) },
   });

@@ -391,12 +391,22 @@ Signing + settlement are injectable so the protocol is testable offline.
 The receipt is bound to the evidence it bought via `resource`; the decision bundle
 carries `payments: [{ evidenceId, receipt }]` (hashed into `rationaleHash`, pinned to IPFS).
 
+**Outbound spend cap** (N1): `maxAmountRequired` is supplied by the counterparty's 402
+response, so the agent **never** signs it blindly. `createPayment` rejects any required
+amount above `X402_MAX_PRICE_BASE_UNITS` *before* signing, and that env var is **required**
+whenever `X402_PREMIUM_FEED_URL` is set (config `superRefine`) — a compromised feed URL
+therefore can't drain the payer up to its balance. An over-cap price degrades to empty
+paid-evidence (additive, never blocks a cycle).
+
 **Inbound payment verification** (`payments/verifier.ts`): `/risk-score` verifies the
 inbound `X-PAYMENT` by **recovering the EIP-712 signer** (`recoverTypedDataAddress`) and
 confirming it equals `authorization.from` (plus recipient/amount/validity bounds) — never
 just structure. With `X402_SETTLE_ONCHAIN=true` + an ALLOCATOR wallet it then **settles
 on-chain** by submitting `transferWithAuthorization` (returning the real tx hash);
-otherwise it verifies the signature and delegates settlement to a facilitator. The
+otherwise it verifies the signature and delegates settlement to a facilitator. In that
+verify-only mode nothing consumes the EIP-3009 nonce on-chain, so `replayGuardedVerifier`
+tracks spent `(from, nonce)` pairs in memory until `validBefore` and rejects replays (N3);
+the on-chain path needs no guard since the consumed nonce makes settlement single-use. The
 dev-only `shapeOnlyVerifier` is retained for tests, never wired into the running agent.
 
 ---
@@ -463,7 +473,7 @@ guardrails own all hard limits.
 ### 3.3 Validation & clamping (TS, before anything is signed)
 - Reject if JSON fails the zod schema → **fall back to the deterministic allocation**.
 - `usdyMaxWeightBps = min(model.usdyMaxWeightBps, deterministic.maxUsdyWeightBpsAllowed)`.
-- If `deRisk == true`, require ≥1 `signals[*]` with a resolvable `evidenceId`; else ignore the de-risk request.
+- If `deRisk == true`, require ≥1 `signals[*]` with a resolvable `evidenceId` **whose evidence `source` is on the trusted allow-list** (`CURATED_EVIDENCE_SOURCES`, the vetted first-party RWA feeds); else ignore the de-risk request. Un-vetted/scraped sources can inform the model as context but cannot, on their own, unlock a de-risk (N2).
 - The model may only **tighten**: final USDY weight = `min(deterministic.candidate.USDY, model.usdyMaxWeightBps)`. It can never increase USDY or any bucket above the deterministic candidate.
 - `rationale` + `signals` (with resolved evidence URLs) are hashed (`rationaleHash`) and bundled to IPFS (`decisionURI`) before calling `rebalance`/`deRisk`.
 

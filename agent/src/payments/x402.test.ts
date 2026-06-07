@@ -100,6 +100,27 @@ describe("buildAuthorization / createPayment", () => {
       verifyingContract: REQ.asset,
     });
   });
+
+  it("rejects a required amount above the spend cap BEFORE signing (N1)", async () => {
+    const { signer, calls } = stubSigner();
+    // REQ.maxAmountRequired = 10000; cap one unit below it.
+    await expect(
+      createPayment({ requirements: REQ, from: FROM, signer, nowSec: 1_000, maxAmountBaseUnits: 9_999n }),
+    ).rejects.toThrow(/exceeds max-spend cap/);
+    expect(calls.length).toBe(0); // never signed a counterparty-dictated over-cap amount
+  });
+
+  it("signs when the required amount is at or below the spend cap", async () => {
+    const { signer } = stubSigner();
+    const payment = await createPayment({
+      requirements: REQ,
+      from: FROM,
+      signer,
+      nowSec: 1_000,
+      maxAmountBaseUnits: 10_000n, // exactly the required amount
+    });
+    expect(payment.payload.signature).toBe(SIG);
+  });
 });
 
 describe("payAndFetch (402 -> pay -> 200)", () => {
@@ -153,6 +174,23 @@ describe("payAndFetch (402 -> pay -> 200)", () => {
     expect(res.receipt?.amount).toBe("10000");
     expect(res.receipt?.resource).toBe(REQ.resource); // binds receipt to the evidence bought
     expect(paidCalls()).toBe(1);
+  });
+
+  it("throws without paying when the 402 price exceeds the spend cap (N1)", async () => {
+    const { signer, calls } = stubSigner();
+    const { fetchImpl, paidCalls } = makeServer();
+    await expect(
+      payAndFetch({
+        url: REQ.resource,
+        from: FROM,
+        signer,
+        fetchImpl,
+        nowSec: 1_000,
+        maxAmountBaseUnits: 9_999n, // below REQ.maxAmountRequired (10000)
+      }),
+    ).rejects.toThrow(/exceeds max-spend cap/);
+    expect(calls.length).toBe(0); // never signed
+    expect(paidCalls()).toBe(0); // resource never unlocked
   });
 
   it("does not pay when the resource is already free (non-402)", async () => {

@@ -62,6 +62,11 @@ const configSchema = z.object({
   // Optional premium feed the agent PAYS for via x402; its settlement receipt is
   // pinned into the decision evidence bundle.
   x402PremiumFeedUrl: z.string().url().optional(),
+  // Hard ceiling (base units) on what the agent will pay per premium-feed call.
+  // Required whenever X402_PREMIUM_FEED_URL is set so a malicious/compromised feed
+  // can never make the agent sign a counterparty-dictated amount above an operator-set
+  // limit. Enforced before signing in `createPayment` (N1).
+  x402MaxPriceBaseUnits: z.coerce.bigint().nonnegative().optional(),
   // When true (and an ALLOCATOR wallet is present), /risk-score SETTLES inbound
   // payments on-chain via transferWithAuthorization; otherwise it verifies the
   // EIP-712 signature and delegates settlement to a facilitator.
@@ -86,6 +91,16 @@ const configSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["x402Asset"],
       message: "X402_ASSET is required when X402_PAY_TO is set",
+    });
+  }
+  // A premium feed the agent pays for must carry an operator-set spend ceiling, so a
+  // compromised feed URL can't make the agent sign an arbitrary (balance-draining)
+  // amount taken straight from the counterparty's 402 response (N1).
+  if (cfg.x402PremiumFeedUrl && cfg.x402MaxPriceBaseUnits === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["x402MaxPriceBaseUnits"],
+      message: "X402_MAX_PRICE_BASE_UNITS is required when X402_PREMIUM_FEED_URL is set",
     });
   }
 });
@@ -130,6 +145,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     x402TokenVersion: pick("X402_TOKEN_VERSION"),
     x402TimeoutSeconds: pick("X402_TIMEOUT_SECONDS"),
     x402PremiumFeedUrl: pick("X402_PREMIUM_FEED_URL"),
+    x402MaxPriceBaseUnits: pick("X402_MAX_PRICE_BASE_UNITS"),
     x402SettleOnChain: pick("X402_SETTLE_ONCHAIN"),
     agentPort: pick("AGENT_PORT"),
     agentLogLevel: pick("AGENT_LOG_LEVEL"),

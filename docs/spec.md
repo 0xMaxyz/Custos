@@ -391,6 +391,13 @@ Signing + settlement are injectable so the protocol is testable offline.
 The receipt is bound to the evidence it bought via `resource`; the decision bundle
 carries `payments: [{ evidenceId, receipt }]` (hashed into `rationaleHash`, pinned to IPFS).
 
+**Outbound spend cap** (N1): `maxAmountRequired` is supplied by the counterparty's 402
+response, so the agent **never** signs it blindly. `createPayment` rejects any required
+amount above `X402_MAX_PRICE_BASE_UNITS` *before* signing, and that env var is **required**
+whenever `X402_PREMIUM_FEED_URL` is set (config `superRefine`) — a compromised feed URL
+therefore can't drain the payer up to its balance. An over-cap price degrades to empty
+paid-evidence (additive, never blocks a cycle).
+
 **Inbound payment verification** (`payments/verifier.ts`): `/risk-score` verifies the
 inbound `X-PAYMENT` by **recovering the EIP-712 signer** (`recoverTypedDataAddress`) and
 confirming it equals `authorization.from` (plus recipient/amount/validity bounds) — never

@@ -132,6 +132,7 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
       url: config.x402PremiumFeedUrl,
       from: account.address,
       signer,
+      maxPriceBaseUnits: config.x402MaxPriceBaseUnits,
     });
   }
 

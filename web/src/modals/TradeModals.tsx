@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { parseUnits } from "viem";
 import { Icon } from "../components/Icons";
 import { Spinner } from "../components/Components";
@@ -32,6 +33,15 @@ import {
 
 // Minimal wallet shape the trade modals need (address + spendable USDC balance).
 export interface TradeWallet { connected: boolean; address?: string | undefined; balance?: string | undefined; }
+
+// After a deposit/redeem mines, vault balances change on-chain. Invalidate the
+// wagmi read queries so useVaultData refetches immediately instead of lagging up to
+// its 15s poll (which can look like a duplicate/no-op action) (N6). wagmi keys read
+// hooks as ['readContract', …] / ['readContracts', …]; react-query prefix-matches.
+function invalidateVaultReads(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: ["readContracts"] });
+  void qc.invalidateQueries({ queryKey: ["readContract"] });
+}
 
 function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
@@ -83,6 +93,7 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
   const [approveHash, setApproveHash] = useState("");
   const [txHash, setTxHash] = useState("");
   const { address: userAddress } = useAccount();
+  const queryClient = useQueryClient();
   // Writes target the connected chain's deployed vault (resolved from @custos/shared).
   const VAULT_ADDRESS = resolveDeployment(useChainId()).vault as `0x${string}`;
   const isDeployed = VAULT_ADDRESS.length > 2;
@@ -128,9 +139,10 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
   useEffect(() => {
     if (depositConfirmed && phase === "depositing") {
       setPhase("done");
+      invalidateVaultReads(queryClient); // refresh TVL/position now, not on the next poll (N6)
       onToast({ kind: "success", title: "Deposit confirmed", body: `${fmt.usd(n)} deposited · ${fmt.num(sharesOut)} shares`, tx: txHash });
     }
-  }, [depositConfirmed, phase, n, sharesOut, txHash, onToast]);
+  }, [depositConfirmed, phase, n, sharesOut, txHash, onToast, queryClient]);
 
   const runLive = async () => {
     if (!userAddress || !usdcAddress) return;
@@ -216,6 +228,7 @@ export function WithdrawModal({ position, vault, onClose, onToast }: {
   const [phase, setPhase] = useState<WithdrawPhase>("form");
   const [txHash, setTxHash] = useState("");
   const { address: userAddress } = useAccount();
+  const queryClient = useQueryClient();
   const VAULT_ADDRESS = resolveDeployment(useChainId()).vault as `0x${string}`;
   const isDeployed = VAULT_ADDRESS.length > 2;
   const sharePrice = parseFloat(vault.sharePrice);
@@ -240,6 +253,7 @@ export function WithdrawModal({ position, vault, onClose, onToast }: {
   useEffect(() => {
     if (redeemConfirmed && phase === "withdrawing") {
       setPhase("done");
+      invalidateVaultReads(queryClient); // refresh TVL/position now, not on the next poll (N6)
       onToast({ kind: "success", title: "Withdrawal confirmed", body: `${fmt.usd(usdcOut)} sent to your wallet`, tx: txHash });
     }
   }, [redeemConfirmed]);

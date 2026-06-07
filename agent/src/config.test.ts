@@ -67,6 +67,18 @@ describe("loadConfig", () => {
       loadConfig({ ...minimalEnv, X402_PAY_TO: payTo, X402_ASSET: `0x${"a0".repeat(20)}` }).x402PayTo,
     ).toBe(payTo);
   });
+
+  it("requires X402_MAX_PRICE_BASE_UNITS when X402_PREMIUM_FEED_URL is set (N1)", () => {
+    const feedEnv = { ...minimalEnv, X402_PREMIUM_FEED_URL: "https://feed.example/premium" };
+    // Fail-closed: a paid feed with no spend ceiling is rejected at startup.
+    expect(() => loadConfig(feedEnv)).toThrow();
+    const cfg = loadConfig({ ...feedEnv, X402_MAX_PRICE_BASE_UNITS: "50000" });
+    expect(cfg.x402MaxPriceBaseUnits).toBe(50_000n);
+  });
+
+  it("leaves X402_MAX_PRICE_BASE_UNITS optional when no premium feed is set", () => {
+    expect(loadConfig(minimalEnv).x402MaxPriceBaseUnits).toBeUndefined();
+  });
 });
 
 describe("tryLoadConfig", () => {

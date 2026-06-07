@@ -8,7 +8,7 @@ import { assess } from "../risk/engine.js";
 import { validateProposal, applyVerdict, type ChainContext } from "../risk/validator.js";
 import { runSignalLayer } from "../llm/signals.js";
 import { AnthropicClient } from "../llm/anthropic.js";
-import { buildEvidenceFetcher } from "../llm/evidence.js";
+import { buildEvidenceFetcher, CURATED_EVIDENCE_SOURCES } from "../llm/evidence.js";
 import { pinRationale, type RationaleBundle, type PaidEvidenceReceipt } from "./ipfs.js";
 import type { PaidEvidenceFetcher } from "../payments/evidence.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
@@ -97,8 +97,12 @@ export class Executor {
       const llm = new AnthropicClient(this.config);
       const fetcher = buildEvidenceFetcher();
       try { evidence = await fetcher(); } catch { evidence = []; }
-      verdict = await runSignalLayer(snapshot, assessment, { llm, fetchEvidence: async () => evidence })
-        .catch(() => null);
+      verdict = await runSignalLayer(snapshot, assessment, {
+        llm,
+        fetchEvidence: async () => evidence,
+        // Only vetted RWA sources can satisfy the de-risk citation gate (N2).
+        trustedEvidenceSources: CURATED_EVIDENCE_SOURCES,
+      }).catch(() => null);
     }
 
     // 3b. Paid evidence (A4.1): pay for a premium feed via x402 and pin its receipt

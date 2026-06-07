@@ -37,6 +37,19 @@ const FEEDS: FeedDescriptor[] = [
 ];
 
 /**
+ * Sources whose scraped evidence may *satisfy the de-risk citation gate* (N2).
+ *
+ * Evidence summaries are pulled from external pages, so their content is
+ * attacker-influenceable. To stop a hostile/un-vetted feed from fabricating an
+ * item that unlocks an unwarranted LLM de-risk, only these vetted first-party RWA
+ * sources can trigger a de-risk. Other scraped sources (e.g. an operator-configured
+ * premium feed) can still inform the model as context — they just can't, on their
+ * own, satisfy `clampVerdict`'s de-risk citation check. Derived from {@link FEEDS}
+ * so the two never drift; passed into `runSignalLayer` by the executor.
+ */
+export const CURATED_EVIDENCE_SOURCES: ReadonlySet<string> = new Set(FEEDS.map((f) => f.source));
+
+/**
  * Fetch a short plaintext summary from a URL by extracting the `<title>` and
  * `<meta name="description">` tags. Returns null when the page is unreachable or
  * the content is unusable.

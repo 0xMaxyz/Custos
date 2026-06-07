@@ -7,7 +7,7 @@ import { assess } from "./risk/engine.js";
 import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
 import { AlertNotifier } from "./alerts.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
-import { onChainSettlingVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
+import { onChainSettlingVerifier, replayGuardedVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
 import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
 import type { Decision } from "./types.js";
@@ -80,7 +80,9 @@ const x402Verify =
         publicClient: pipeline.clients.publicClient,
         asset: config.x402Asset as `0x${string}`,
       })
-    : signatureVerifyingVerifier();
+    : // Verify-only mode settles nothing on-chain, so guard against X-PAYMENT replays
+      // off-chain (N3); the on-chain path above is single-use via the EIP-3009 nonce.
+      replayGuardedVerifier(signatureVerifyingVerifier());
 const x402 =
   config.x402PayTo && config.x402Asset
     ? {
@@ -132,6 +134,7 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
       url: config.x402PremiumFeedUrl,
       from: account.address,
       signer,
+      maxPriceBaseUnits: config.x402MaxPriceBaseUnits,
     });
   }
 

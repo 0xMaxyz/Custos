@@ -763,4 +763,34 @@ describe("Executor paid evidence (x402) → pinned bundle.payments", () => {
     expect(pinned[0]!.payments![0]!.receipt.success).toBe(true);
     expect(pinned[0]!.evidence.some((e) => e.id === "x402-premium")).toBe(true);
   });
+
+  it("degrades to no paid evidence when the feed price exceeds the spend cap (N1)", async () => {
+    const { buildPaidEvidenceFetcher } = await import("../payments/evidence.js");
+    const { PAYMENT_HEADER } = await import("../payments/x402.js");
+
+    const REQ = {
+      scheme: "exact" as const, network: "mantle", chainId: 5000, maxAmountRequired: "10000",
+      resource: "https://feeds.example/premium", description: "d", mimeType: "application/json",
+      payTo: "0x000000000000000000000000000000000000bEEF" as `0x${string}`, maxTimeoutSeconds: 120,
+      asset: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9" as `0x${string}`, extra: { name: "USD Coin", version: "2" },
+    };
+    let signedOrUnlocked = false;
+    const fetchImpl = (async (_url: string, init?: { headers?: Record<string, string> }) => {
+      if (init?.headers?.[PAYMENT_HEADER]) signedOrUnlocked = true; // would only reach here after signing
+      return { status: 402, headers: { get: () => null }, json: async () => ({ accepts: [REQ] }), text: async () => "" };
+    }) as never;
+    const signer = (async () => { signedOrUnlocked = true; return `0x${"ab".repeat(65)}`; }) as never;
+
+    const fetcher = buildPaidEvidenceFetcher({
+      url: REQ.resource,
+      from: "0x000000000000000000000000000000000000A11c",
+      signer,
+      fetchImpl,
+      maxPriceBaseUnits: 9_999n, // below the feed's required 10000
+    });
+
+    const out = await fetcher();
+    expect(out).toEqual({ evidence: [], payments: [] }); // additive: never blocks a cycle
+    expect(signedOrUnlocked).toBe(false); // rejected before signing
+  });
 });

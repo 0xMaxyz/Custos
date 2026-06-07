@@ -21,6 +21,30 @@ import { resolveDeployment } from "./deployment";
 // Set VITE_VAULT_DEPLOY_BLOCK after deploy (defaults to 0 = from genesis).
 const DEPLOY_BLOCK = BigInt(import.meta.env.VITE_VAULT_DEPLOY_BLOCK ?? "0");
 
+// Mantle RPC providers cap the block span of a single getLogs call, so a lone
+// fromBlock→latest query can exceed the per-call limit and fail (N5). Page the range.
+const MAX_LOG_RANGE = 10_000n;
+
+/**
+ * Fetch logs over `[fromBlock, latest]` in `maxRange`-sized pages, concatenated in
+ * order. `getBlockNumber` resolves the head; `getLogsRange` runs one bounded query.
+ * Splitting the span keeps each call within provider log-range limits (N5).
+ */
+export async function getLogsPaged<T>(
+  getBlockNumber: () => Promise<bigint>,
+  getLogsRange: (range: { fromBlock: bigint; toBlock: bigint }) => Promise<T[]>,
+  fromBlock: bigint,
+  maxRange: bigint = MAX_LOG_RANGE,
+): Promise<T[]> {
+  const head = await getBlockNumber();
+  const out: T[] = [];
+  for (let start = fromBlock; start <= head; start += maxRange) {
+    const end = start + maxRange - 1n < head ? start + maxRange - 1n : head;
+    out.push(...(await getLogsRange({ fromBlock: start, toBlock: end })));
+  }
+  return out;
+}
+
 // ── Canonical ERC-8004 identity registry ABI (read-only subset) ──────────────
 const IDENTITY_ABI = [
   {
@@ -85,20 +109,25 @@ export function useDecisions(): GuardianFeed {
       setLiveDecisions([]);
       return;
     }
-    client.getLogs({
-      address: VAULT_ADDRESS,
-      event: {
-        type: "event",
-        name: "DecisionRecorded",
-        inputs: [
-          { name: "id",            type: "uint256", indexed: true  },
-          { name: "kind",          type: "uint8",   indexed: false },
-          { name: "rationaleHash", type: "bytes32", indexed: false },
-          { name: "decisionURI",   type: "string",  indexed: false },
-        ],
-      },
-      fromBlock: DEPLOY_BLOCK,
-    }).then((logs) => {
+    getLogsPaged(
+      () => client.getBlockNumber(),
+      ({ fromBlock, toBlock }) => client.getLogs({
+        address: VAULT_ADDRESS,
+        event: {
+          type: "event",
+          name: "DecisionRecorded",
+          inputs: [
+            { name: "id",            type: "uint256", indexed: true  },
+            { name: "kind",          type: "uint8",   indexed: false },
+            { name: "rationaleHash", type: "bytes32", indexed: false },
+            { name: "decisionURI",   type: "string",  indexed: false },
+          ],
+        },
+        fromBlock,
+        toBlock,
+      }),
+      DEPLOY_BLOCK,
+    ).then((logs) => {
       const next: Decision[] = [];
       for (const log of [...logs].reverse()) {
         const args = log.args as { id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string };

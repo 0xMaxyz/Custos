@@ -22,6 +22,11 @@ export interface PaidEvidenceConfig {
   readonly evidenceId?: string;
   readonly type?: EvidenceItem["type"];
   readonly source?: string;
+  /**
+   * Hard ceiling (base units) on what the agent will pay this feed. Over-cap prices
+   * are rejected before signing (N1); the rejection degrades to empty evidence below.
+   */
+  readonly maxPriceBaseUnits?: bigint | undefined;
   /** Injected transport (defaults to global fetch). */
   readonly fetchImpl?: FetchLike;
 }
@@ -50,6 +55,7 @@ export function buildPaidEvidenceFetcher(cfg: PaidEvidenceConfig): PaidEvidenceF
         from: cfg.from,
         signer: cfg.signer,
         fetchImpl,
+        maxAmountBaseUnits: cfg.maxPriceBaseUnits,
       });
       const summary =
         typeof res.data?.summary === "string"

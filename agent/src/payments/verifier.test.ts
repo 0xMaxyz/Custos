@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
 import { createPayment, type Eip3009Signer, type PaymentRequirements } from "./x402.js";
-import { onChainSettlingVerifier, recoverPaymentSigner, signatureVerifyingVerifier } from "./verifier.js";
+import {
+  createInMemoryNonceStore,
+  onChainSettlingVerifier,
+  recoverPaymentSigner,
+  replayGuardedVerifier,
+  signatureVerifyingVerifier,
+} from "./verifier.js";
 
 const REQ: PaymentRequirements = {
   scheme: "exact",
@@ -55,6 +61,44 @@ describe("recoverPaymentSigner / signatureVerifyingVerifier", () => {
     const payment = await validPayment();
     const r = await signatureVerifyingVerifier(() => AT + 10_000)(payment, REQ);
     expect(r).toBeNull();
+  });
+});
+
+describe("replayGuardedVerifier (verify-only mode, N3)", () => {
+  it("rejects a replay of the same X-PAYMENT", async () => {
+    const verify = replayGuardedVerifier(signatureVerifyingVerifier(() => AT), createInMemoryNonceStore(), () => AT);
+    const payment = await validPayment();
+    expect((await verify(payment, REQ))?.success).toBe(true); // first use settles nothing but unlocks once
+    expect(await verify(payment, REQ)).toBeNull(); // same (from,nonce) → replay rejected
+  });
+
+  it("allows distinct nonces from the same payer", async () => {
+    const verify = replayGuardedVerifier(signatureVerifyingVerifier(() => AT), createInMemoryNonceStore(), () => AT);
+    const p1 = await createPayment({ requirements: REQ, from: account.address, signer, nowSec: AT, nonce: `0x${"66".repeat(32)}` });
+    const p2 = await createPayment({ requirements: REQ, from: account.address, signer, nowSec: AT, nonce: `0x${"77".repeat(32)}` });
+    expect((await verify(p1, REQ))?.success).toBe(true);
+    expect((await verify(p2, REQ))?.success).toBe(true);
+  });
+
+  it("does not consume a nonce when the inner verifier rejects", async () => {
+    const store = createInMemoryNonceStore();
+    const verify = replayGuardedVerifier(signatureVerifyingVerifier(() => AT), store, () => AT);
+    const payment = await validPayment();
+    const tampered = {
+      ...payment,
+      payload: { ...payment.payload, authorization: { ...payment.payload.authorization, value: "20000" } },
+    };
+    expect(await verify(tampered, REQ)).toBeNull(); // fails inner verification
+    // The genuine payment (same nonce) is still spendable — the tamper never recorded it.
+    expect((await verify(payment, REQ))?.success).toBe(true);
+  });
+
+  it("prunes a spent nonce once it expires, bounding memory", () => {
+    const store = createInMemoryNonceStore();
+    const key = "0xabc:0xdef";
+    expect(store.checkAndRecord(key, 1_100, 1_000)).toBe(false); // first use; expires at 1100
+    expect(store.checkAndRecord(key, 1_100, 1_050)).toBe(true); // replay before expiry
+    expect(store.checkAndRecord(key, 2_100, 2_000)).toBe(false); // now past 1100 → pruned, key reusable
   });
 });
 

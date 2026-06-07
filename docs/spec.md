@@ -403,7 +403,10 @@ inbound `X-PAYMENT` by **recovering the EIP-712 signer** (`recoverTypedDataAddre
 confirming it equals `authorization.from` (plus recipient/amount/validity bounds) — never
 just structure. With `X402_SETTLE_ONCHAIN=true` + an ALLOCATOR wallet it then **settles
 on-chain** by submitting `transferWithAuthorization` (returning the real tx hash);
-otherwise it verifies the signature and delegates settlement to a facilitator. The
+otherwise it verifies the signature and delegates settlement to a facilitator. In that
+verify-only mode nothing consumes the EIP-3009 nonce on-chain, so `replayGuardedVerifier`
+tracks spent `(from, nonce)` pairs in memory until `validBefore` and rejects replays (N3);
+the on-chain path needs no guard since the consumed nonce makes settlement single-use. The
 dev-only `shapeOnlyVerifier` is retained for tests, never wired into the running agent.
 
 ---

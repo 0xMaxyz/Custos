@@ -30,10 +30,13 @@ contract Guardrails is AccessControl {
     error InvalidBucket();
     error TimelockNotElapsed();
     error InvalidConfig();
+    error AlreadyInitialized();
+    error NoPendingChange();
 
     // ── Events ────────────────────────────────────────────────────────────────
 
     event ConfigUpdated(Config newConfig);
+    event ConfigQueued(Config newConfig, uint256 unlocksAt);
 
     // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -80,6 +83,15 @@ contract Guardrails is AccessControl {
 
     Config private _config;
 
+    /// One-shot bootstrap flag (H3): the first `setConfig` (at deploy) applies the
+    /// config instantly; afterwards every change is timelocked via queue/activate.
+    bool private _initialized;
+
+    /// Pending timelocked config change (H3).
+    Config private _pendingConfig;
+    bool private _hasPendingConfig;
+    uint256 private _configUnlocksAt;
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     constructor(address admin) {
@@ -117,16 +129,51 @@ contract Guardrails is AccessControl {
 
     // ── Config management ─────────────────────────────────────────────────────
 
-    /// @notice Replace the entire guardrail config. Only ADMIN.
+    /// @notice One-shot bootstrap of the guardrail config at deploy time. Applies
+    ///         instantly the first time, then seals: every subsequent change (tighten
+    ///         OR loosen) must go through queueConfig/activateConfig (H3 — the guardrail
+    ///         brain is the most sensitive surface). Only ADMIN.
     function setConfig(Config calldata newConfig) external onlyRole(Roles.ADMIN) {
+        if (_initialized) revert AlreadyInitialized();
         _requireValidConfig(newConfig);
         _config = newConfig;
+        _initialized = true;
         emit ConfigUpdated(newConfig);
+    }
+
+    /// @notice Queue a full guardrail config change behind the addStrategyTimelock.
+    ///         Every post-bootstrap config change is timelocked (H3). Only ADMIN.
+    function queueConfig(Config calldata newConfig) external onlyRole(Roles.ADMIN) {
+        _requireValidConfig(newConfig);
+        _pendingConfig = newConfig;
+        _hasPendingConfig = true;
+        _configUnlocksAt = block.timestamp + _config.addStrategyTimelock;
+        emit ConfigQueued(newConfig, _configUnlocksAt);
+    }
+
+    /// @notice Activate the queued config once its timelock has elapsed. Only ADMIN.
+    function activateConfig() external onlyRole(Roles.ADMIN) {
+        if (!_hasPendingConfig) revert NoPendingChange();
+        if (block.timestamp < _configUnlocksAt) revert TimelockNotElapsed();
+        _config = _pendingConfig;
+        delete _pendingConfig;
+        _hasPendingConfig = false;
+        _configUnlocksAt = 0;
+        emit ConfigUpdated(_config);
     }
 
     /// @notice Read the current config.
     function config() external view returns (Config memory) {
         return _config;
+    }
+
+    /// @notice The pending (queued) config, whether one exists, and its unlock time (H3).
+    function pendingConfig()
+        external
+        view
+        returns (Config memory cfg, bool exists, uint256 unlocksAt)
+    {
+        return (_pendingConfig, _hasPendingConfig, _configUnlocksAt);
     }
 
     // ── Validation helpers ────────────────────────────────────────────────────

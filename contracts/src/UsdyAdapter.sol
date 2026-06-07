@@ -174,7 +174,21 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
      *         leg keeps its face value.
      */
     function totalAssets() external view override returns (uint256) {
+        return _totalAssets();
+    }
+
+    /// @dev Internal total-assets so callers (e.g. {maxWithdrawable}) avoid an external
+    ///      `this.totalAssets()` self-call.
+    function _totalAssets() internal view returns (uint256) {
         return _usdyValue() + _musdValue();
+    }
+
+    /// @notice Whether the adapter holds USDY or mUSD. Balance-based and
+    ///         oracle-independent, so the vault never removes this adapter and orphans
+    ///         funds when the oracle is down (totalAssets() would read 0). See M1.
+    function hasAssets() external view override returns (bool) {
+        if (IERC20(USDY).balanceOf(address(this)) > 0) return true;
+        return MUSD != address(0) && IERC20(MUSD).balanceOf(address(this)) > 0;
     }
 
     /// @dev USDC (6-dec) value of held USDY at oracle NAV; 0 if none or oracle down.
@@ -205,7 +219,7 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
      *         Phase 2a: equal to totalAssets(). Phase 2b will cap by DEX liquidity.
      */
     function maxWithdrawable() external view override returns (uint256) {
-        return this.totalAssets();
+        return _totalAssets();
     }
 
     /**

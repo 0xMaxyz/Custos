@@ -240,8 +240,10 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     if (bucket >= NUM_BUCKETS) revert InvalidBucket();
     IStrategyAdapter adapter = adapters[bucket];
     if (address(adapter) == address(0)) revert NothingToWithdraw();
-    // Require that the adapter holds nothing before removal.
-    if (adapter.totalAssets() != 0) revert AdapterStillHasAssets();
+    // Require that the adapter holds no underlying tokens before removal. Uses a
+    // balance-based check (not totalAssets value) so a USDY position is never
+    // orphaned by an oracle outage that makes totalAssets() read 0 (M1).
+    if (adapter.hasAssets()) revert AdapterStillHasAssets();
     delete adapters[bucket];
     emit StrategyRemoved(bucket);
   }

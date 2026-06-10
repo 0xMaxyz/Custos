@@ -124,6 +124,7 @@ export class Scheduler {
 
   private _schedulePeriodic(): void {
     if (!this._running) return;
+    clearTimeout(this._periodicTimer);
     this._periodicTimer = setTimeout(() => {
       void this._runPeriodic();
     }, this.intervalMs);
@@ -131,6 +132,10 @@ export class Scheduler {
 
   private _schedulePoll(): void {
     if (!this._running) return;
+    // Clear any timer already pending: injectBreachCondition() can start a second
+    // _runPoll() while a tick is mid-flight, and both reschedule on completion —
+    // without this, the overwritten timer leaks a duplicate poll loop.
+    clearTimeout(this._pollTimer);
     this._pollTimer = setTimeout(() => {
       void this._runPoll();
     }, this.pollMs);
@@ -144,12 +149,17 @@ export class Scheduler {
   private async _runPoll(): Promise<void> {
     const wasBreachPending = this._breachPending;
     this._breachPending = false;
-    await this._runGuarded("poll", (result) => {
+    const ran = await this._runGuarded("poll", (result) => {
       // Notify on a submitted decision, or whenever a breach was explicitly injected.
       if (result.submitted || wasBreachPending) {
         this.onCycle(result);
       }
     });
+    // An injected breach skipped by the in-flight guard must not be swallowed:
+    // re-arm it so the next poll tick still reports the breach cycle via onCycle.
+    if (!ran && wasBreachPending) {
+      this._breachPending = true;
+    }
     this._schedulePoll();
   }
 }

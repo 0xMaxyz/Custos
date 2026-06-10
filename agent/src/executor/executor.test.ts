@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { Bucket } from "@custos/shared";
+import { isCycleFailure, type CycleFailureError } from "./errors.js";
 import type { MarketSnapshot, WeightsBps } from "../types.js";
 import type { RiskVerdict, EvidenceType } from "../llm/types.js";
 
@@ -710,7 +711,6 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
   }
 
   it("receipt timeout on a forced de-risk → CycleFailureError(deRiskRequired, stage=receipt, txHash)", async () => {
-    const { CycleFailureError, isCycleFailure } = await import("./errors.js");
     const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // depeg → deRisk
     const txHash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as `0x${string}`;
     const executor = await makeExecutorWith(
@@ -725,7 +725,7 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
     );
 
     expect(isCycleFailure(err)).toBe(true);
-    const f = err as InstanceType<typeof CycleFailureError>;
+    const f = err as CycleFailureError;
     expect(f.deRiskRequired).toBe(true);
     expect(f.stage).toBe("receipt");
     expect(f.kind).toBe("derisk");
@@ -733,7 +733,6 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
   });
 
   it("writeContract failure on a forced de-risk → CycleFailureError(stage=submit, no txHash)", async () => {
-    const { CycleFailureError, isCycleFailure } = await import("./errors.js");
     const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
     const executor = await makeExecutorWith(
       snap,
@@ -747,10 +746,33 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
     );
 
     expect(isCycleFailure(err)).toBe(true);
-    const f = err as InstanceType<typeof CycleFailureError>;
+    const f = err as CycleFailureError;
     expect(f.stage).toBe("submit");
     expect(f.deRiskRequired).toBe(true);
     expect(f.txHash).toBeUndefined();
+  });
+
+  it("a receipt that confirms REVERTED → CycleFailureError(stage=receipt), not a false success", async () => {
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
+    const txHash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as `0x${string}`;
+    // viem resolves (does not throw) on a mined-but-reverted tx — status flags it.
+    const executor = await makeExecutorWith(
+      snap,
+      async () => ({ logs: [], transactionHash: txHash, status: "reverted" }),
+      async () => txHash,
+    );
+
+    const err = await executor.runCycle().then(
+      () => { throw new Error("expected runCycle to throw"); },
+      (e: unknown) => e,
+    );
+
+    expect(isCycleFailure(err)).toBe(true);
+    const f = err as CycleFailureError;
+    expect(f.stage).toBe("receipt");
+    expect(f.deRiskRequired).toBe(true);
+    expect(f.txHash).toBe(txHash);
+    expect(String(f.cause)).toMatch(/reverted/i);
   });
 
   it("passes a bounded timeout + retryCount to waitForTransactionReceipt (O2)", async () => {
@@ -900,5 +922,93 @@ describe("Executor paid evidence (x402) → pinned bundle.payments", () => {
     const out = await fetcher();
     expect(out).toEqual({ evidence: [], payments: [] }); // additive: never blocks a cycle
     expect(signedOrUnlocked).toBe(false); // rejected before signing
+  });
+});
+
+
+// ── O4: tx-journal write-before-receipt / clear-on-success ─────────────────────
+
+describe("Executor tx-journal (O4)", () => {
+  function makeJournalSnapshotter(snap: MarketSnapshot) {
+    return { snapshot: vi.fn(async () => snap), invalidate: vi.fn() } as never;
+  }
+
+  it("writes the journal BEFORE awaiting the receipt, then clears on success", async () => {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const journal = await import("./txjournal.js");
+
+    const writeSpy = vi.spyOn(journal, "writeJournal");
+    const clearSpy = vi.spyOn(journal, "clearJournal");
+
+    let writtenBeforeWait = false;
+    let clearedBeforeWait = false;
+    const writeContract = vi.fn(async () => "0xfeed" as `0x${string}`);
+    const readContract = vi.fn(async () => 0n);
+    const waitForTransactionReceipt = vi.fn(async () => {
+      writtenBeforeWait = writeSpy.mock.calls.length > 0;
+      clearedBeforeWait = clearSpy.mock.calls.length > 0;
+      return { logs: [], status: "success" };
+    });
+    const publicClient = { readContract, waitForTransactionReceipt } as never;
+    const walletClient = { writeContract, chain: { id: 5000 }, account: { address: "0x1234" } } as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      AGENT_STATE_PATH: "/tmp/custos-journal-test-unit.json",
+    });
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // depeg -> deRisk
+
+    const executor = new Executor({ config, clients: { publicClient, walletClient } as never, snapshotter: makeJournalSnapshotter(snap) });
+    await executor.runCycle();
+
+    expect(writeSpy).toHaveBeenCalledOnce();
+    const writeArgs = writeSpy.mock.calls[0] as unknown as [string, { txHash: string; kind: string; deRiskRequired: boolean }];
+    expect(writeArgs[0]).toBe("/tmp/custos-journal-test-unit.json");
+    expect(writeArgs[1].txHash).toBe("0xfeed");
+    expect(writeArgs[1].kind).toBe("derisk");
+    expect(writeArgs[1].deRiskRequired).toBe(true);
+
+    expect(writtenBeforeWait).toBe(true);
+    expect(clearedBeforeWait).toBe(false);
+    expect(clearSpy).toHaveBeenCalledOnce();
+
+    writeSpy.mockRestore();
+    clearSpy.mockRestore();
+  });
+
+  it("does NOT clear the journal when the receipt times out (entry survives for recovery)", async () => {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const journal = await import("./txjournal.js");
+
+    const writeSpy = vi.spyOn(journal, "writeJournal");
+    const clearSpy = vi.spyOn(journal, "clearJournal");
+
+    const writeContract = vi.fn(async () => "0xfeed" as `0x${string}`);
+    const readContract = vi.fn(async () => 0n);
+    const waitForTransactionReceipt = vi.fn(async () => { throw new Error("Timed out"); });
+    const publicClient = { readContract, waitForTransactionReceipt } as never;
+    const walletClient = { writeContract, chain: { id: 5000 }, account: { address: "0x1234" } } as never;
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      AGENT_STATE_PATH: "/tmp/custos-journal-test-unit2.json",
+      TX_RECEIPT_TIMEOUT_MS: "1000",
+    });
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
+
+    const executor = new Executor({ config, clients: { publicClient, walletClient } as never, snapshotter: makeJournalSnapshotter(snap) });
+    await executor.runCycle().catch(() => {});
+
+    expect(writeSpy).toHaveBeenCalledOnce();
+    expect(clearSpy).not.toHaveBeenCalled(); // entry left in place for startup reconciliation
+
+    writeSpy.mockRestore();
+    clearSpy.mockRestore();
   });
 });

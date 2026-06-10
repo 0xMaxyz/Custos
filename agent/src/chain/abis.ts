@@ -119,3 +119,87 @@ export const erc20Abi = [
     outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
+
+/**
+ * Governance-event ABIs (mainnet launch security control). Signatures verified
+ * against contracts/src/Guardrails.sol and contracts/src/YieldVault.sol:
+ *
+ *   Guardrails: event ConfigQueued(Config newConfig, uint256 unlocksAt)
+ *               event ConfigCancelled()
+ *               event ConfigUpdated(Config newConfig)   // emitted on activation
+ *   YieldVault: event GuardrailsQueued(address indexed newGuardrails, uint256 unlocksAt)
+ *               event GuardrailsUpdated(address indexed newGuardrails) // activation
+ *
+ * NOTE: there is no `ConfigActivated` / `GuardrailsActivated` event in the source —
+ * activation surfaces as `ConfigUpdated` / `GuardrailsUpdated` respectively. We
+ * decode only the fields we page on (the queued config blob itself is not needed
+ * for the alert), so the `Config` tuple is intentionally omitted from the decoded
+ * args — getLogs still matches by event topic0.
+ */
+export const guardrailsEventsAbi = [
+  {
+    type: "event",
+    name: "ConfigQueued",
+    inputs: [
+      { name: "newConfig", type: "tuple", indexed: false, components: [
+        { name: "maxWeightBps", type: "uint16[4]" },
+        { name: "minIdleBps", type: "uint16" },
+        { name: "minInstantLiquidityBps", type: "uint16" },
+        { name: "maxUsdyNotionalUsdc", type: "uint256" },
+        { name: "maxSlippageBps", type: "uint16" },
+        { name: "maxRebalanceMoveBps", type: "uint16" },
+        { name: "minRebalanceInterval", type: "uint32" },
+        { name: "tvlCap", type: "uint256" },
+        { name: "perTxDepositCap", type: "uint256" },
+        { name: "addStrategyTimelock", type: "uint32" },
+        { name: "pegWarnBps", type: "uint16" },
+        { name: "pegBlockBps", type: "uint16" },
+        { name: "pegDeRiskBps", type: "uint16" },
+        { name: "oracleMaxAge", type: "uint32" },
+        { name: "oracleRangeEndBuffer", type: "uint32" },
+      ] },
+      { name: "unlocksAt", type: "uint256", indexed: false },
+    ],
+  },
+  { type: "event", name: "ConfigCancelled", inputs: [] },
+  {
+    type: "event",
+    name: "ConfigUpdated",
+    inputs: [
+      { name: "newConfig", type: "tuple", indexed: false, components: [
+        { name: "maxWeightBps", type: "uint16[4]" },
+        { name: "minIdleBps", type: "uint16" },
+        { name: "minInstantLiquidityBps", type: "uint16" },
+        { name: "maxUsdyNotionalUsdc", type: "uint256" },
+        { name: "maxSlippageBps", type: "uint16" },
+        { name: "maxRebalanceMoveBps", type: "uint16" },
+        { name: "minRebalanceInterval", type: "uint32" },
+        { name: "tvlCap", type: "uint256" },
+        { name: "perTxDepositCap", type: "uint256" },
+        { name: "addStrategyTimelock", type: "uint32" },
+        { name: "pegWarnBps", type: "uint16" },
+        { name: "pegBlockBps", type: "uint16" },
+        { name: "pegDeRiskBps", type: "uint16" },
+        { name: "oracleMaxAge", type: "uint32" },
+        { name: "oracleRangeEndBuffer", type: "uint32" },
+      ] },
+    ],
+  },
+] as const;
+
+/** YieldVault governance events: pending-guardrails queue + activation. */
+export const yieldVaultGovernanceEventsAbi = [
+  {
+    type: "event",
+    name: "GuardrailsQueued",
+    inputs: [
+      { name: "newGuardrails", type: "address", indexed: true },
+      { name: "unlocksAt", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "GuardrailsUpdated",
+    inputs: [{ name: "newGuardrails", type: "address", indexed: true }],
+  },
+] as const;

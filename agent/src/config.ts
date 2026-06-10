@@ -23,6 +23,11 @@ const configSchema = z.object({
   // How long to wait for a submitted tx's receipt before treating the cycle as a
   // loud failure (O2). Bounded waiting only — no fee-bump/replacement machinery.
   txReceiptTimeoutMs: z.coerce.number().int().positive().default(120_000),
+  // O4: optional path to a tiny JSON tx-journal. When set, the executor persists
+  // the last submitted tx (hash + kind + deRiskRequired) BEFORE awaiting its
+  // receipt, and clears it on confirmation, so a crash mid-flight can be
+  // reconciled at startup. Unset -> journaling is a no-op.
+  agentStatePath: z.string().min(1).optional(),
 
   // ── LLM (optional until PR-3b) ──
   anthropicApiKey: z.string().min(1).optional(),
@@ -125,6 +130,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
   return {
     mantleRpcUrl: pick("MANTLE_RPC_URL"),
     txReceiptTimeoutMs: pick("TX_RECEIPT_TIMEOUT_MS"),
+    agentStatePath: pick("AGENT_STATE_PATH"),
     anthropicApiKey: pick("ANTHROPIC_API_KEY"),
     anthropicModel: pick("ANTHROPIC_MODEL"),
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),

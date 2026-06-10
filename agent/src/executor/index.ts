@@ -11,6 +11,7 @@ import { AnthropicClient } from "../llm/anthropic.js";
 import { buildEvidenceFetcher, CURATED_EVIDENCE_SOURCES } from "../llm/evidence.js";
 import { pinRationale, type RationaleBundle, type PaidEvidenceReceipt } from "./ipfs.js";
 import { CycleFailureError } from "./errors.js";
+import { writeJournal, clearJournal } from "./txjournal.js";
 import type { PaidEvidenceFetcher } from "../payments/evidence.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
@@ -311,17 +312,40 @@ export class Executor {
       throw new CycleFailureError({ ...meta, stage: "submit", cause });
     }
 
+    // O4: persist the in-flight tx BEFORE awaiting the receipt, so a crash here
+    // leaves a crash-recovery hint to reconcile at startup. No-op when unconfigured.
+    writeJournal(this.config.agentStatePath, {
+      txHash: hash,
+      kind: meta.kind,
+      deRiskRequired: meta.deRiskRequired,
+      sentAt: new Date().toISOString(),
+    });
+
+    let receipt;
     try {
-      return await this.public.waitForTransactionReceipt({
+      receipt = await this.public.waitForTransactionReceipt({
         hash,
         timeout: this.config.txReceiptTimeoutMs,
         retryCount: 3,
       });
     } catch (cause) {
-      // Tx was broadcast but the receipt never confirmed within the bound (or
-      // confirmed reverted). Surface the hash so the failure can be traced.
+      // Tx was broadcast but the receipt never confirmed within the bound.
+      // Surface the hash so the failure can be traced.
       throw new CycleFailureError({ ...meta, stage: "receipt", cause, txHash: hash });
     }
+    // viem RESOLVES on a mined-but-reverted tx (status flags it) — without this
+    // check a reverted required de-risk would be reported as a success.
+    if (receipt.status === "reverted") {
+      throw new CycleFailureError({
+        ...meta,
+        stage: "receipt",
+        cause: new Error("transaction reverted on-chain"),
+        txHash: hash,
+      });
+    }
+    // O4: tx confirmed (succeeded) — drop the crash-recovery hint.
+    clearJournal(this.config.agentStatePath);
+    return receipt;
   }
 
   /**

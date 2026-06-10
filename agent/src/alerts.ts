@@ -121,6 +121,16 @@ export class AlertNotifier {
     await this._send(formatFailureAlert(alert));
   }
 
+  /**
+   * Fire a generic governance alert: a queued/cancelled/activated guardrail change
+   * detected on-chain. With the short (6h) launch timelock, queued-config visibility
+   * is a security control, so this pages the operator. Reuses the same _send plumbing
+   * (both channels, bounded timeout); like the others, never throws.
+   */
+  async notifyGovernance(message: string): Promise<void> {
+    await this._send(message);
+  }
+
   private async _send(message: string): Promise<void> {
     await Promise.allSettled([
       this._sendTelegram(message),

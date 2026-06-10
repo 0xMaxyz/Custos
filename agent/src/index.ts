@@ -3,11 +3,13 @@ import { tryLoadConfig } from "./config.js";
 import { buildPipeline, type Pipeline } from "./pipeline.js";
 import { Executor } from "./executor/index.js";
 import { Scheduler } from "./scheduler.js";
-import { assess } from "./risk/engine.js";
-import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
+import { AnthropicExplainer, type ExplainContext } from "./llm/explain.js";
+import { computeFreshContext } from "./context.js";
 import { AlertNotifier } from "./alerts.js";
-import { assertChainId } from "./chain/clients.js";
+import { assertChainId, makeClients } from "./chain/clients.js";
+import { GovernanceWatcher } from "./governanceWatch.js";
 import { isCycleFailure } from "./executor/errors.js";
+import { reconcileJournal } from "./executor/txjournal.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
 import { onChainSettlingVerifier, replayGuardedVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
@@ -36,6 +38,11 @@ const pipeline: Pipeline | undefined = needsPipeline ? buildPipeline(config) : u
 // recent decisions. A short TTL cache coalesces bursts of chat messages so a
 // chatty session doesn't re-snapshot (RPC + 1delta) on every question.
 const CONTEXT_TTL_MS = 10_000;
+// O7: the PAID /risk-score path can't tolerate the full 10s context staleness —
+// during a fast depeg a 10s-old "all clear" sold for money is unacceptable. It
+// asks for a much tighter freshness bound (re-snapshotting otherwise). The
+// payment itself bounds abuse of the extra RPC load.
+const RISK_SCORE_MAX_AGE_MS = 2_000;
 let contextCache: { at: number; value: ExplainContext } | undefined;
 
 // Most-recent-first ring buffer of submitted decisions, for "what changed?".
@@ -47,22 +54,26 @@ const rememberDecision = (d: Decision) => {
   if (recentDecisions.length > 10) recentDecisions.pop();
   contextCache = undefined;
 };
-// `getContext` only needs the data pipeline — it grounds both `/ask` (A3.1) and
-// `/snapshot` (A2.1). Wire it whenever the pipeline exists, so a vault+allocator
-// agent exposes `/snapshot` even without an Anthropic key.
-const getContext = pipeline
-  ? async (): Promise<ExplainContext | null> => {
-      const now = Date.now();
-      if (contextCache && now - contextCache.at < CONTEXT_TTL_MS) {
-        return contextCache.value;
-      }
-      const snapshot = await pipeline.snapshotter.snapshot();
-      const assessment = assess(snapshot);
-      const value = buildExplainContext(snapshot, assessment, recentDecisions);
-      contextCache = { at: now, value };
-      return value;
+// `getFreshContext` only needs the data pipeline — it grounds `/ask` (A3.1),
+// `/snapshot` (A2.1), and the paid `/risk-score` (A4.1). Wire it whenever the
+// pipeline exists, so a vault+allocator agent exposes `/snapshot` even without
+// an Anthropic key. `maxAgeMs` bounds the staleness each caller will accept
+// (default CONTEXT_TTL_MS; the paid path passes a tighter bound). See context.ts.
+const getFreshContext = pipeline
+  ? async (maxAgeMs: number = CONTEXT_TTL_MS): Promise<ExplainContext | null> => {
+      const out = await computeFreshContext(
+        pipeline.snapshotter,
+        recentDecisions,
+        contextCache,
+        maxAgeMs,
+        Date.now(),
+      );
+      contextCache = out.cache;
+      return out.value;
     }
   : undefined;
+// `/ask` + `/snapshot` use the default 10s TTL; the paid path passes a tighter bound.
+const getContext = getFreshContext;
 
 // Alert notifier (A3.2): fires on de-risk events via Telegram and/or Discord.
 const alertNotifier = new AlertNotifier({
@@ -103,7 +114,8 @@ const x402 =
         }),
         verify: x402Verify,
         riskScore: async (): Promise<Record<string, unknown>> => {
-          const ctx = getContext ? await getContext() : null;
+          // Paid signal: tolerate at most ~2s of cache age (re-snapshot otherwise).
+          const ctx = getFreshContext ? await getFreshContext(RISK_SCORE_MAX_AGE_MS) : null;
           return ctx
             ? {
                 riskLevel: ctx.riskLevel,
@@ -116,6 +128,26 @@ const x402 =
         },
       }
     : undefined;
+
+// Governance-event watcher (security control for the short 6h launch timelock):
+// page the operator whenever someone queues/cancels/activates a guardrail change.
+// Wired whenever GUARDRAILS_ADDRESS is set, in BOTH read-only and execution modes.
+// It only needs a read client, so it reuses the pipeline's publicClient when one
+// exists, else spins up a standalone read client. start() snapshots the current
+// head (no historical backfill); stop() clears the timer on app close.
+let governanceWatcher: GovernanceWatcher | undefined;
+const buildGovernanceWatcher = (): GovernanceWatcher | undefined => {
+  if (!config.guardrailsAddress) return undefined;
+  const publicClient = pipeline?.clients.publicClient ?? makeClients(config).publicClient;
+  return new GovernanceWatcher({
+    publicClient,
+    guardrailsAddress: config.guardrailsAddress as `0x${string}`,
+    vaultAddress: config.vaultAddress as `0x${string}` | undefined,
+    alertNotifier,
+    onError: (err) => app.log.warn({ err }, "governance watcher error"),
+    onDebug: (msg) => app.log.debug(msg),
+  });
+};
 
 const allowedOrigins = config.corsAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean);
 const app = buildServer({ explainClient, getContext, x402, allowedOrigins });
@@ -192,12 +224,36 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
     // O6: never start the autonomous loop against the wrong network. Verify the RPC
     // serves Mantle mainnet (chainId 5000) before the scheduler can sign any tx.
     await assertChainId(pipeline.clients.publicClient);
+    // O4: reconcile any tx left in-flight by a crash BEFORE the scheduler can sign
+    // a new one — log the outcome, and page (notifyFailure) if a REQUIRED de-risk
+    // never confirmed. No-op when AGENT_STATE_PATH is unset. Never throws.
+    await reconcileJournal(config.agentStatePath, pipeline.clients.publicClient, {
+      timeoutMs: config.txReceiptTimeoutMs,
+      log: (msg) => app.log.info(msg),
+      alertFailure: (entry, detail) => {
+        if (!alertNotifier.isConfigured) return;
+        return alertNotifier
+          .notifyFailure({
+            stage: "startup-recovery",
+            cause: `Unconfirmed required de-risk recovered at startup: ${detail}`,
+            txHash: entry.txHash,
+            asOf: new Date().toISOString(),
+          })
+          .catch((err: unknown) => app.log.warn({ err }, "startup-recovery alert delivery failed"));
+      },
+    });
     scheduler.start();
     app.log.info("autonomous scheduler started (periodic=60m, poll=30s)");
+    governanceWatcher = buildGovernanceWatcher();
+    if (governanceWatcher) {
+      await governanceWatcher.start();
+      app.log.info("governance watcher started (poll=60s)");
+    }
   });
 
   app.addHook("onClose", async () => {
     scheduler.stop();
+    governanceWatcher?.stop();
   });
 } else {
   app.log.warn("ALLOCATOR_PRIVATE_KEY or VAULT_ADDRESS not set — running in read-only mode (no scheduler)");
@@ -207,6 +263,20 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
   if (pipeline) {
     app.addHook("onReady", async () => {
       await assertChainId(pipeline.clients.publicClient);
+    });
+  }
+  // The governance watcher needs no allocator/vault — wire it in read-only mode too
+  // whenever GUARDRAILS_ADDRESS is set, so queued config changes are still paged.
+  if (config.guardrailsAddress) {
+    app.addHook("onReady", async () => {
+      governanceWatcher = buildGovernanceWatcher();
+      if (governanceWatcher) {
+        await governanceWatcher.start();
+        app.log.info("governance watcher started (poll=60s, read-only mode)");
+      }
+    });
+    app.addHook("onClose", async () => {
+      governanceWatcher?.stop();
     });
   }
 }

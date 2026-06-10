@@ -8,6 +8,12 @@ services:
         required: false
     environment:
       AGENT_PORT: 8080
+      # O4: persist the crash-recovery tx journal on the mounted volume below so a
+      # restart can reconcile any tx left in flight. Overrides AGENT_STATE_PATH in .env.
+      AGENT_STATE_PATH: /data/state.json
+    volumes:
+      # Durable home for the tx journal (state.json) across container restarts.
+      - ./data/agent:/data
     expose:
       - "8080"
     restart: unless-stopped

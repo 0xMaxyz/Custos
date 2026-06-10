@@ -29,6 +29,34 @@ export interface DeRiskAlert {
   asOf: string;
 }
 
+/**
+ * A failure alert (O1): a de-risk that was REQUIRED (deterministic force or LLM
+ * verdict) did not confirm on-chain. Distinct from {@link DeRiskAlert} (success)
+ * so operators can page on it differently.
+ */
+export interface FailureAlert {
+  /** Where the cycle failed (e.g. "submit", "receipt"). */
+  stage: string;
+  /** Human-readable cause (error message). */
+  cause: string;
+  /** Broadcast tx hash, if the failure happened after the tx was sent. */
+  txHash?: string | undefined;
+  asOf: string;
+}
+
+/** Returns the CRITICAL plain-text message for a failed required de-risk. */
+export function formatFailureAlert(alert: FailureAlert): string {
+  const lines = [
+    "🔴 CRITICAL: Custos de-risk FAILED to confirm",
+    "A required de-risk did NOT execute on-chain — the vault may still be exposed.",
+    `Stage: ${alert.stage}`,
+    `Cause: ${alert.cause}`,
+  ];
+  if (alert.txHash) lines.push(`Tx: ${alert.txHash}`);
+  lines.push(`At: ${alert.asOf}`);
+  return lines.join("\n");
+}
+
 /** Returns the plain-text message sent to both channels. */
 export function formatAlert(alert: DeRiskAlert): string {
   const flagStr = alert.flags.filter((f) => f !== "NONE").join(", ") || "none";
@@ -81,7 +109,19 @@ export class AlertNotifier {
   }
 
   async notify(alert: DeRiskAlert): Promise<void> {
-    const message = formatAlert(alert);
+    await this._send(formatAlert(alert));
+  }
+
+  /**
+   * Fire a CRITICAL failure alert (O1) for a required de-risk that did not confirm.
+   * Like {@link notify}, never throws — delivery failures are swallowed so the
+   * scheduler's failure path can't crash on a hung webhook.
+   */
+  async notifyFailure(alert: FailureAlert): Promise<void> {
+    await this._send(formatFailureAlert(alert));
+  }
+
+  private async _send(message: string): Promise<void> {
     await Promise.allSettled([
       this._sendTelegram(message),
       this._sendDiscord(message),

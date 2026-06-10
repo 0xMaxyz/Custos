@@ -6,6 +6,8 @@ import { Scheduler } from "./scheduler.js";
 import { assess } from "./risk/engine.js";
 import { AnthropicExplainer, buildExplainContext, type ExplainContext } from "./llm/explain.js";
 import { AlertNotifier } from "./alerts.js";
+import { assertChainId } from "./chain/clients.js";
+import { isCycleFailure } from "./executor/errors.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
 import { onChainSettlingVerifier, replayGuardedVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
@@ -145,7 +147,24 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
     paidEvidence,
   });
   const scheduler = new Scheduler(executor, {
-    onError: (e) => app.log.error({ err: e }, "scheduler cycle error"),
+    onDebug: (msg) => app.log.debug(msg),
+    onError: (e) => {
+      app.log.error({ err: e }, "scheduler cycle error");
+      // O1: a REQUIRED de-risk that did not confirm on-chain is a CRITICAL event —
+      // page the operator, distinct from the success notification. Other errors
+      // (routine RPC blips, rejected proposals) only log. Alert delivery must never
+      // throw, so swallow any rejection here too.
+      if (isCycleFailure(e) && e.deRiskRequired && alertNotifier.isConfigured) {
+        alertNotifier
+          .notifyFailure({
+            stage: e.stage,
+            cause: e.cause instanceof Error ? e.cause.message : String(e.cause),
+            txHash: e.txHash,
+            asOf: new Date().toISOString(),
+          })
+          .catch((err: unknown) => app.log.warn({ err }, "critical alert delivery failed"));
+      }
+    },
     onCycle: (r) => {
       if (r.submitted) {
         app.log.info({ kind: r.kind, decisionId: r.decisionId?.toString(), txHash: r.txHash }, "decision submitted");
@@ -170,6 +189,9 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
   });
 
   app.addHook("onReady", async () => {
+    // O6: never start the autonomous loop against the wrong network. Verify the RPC
+    // serves Mantle mainnet (chainId 5000) before the scheduler can sign any tx.
+    await assertChainId(pipeline.clients.publicClient);
     scheduler.start();
     app.log.info("autonomous scheduler started (periodic=60m, poll=30s)");
   });
@@ -179,6 +201,14 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
   });
 } else {
   app.log.warn("ALLOCATOR_PRIVATE_KEY or VAULT_ADDRESS not set — running in read-only mode (no scheduler)");
+  // Read-only mode still talks to the RPC (snapshots / explainer). Verify the
+  // chain-id once at startup when a pipeline (and thus an RPC client) exists, so a
+  // misconfigured RPC is caught early rather than surfacing as confusing read data.
+  if (pipeline) {
+    app.addHook("onReady", async () => {
+      await assertChainId(pipeline.clients.publicClient);
+    });
+  }
 }
 
 app

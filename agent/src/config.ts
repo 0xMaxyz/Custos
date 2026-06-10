@@ -20,7 +20,9 @@ const privateKey = z
 const configSchema = z.object({
   // ── Chain / RPC ──
   mantleRpcUrl: z.string().url(),
-  forkBlockNumber: z.coerce.bigint().optional(),
+  // How long to wait for a submitted tx's receipt before treating the cycle as a
+  // loud failure (O2). Bounded waiting only — no fee-bump/replacement machinery.
+  txReceiptTimeoutMs: z.coerce.number().int().positive().default(120_000),
 
   // ── LLM (optional until PR-3b) ──
   anthropicApiKey: z.string().min(1).optional(),
@@ -122,7 +124,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
   };
   return {
     mantleRpcUrl: pick("MANTLE_RPC_URL"),
-    forkBlockNumber: pick("FORK_BLOCK_NUMBER"),
+    txReceiptTimeoutMs: pick("TX_RECEIPT_TIMEOUT_MS"),
     anthropicApiKey: pick("ANTHROPIC_API_KEY"),
     anthropicModel: pick("ANTHROPIC_MODEL"),
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),

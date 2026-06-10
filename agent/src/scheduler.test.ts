@@ -147,4 +147,31 @@ describe("Scheduler", () => {
     await vi.advanceTimersByTimeAsync(1);
     scheduler.stop();
   });
+
+  it("re-arms an injected breach dropped by the in-flight guard (O3)", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let calls = 0;
+    const runCycle = vi.fn(async (): Promise<CycleResult> => {
+      calls += 1;
+      if (calls === 1) await gate; // hold only the first (routine) cycle
+      return { submitted: false, reason: "noop" };
+    });
+    const executor = makeExecutor({ runCycle });
+    const onCycle = vi.fn();
+    const scheduler = new Scheduler(executor, { intervalMs: 60_000, pollMs: 50, onCycle });
+    scheduler.start();
+
+    // First poll tick starts a held cycle; a breach injected mid-flight is skipped.
+    await vi.advanceTimersByTimeAsync(60);
+    scheduler.injectBreachCondition();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onCycle).not.toHaveBeenCalled(); // nothing reported yet
+
+    // Release; the next poll tick must still report the breach cycle (not swallow it).
+    release();
+    await vi.advanceTimersByTimeAsync(60);
+    expect(onCycle).toHaveBeenCalledWith(expect.objectContaining({ submitted: false }));
+    scheduler.stop();
+  });
 });

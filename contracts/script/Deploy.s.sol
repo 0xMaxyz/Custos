@@ -250,13 +250,6 @@ contract Deploy is Script {
     }
 
     /**
-     * @notice Grant DEFAULT_ADMIN_ROLE + ADMIN on every admin-bearing contract to newAdmin,
-     *         then renounce the deployer own roles (H4). Runs inside the active broadcast.
-     *         Each constructor granted exactly DEFAULT_ADMIN_ROLE + ADMIN to the deployer.
-     *         Per contract: grant new admin first, then renounce deployer ADMIN, then
-     *         DEFAULT_ADMIN_ROLE last (it governs grants/renounces).
-     */
-    /**
      * @notice Read + validate ADMIN_ADDRESS and hand off admin if a distinct target is set
      *         (H4). On mainnet ADMIN_ADDRESS is required and must differ from the deployer.
      *         Off mainnet, an unset/zero or self address simply skips the handoff (the
@@ -278,6 +271,13 @@ contract Deploy is Script {
         console2.log("Deployer admin roles renounced");
     }
 
+    /**
+     * @notice Grant DEFAULT_ADMIN_ROLE + ADMIN on every admin-bearing contract to newAdmin,
+     *         then renounce the deployer's own roles (H4). Runs inside the active broadcast.
+     *         Each constructor granted exactly DEFAULT_ADMIN_ROLE + ADMIN to the deployer.
+     *         Per contract: grant new admin first, then renounce deployer ADMIN, then
+     *         DEFAULT_ADMIN_ROLE last (it governs grants/renounces).
+     */
     function _handoffAdmin(address newAdmin, address deployer) internal {
         bytes32 defaultAdmin = guardrails.DEFAULT_ADMIN_ROLE();
 

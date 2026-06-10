@@ -266,6 +266,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Queue a new Guardrails contract behind the addStrategyTimelock. Swapping
     ///         the guardrail brain is the single most sensitive admin action, so it is
     ///         timelocked rather than instant (H3). Only ADMIN.
+    /// @dev    To CANCEL a pending guardrails swap, re-queue with address(0): that
+    ///         overwrites pendingGuardrails to the zero address, and activateGuardrails
+    ///         then reverts NoPendingGuardrails. No dedicated cancel function is needed.
     function queueGuardrails(address _guardrails) external onlyRole(Roles.ADMIN) {
         pendingGuardrails = _guardrails;
         guardrailsUnlocksAt = block.timestamp + guardrails.config().addStrategyTimelock;
@@ -466,7 +469,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         uint256 idleBefore = IERC20(asset()).balanceOf(address(this));
 
         IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
-        if (address(usdyAdapter) != address(0) && usdyAdapter.totalAssets() > 0) {
+        // M4: gate on hasAssets() (balance-based) not totalAssets() (NAV-based, reads 0 on
+        // an oracle outage) so a de-risk during a dead oracle still unwinds the position.
+        if (address(usdyAdapter) != address(0) && usdyAdapter.hasAssets()) {
             bytes memory sd = swapData.length > BUCKET_USDY ? swapData[BUCKET_USDY] : bytes("");
             usdyAdapter.emergencyWithdrawAll(minOutUsdc, address(this), sd);
         }
@@ -502,7 +507,15 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         if (address(usdyAdapter) == address(0)) return 0;
 
         uint256 valueAtNav = usdyAdapter.totalAssets(); // 6-dec USDC, NAV-based
-        if (valueAtNav == 0) return 0;
+        if (valueAtNav == 0) {
+            // M4 -- oracle is down (NAV-based valuation reads 0) but the bucket may still
+            // hold USDY. The NAV floor source is gone, so fall back to a DEX-spot-derived
+            // floor computed from the actual held balances (oracle-independent). When the
+            // allocator supplies a spot this still blocks gross slippage/MEV on the exit;
+            // when no spot is supplied (the GUARDIAN path, where the off-chain-validated
+            // swapData is trusted) it returns 0, preserving the guardian behavior today.
+            return _spotFloorUsdc(usdyAdapter, usdyDexSpotUsdc);
+        }
 
         // Discount the bucket value to the real exit price when a DEX spot below NAV
         // is supplied. nav and usdyDexSpotUsdc are both 18-dec USDC-per-USDY, so the
@@ -515,6 +528,38 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         } catch {
             // Oracle down: keep the NAV-based value as the best available basis.
         }
+        uint16 slippageBps = guardrails.config().maxSlippageBps;
+        minOut = (basis * (10_000 - slippageBps)) / 10_000;
+    }
+
+    /**
+     * @notice DEX-spot-derived USDC floor for a de-risk exit when the oracle is down (M4).
+     * @dev Values held USDY at the agent-supplied spot and held mUSD at 1-USD face (mUSD is
+     *      a 1-USD-pegged token, valued at face as the adapter accounts it), then applies
+     *      the slippage haircut. Returns 0 when no spot is supplied (GUARDIAN path --
+     *      trusted swapData) or the bucket is empty, matching the conservative minOut=0
+     *      fallback used elsewhere.
+     * @param usdyAdapter     The USDY bucket adapter.
+     * @param usdyDexSpotUsdc Agent-supplied USDY/USDC DEX spot (18-dec). 0 = no floor.
+     * @return minOut USDC (6-dec) the de-risk liquidation must realize.
+     */
+    function _spotFloorUsdc(IStrategyAdapter usdyAdapter, uint256 usdyDexSpotUsdc)
+        internal
+        view
+        returns (uint256 minOut)
+    {
+        (uint256 usdyBal, uint256 musdBal) = IUsdyAdapter(address(usdyAdapter)).heldRwaBalances();
+
+        // mUSD is 1-USD-pegged and oracle-independent: value at face (18-dec -> 6-dec).
+        uint256 basis = musdBal / 1e12;
+
+        // USDY priced at the supplied spot. usdyBal (18-dec) * spot (18-dec USDC/USDY)
+        // / 1e30 = USDC (6-dec). Without a spot we cannot value USDY -> no USDY floor.
+        if (usdyBal > 0 && usdyDexSpotUsdc > 0) {
+            basis += (usdyBal * usdyDexSpotUsdc) / 1e30;
+        }
+        if (basis == 0) return 0;
+
         uint16 slippageBps = guardrails.config().maxSlippageBps;
         minOut = (basis * (10_000 - slippageBps)) / 10_000;
     }
@@ -592,7 +637,15 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
                 s.usdyOracleNav = nav;
                 s.oracleRangeEnd = rangeEnd;
             } catch {
-                /* oracle down: leave as 0, guard stays inactive this cycle */
+                // M4 -- oracle read reverted. Flag oracleDown only when the USDY bucket
+                // still holds assets (balance-based, oracle-independent): otherwise a dead
+                // oracle with no exposure must NOT force a de-risk. With exposure, the
+                // Guardrails oracleDown branch forces a de-risk so the allocator can exit
+                // a position it can no longer value -- the peg/staleness branches cannot
+                // fire without a NAV. hasAssets() cannot revert (pure balance reads).
+                if (usdyAdapter.hasAssets()) {
+                    s.oracleDown = true;
+                }
             }
         }
         // H2: usdyDexSpot is a TRUSTED allocator-supplied input (the same hot key the depeg

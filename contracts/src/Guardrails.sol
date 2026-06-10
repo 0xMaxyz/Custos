@@ -32,11 +32,13 @@ contract Guardrails is AccessControl {
     error InvalidConfig();
     error AlreadyInitialized();
     error NoPendingChange();
+    error TimelockBelowMinimum();
 
     // ── Events ────────────────────────────────────────────────────────────────
 
     event ConfigUpdated(Config newConfig);
     event ConfigQueued(Config newConfig, uint256 unlocksAt);
+    event ConfigCancelled();
 
     // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +71,13 @@ contract Guardrails is AccessControl {
         uint256 aaveWithdrawable; // current USDC withdrawable from Aave (6-dec)
         uint256 totalAssets; // vault TVL in 6-dec USDC
         uint64 lastRebalanceAt; // unix timestamp of last rebalance
+        // M4 -- set true by YieldVault when the USDY oracle read reverts AND the USDY
+        // bucket still holds assets. The peg/staleness branches below need a live NAV
+        // and are inert on Mantle's Ondo oracle (no on-chain updatedAt/range), so a
+        // dead oracle while exposed to USDY would otherwise leave forceDeRisk=false and
+        // strand the allocator's de-risk path. This flag itself encodes "oracle down +
+        // nonzero USDY exposure", letting the guard force a de-risk.
+        bool oracleDown;
     }
 
     // ── Constants (default values — match packages/shared/src/guardrails.ts) ──
@@ -78,6 +87,13 @@ contract Guardrails is AccessControl {
     uint16 private constant _USDY = 2;
     uint16 private constant _AUSD = 3;
     uint16 private constant _BPS = 10_000;
+
+    /// @notice Floor for `Config.addStrategyTimelock` (M5). Every timelocked governance
+    ///         action (queueConfig, YieldVault.addStrategy/queueGuardrails) derives its
+    ///         delay from this value, so without a floor a queued config could ratchet the
+    ///         delay toward zero and neuter the timelock. Mirrored in
+    ///         packages/shared/src/guardrails.ts (MIN_TIMELOCK).
+    uint32 public constant MIN_TIMELOCK = 1 hours;
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -149,6 +165,16 @@ contract Guardrails is AccessControl {
         _hasPendingConfig = true;
         _configUnlocksAt = block.timestamp + _config.addStrategyTimelock;
         emit ConfigQueued(newConfig, _configUnlocksAt);
+    }
+
+    /// @notice Cancel a pending (queued) config change before it is activated (M5).
+    ///         Clears the pending config and its unlock time. Only ADMIN.
+    function cancelConfig() external onlyRole(Roles.ADMIN) {
+        if (!_hasPendingConfig) revert NoPendingChange();
+        delete _pendingConfig;
+        _hasPendingConfig = false;
+        _configUnlocksAt = 0;
+        emit ConfigCancelled();
     }
 
     /// @notice Activate the queued config once its timelock has elapsed. Only ADMIN.
@@ -301,6 +327,17 @@ contract Guardrails is AccessControl {
         // oracle, plus the off-chain engine's updatedAt check; the peg-deviation branch
         // below stays active. Kept here so the backstop works on any chain whose oracle
         // DOES expose range/updatedAt. See docs/spec.md §2.3.
+        // M4 -- Dead oracle while holding USDY. YieldVault sets `oracleDown` only when the
+        // USDY oracle read reverted AND the USDY bucket still holds assets, so this flag
+        // already encodes "no usable NAV + nonzero RWA exposure". The peg branch needs a
+        // live NAV and the staleness branches are inert on Mantle's Ondo oracle, so this
+        // is the branch that actually fires the de-risk during a full oracle outage. Force
+        // a de-risk (DERISK level); callers distinguish it from a peg breach via the
+        // human-readable reason/evidence they record on the de-risk decision.
+        if (s.oracleDown) {
+            return (true, true, 2); // DERISK -- oracle down
+        }
+
         // Oracle staleness: past range end = invalid NAV.
         bool oracleStale = s.oracleRangeEnd > 0 && block.timestamp > s.oracleRangeEnd;
         // Secondary staleness guard.
@@ -371,5 +408,9 @@ contract Guardrails is AccessControl {
         if (c.minInstantLiquidityBps >= _BPS) revert InvalidConfig();
         if (c.pegWarnBps > c.pegBlockBps) revert InvalidConfig();
         if (c.pegBlockBps > c.pegDeRiskBps) revert InvalidConfig();
+        // M5 -- the add-strategy timelock is also the delay for every other timelocked
+        // governance action (config changes, guardrail swaps). Enforce a hard floor so a
+        // queued config can never ratchet the delay to zero and neuter the timelock.
+        if (c.addStrategyTimelock < MIN_TIMELOCK) revert TimelockBelowMinimum();
     }
 }

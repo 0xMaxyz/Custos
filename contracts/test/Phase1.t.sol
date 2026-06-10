@@ -573,7 +573,8 @@ contract Phase1Test is Test {
             oracleRangeEnd: uint64(block.timestamp + 7 days),
             aaveWithdrawable: tvl * 50 / 100, // 50% of TVL withdrawable from Aave
             totalAssets: tvl,
-            lastRebalanceAt: 0 // first rebalance
+            lastRebalanceAt: 0, // first rebalance
+            oracleDown: false
         });
     }
 

@@ -193,6 +193,12 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
         return MUSD != address(0) && IERC20(MUSD).balanceOf(address(this)) > 0;
     }
 
+    /// @inheritdoc IUsdyAdapter
+    function heldRwaBalances() external view override returns (uint256 usdyBal, uint256 musdBal) {
+        usdyBal = IERC20(USDY).balanceOf(address(this));
+        musdBal = MUSD == address(0) ? 0 : IERC20(MUSD).balanceOf(address(this));
+    }
+
     /// @dev USDC (6-dec) value of held USDY at oracle NAV; 0 if none or oracle down.
     function _usdyValue() internal view returns (uint256) {
         uint256 usdyBal = IERC20(USDY).balanceOf(address(this));

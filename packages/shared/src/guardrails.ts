@@ -59,6 +59,14 @@ export const PER_TX_DEPOSIT_CAP_USDC = 10_000 * 1_000_000; // $10,000
 /** Delay (seconds) before a newly-added strategy adapter becomes usable. */
 export const ADD_STRATEGY_TIMELOCK = 2 * 24 * 3_600; // 48 hours
 
+/**
+ * Hard floor (seconds) for Config.addStrategyTimelock (M5). Mirrors Guardrails.MIN_TIMELOCK.
+ * The add-strategy timelock doubles as the delay for every timelocked governance action
+ * (config changes, guardrail swaps), so a queued config could otherwise ratchet the delay
+ * to zero and neuter the timelock -- this floor (enforced in _requireValidConfig) prevents that.
+ */
+export const MIN_TIMELOCK = 3_600; // 1 hour
+
 // ── USDY risk thresholds ──────────────────────────────────────────────────────
 
 /** |DEX spot - oracle NAV| in bps => surface CAUTION signal. */

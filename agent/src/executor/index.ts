@@ -311,17 +311,29 @@ export class Executor {
       throw new CycleFailureError({ ...meta, stage: "submit", cause });
     }
 
+    let receipt;
     try {
-      return await this.public.waitForTransactionReceipt({
+      receipt = await this.public.waitForTransactionReceipt({
         hash,
         timeout: this.config.txReceiptTimeoutMs,
         retryCount: 3,
       });
     } catch (cause) {
-      // Tx was broadcast but the receipt never confirmed within the bound (or
-      // confirmed reverted). Surface the hash so the failure can be traced.
+      // Tx was broadcast but the receipt never confirmed within the bound.
+      // Surface the hash so the failure can be traced.
       throw new CycleFailureError({ ...meta, stage: "receipt", cause, txHash: hash });
     }
+    // viem RESOLVES on a mined-but-reverted tx (status flags it) — without this
+    // check a reverted required de-risk would be reported as a success.
+    if (receipt.status === "reverted") {
+      throw new CycleFailureError({
+        ...meta,
+        stage: "receipt",
+        cause: new Error("transaction reverted on-chain"),
+        txHash: hash,
+      });
+    }
+    return receipt;
   }
 
   /**

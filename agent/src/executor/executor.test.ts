@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { Bucket } from "@custos/shared";
+import { isCycleFailure, type CycleFailureError } from "./errors.js";
 import type { MarketSnapshot, WeightsBps } from "../types.js";
 import type { RiskVerdict, EvidenceType } from "../llm/types.js";
 
@@ -710,7 +711,6 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
   }
 
   it("receipt timeout on a forced de-risk → CycleFailureError(deRiskRequired, stage=receipt, txHash)", async () => {
-    const { CycleFailureError, isCycleFailure } = await import("./errors.js");
     const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // depeg → deRisk
     const txHash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as `0x${string}`;
     const executor = await makeExecutorWith(
@@ -725,7 +725,7 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
     );
 
     expect(isCycleFailure(err)).toBe(true);
-    const f = err as InstanceType<typeof CycleFailureError>;
+    const f = err as CycleFailureError;
     expect(f.deRiskRequired).toBe(true);
     expect(f.stage).toBe("receipt");
     expect(f.kind).toBe("derisk");
@@ -733,7 +733,6 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
   });
 
   it("writeContract failure on a forced de-risk → CycleFailureError(stage=submit, no txHash)", async () => {
-    const { CycleFailureError, isCycleFailure } = await import("./errors.js");
     const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
     const executor = await makeExecutorWith(
       snap,
@@ -747,10 +746,33 @@ describe("Executor tx-lifecycle failures (O2 → O1)", () => {
     );
 
     expect(isCycleFailure(err)).toBe(true);
-    const f = err as InstanceType<typeof CycleFailureError>;
+    const f = err as CycleFailureError;
     expect(f.stage).toBe("submit");
     expect(f.deRiskRequired).toBe(true);
     expect(f.txHash).toBeUndefined();
+  });
+
+  it("a receipt that confirms REVERTED → CycleFailureError(stage=receipt), not a false success", async () => {
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
+    const txHash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as `0x${string}`;
+    // viem resolves (does not throw) on a mined-but-reverted tx — status flags it.
+    const executor = await makeExecutorWith(
+      snap,
+      async () => ({ logs: [], transactionHash: txHash, status: "reverted" }),
+      async () => txHash,
+    );
+
+    const err = await executor.runCycle().then(
+      () => { throw new Error("expected runCycle to throw"); },
+      (e: unknown) => e,
+    );
+
+    expect(isCycleFailure(err)).toBe(true);
+    const f = err as CycleFailureError;
+    expect(f.stage).toBe("receipt");
+    expect(f.deRiskRequired).toBe(true);
+    expect(f.txHash).toBe(txHash);
+    expect(String(f.cause)).toMatch(/reverted/i);
   });
 
   it("passes a bounded timeout + retryCount to waitForTransactionReceipt (O2)", async () => {

@@ -21,6 +21,12 @@ pragma solidity 0.8.28;
  *
  * Environment variables read:
  *   DEPLOYER_PRIVATE_KEY   - deployer / initial admin
+ *   INITIAL_TIMELOCK_SECONDS - (mainnet, optional) bootstrap addStrategyTimelock for the
+ *                            guarded-launch window (>= 1h MIN_TIMELOCK floor; 0/unset = 2d default)
+ *   ADMIN_ADDRESS          - final admin (DEFAULT_ADMIN_ROLE + ADMIN) recipient. On mainnet
+ *                            (chainId 5000) this MUST be set and != deployer: the deployer
+ *                            EOA hands off all admin roles then renounces its own (H4). On
+ *                            non-mainnet chains it is optional (unset = deployer keeps admin).
  *   ALLOCATOR_ADDRESS      - ALLOCATOR role recipient (hot key, may == deployer for test)
  *   GUARDIAN_ADDRESS       - GUARDIAN role recipient (optional, may == deployer)
  *   TESTNET_USDC           - (testnet only) USDC address; mainnet is hard-coded
@@ -61,6 +67,7 @@ contract Deploy is Script {
         address guardian = vm.envOr("GUARDIAN_ADDRESS", deployer);
 
         bool isMainnet = block.chainid == 5000;
+
         console2.log("=== Custos deploy ===");
         console2.log("Chain:", block.chainid, isMainnet ? "(mainnet)" : "(testnet)");
         console2.log("Deployer:", deployer);
@@ -116,16 +123,30 @@ contract Deploy is Script {
         guardrails = new Guardrails(deployer);
         console2.log("Guardrails:", address(guardrails));
 
-        // One-shot config bootstrap (H3): setConfig applies instantly the first time
-        // and then seals — every later change is timelocked via queueConfig/activateConfig.
-        // Always call it once here to consume that window at deploy. On testnet, zero the
-        // add-strategy timelock so the deploy can queue AND activate adapters in a single
-        // broadcast (no time to warp on a live RPC). Mainnet keeps the 2-day default;
-        // adapters are activated later via ActivateStrategies.s.sol once it elapses.
+        // One-shot config bootstrap (H3): setConfig applies instantly the first time and
+        // then seals — every later change is timelocked via queueConfig/activateConfig.
+        // Always call it once here to consume that window at deploy. On testnet, shorten
+        // the add-strategy timelock to the MIN_TIMELOCK floor (M5: it can no longer be 0)
+        // so adapters can be activated ~1h after deploy via ActivateStrategies.s.sol;
+        // mainnet keeps the 2-day default. Adapters are queued here, activated later.
         Guardrails.Config memory cfg = guardrails.config();
         if (!isMainnet) {
-            cfg.addStrategyTimelock = 0;
-            console2.log("Testnet: addStrategyTimelock set to 0");
+            cfg.addStrategyTimelock = guardrails.MIN_TIMELOCK();
+            console2.log("Testnet: addStrategyTimelock set to MIN_TIMELOCK (1h)");
+        } else {
+            // v1 guarded launch (see docs/deploy.md): optionally bootstrap with a shorter
+            // timelock (>= MIN_TIMELOCK floor) for the mainnet shakeout window, then queue
+            // a raise back to 48h once smoke tests pass. Unset/0 keeps the 2-day default.
+            uint256 initialTimelock = vm.envOr("INITIAL_TIMELOCK_SECONDS", uint256(0));
+            if (initialTimelock != 0) {
+                require(
+                    initialTimelock >= guardrails.MIN_TIMELOCK(),
+                    "INITIAL_TIMELOCK_SECONDS below MIN_TIMELOCK"
+                );
+                require(initialTimelock <= type(uint32).max, "INITIAL_TIMELOCK_SECONDS too large");
+                cfg.addStrategyTimelock = uint32(initialTimelock);
+                console2.log("Mainnet: addStrategyTimelock bootstrapped to", initialTimelock);
+            }
         }
         guardrails.setConfig(cfg);
 
@@ -143,16 +164,11 @@ contract Deploy is Script {
             aaveAdapter = new AaveV3Adapter(aavePool, usdc, aUsdc, address(vault));
             console2.log("AaveV3Adapter:", address(aaveAdapter));
 
-            // Queue adapter in vault bucket 1 (AAVE). Testnet: zero timelock.
+            // Queue adapter in vault bucket 1 (AAVE). Activated later via
+            // ActivateStrategies.s.sol once the add-strategy timelock elapses (M5: the
+            // timelock floor means it can no longer be activated in this same broadcast).
             vault.addStrategy(1, address(aaveAdapter));
-            if (!isMainnet) {
-                // Timelock was zeroed above for testnet, so activate immediately.
-                vault.activateStrategy(1);
-            }
-            console2.log(
-                "AaveV3Adapter queued in bucket 1",
-                isMainnet ? "(awaiting timelock)" : "(activated)"
-            );
+            console2.log("AaveV3Adapter queued in bucket 1 (awaiting timelock)");
         } else {
             console2.log("AaveV3Adapter SKIPPED - no Aave pool address");
         }
@@ -175,12 +191,7 @@ contract Deploy is Script {
             console2.log("  mUSD leg:", musd == address(0) ? address(0) : musd);
 
             vault.addStrategy(2, address(usdyAdapter));
-            if (!isMainnet) {
-                vault.activateStrategy(2);
-            }
-            console2.log(
-                "UsdyAdapter queued in bucket 2", isMainnet ? "(awaiting timelock)" : "(activated)"
-            );
+            console2.log("UsdyAdapter queued in bucket 2 (awaiting timelock)");
         } else {
             console2.log("UsdyAdapter SKIPPED - missing USDY/oracle/router address");
         }
@@ -198,12 +209,7 @@ contract Deploy is Script {
             console2.log("AusdAdapter:", address(ausdAdapter));
 
             vault.addStrategy(3, address(ausdAdapter));
-            if (!isMainnet) {
-                vault.activateStrategy(3);
-            }
-            console2.log(
-                "AusdAdapter queued in bucket 3", isMainnet ? "(awaiting timelock)" : "(activated)"
-            );
+            console2.log("AusdAdapter queued in bucket 3 (awaiting timelock)");
         } else {
             console2.log("AusdAdapter SKIPPED - missing AUSD/router address");
         }
@@ -213,6 +219,12 @@ contract Deploy is Script {
         vault.grantRole(Roles.GUARDIAN, guardian);
         console2.log("ALLOCATOR granted to:", allocator);
         console2.log("GUARDIAN granted to:", guardian);
+
+        // 7. Admin handoff (H4). MUST run after all deployer-privileged setup above
+        // (setConfig bootstrap, addStrategy/activateStrategy, ALLOCATOR/GUARDIAN grants) so
+        // nothing the deployer still needs runs after it renounces. The target ADMIN_ADDRESS
+        // is read + validated inside _maybeHandoffAdmin (kept out of run() to bound stack).
+        _maybeHandoffAdmin(deployer, isMainnet);
 
         vm.stopBroadcast();
 
@@ -235,5 +247,53 @@ contract Deploy is Script {
         }
         console2.log('  "deployer": "%s"', deployer);
         console2.log("}");
+    }
+
+    /**
+     * @notice Grant DEFAULT_ADMIN_ROLE + ADMIN on every admin-bearing contract to newAdmin,
+     *         then renounce the deployer own roles (H4). Runs inside the active broadcast.
+     *         Each constructor granted exactly DEFAULT_ADMIN_ROLE + ADMIN to the deployer.
+     *         Per contract: grant new admin first, then renounce deployer ADMIN, then
+     *         DEFAULT_ADMIN_ROLE last (it governs grants/renounces).
+     */
+    /**
+     * @notice Read + validate ADMIN_ADDRESS and hand off admin if a distinct target is set
+     *         (H4). On mainnet ADMIN_ADDRESS is required and must differ from the deployer.
+     *         Off mainnet, an unset/zero or self address simply skips the handoff (the
+     *         deployer keeps admin for dev ergonomics). Kept separate from run() so the env
+     *         read + local do not inflate run() stack depth.
+     */
+    function _maybeHandoffAdmin(address deployer, bool isMainnet) internal {
+        address adminAddress = vm.envOr("ADMIN_ADDRESS", address(0));
+        if (isMainnet) {
+            require(adminAddress != address(0), "ADMIN_ADDRESS must be set on mainnet");
+            require(adminAddress != deployer, "ADMIN_ADDRESS must differ from deployer on mainnet");
+        }
+        if (adminAddress == address(0) || adminAddress == deployer) {
+            console2.log("Admin handoff SKIPPED - deployer retains admin (non-mainnet)");
+            return;
+        }
+        _handoffAdmin(adminAddress, deployer);
+        console2.log("Admin handed off to:", adminAddress);
+        console2.log("Deployer admin roles renounced");
+    }
+
+    function _handoffAdmin(address newAdmin, address deployer) internal {
+        bytes32 defaultAdmin = guardrails.DEFAULT_ADMIN_ROLE();
+
+        guardrails.grantRole(defaultAdmin, newAdmin);
+        guardrails.grantRole(Roles.ADMIN, newAdmin);
+        guardrails.renounceRole(Roles.ADMIN, deployer);
+        guardrails.renounceRole(defaultAdmin, deployer);
+
+        vault.grantRole(defaultAdmin, newAdmin);
+        vault.grantRole(Roles.ADMIN, newAdmin);
+        vault.renounceRole(Roles.ADMIN, deployer);
+        vault.renounceRole(defaultAdmin, deployer);
+
+        benchmark.grantRole(defaultAdmin, newAdmin);
+        benchmark.grantRole(Roles.ADMIN, newAdmin);
+        benchmark.renounceRole(Roles.ADMIN, deployer);
+        benchmark.renounceRole(defaultAdmin, deployer);
     }
 }

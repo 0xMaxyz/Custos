@@ -10,6 +10,7 @@
 | [spec.md](./spec.md) | Guardrail parameters, contract interfaces, LLM prompt schema |
 | [ui.md](./ui.md) | UI/UX design spec, component inventory, data dictionary, fixtures |
 | [agents.md](./agents.md) | Operating guide for AI coding agents and human contributors |
+| [deploy.md](./deploy.md) | End-to-end deployment runbook (contracts, agent, web, ops) |
 | [demo.md](./demo.md) | Demo video production guide |
 | [marketing.md](./marketing.md) | Marketing copy, tweet thread, screenshot guide |
 
@@ -19,6 +20,7 @@
 - **Build or audit contracts** → [spec.md](./spec.md) §1–2 + [contracts/README.md](../contracts/README.md)
 - **Work on the AI agent** → [spec.md](./spec.md) §3 + [agent/README.md](../agent/README.md)
 - **Build the frontend** → [ui.md](./ui.md) + [web/README.md](../web/README.md)
+- **Deploy to mainnet/testnet** → [deploy.md](./deploy.md)
 - **Contributor or coding-agent rules** → [agents.md](./agents.md)
 
 ## Package docs

@@ -64,7 +64,7 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
 2. **Guardrails are the final authority.** On-chain guardrails (see [`docs/spec.md`
    §1](./spec.md): max weight/bucket, min idle+Aave liquidity buffer, max slippage,
    token/venue whitelist, rebalance-frequency cap, per-tx caps, pause/kill switch,
-   add-strategy timelock, depeg/oracle-deviation guard) are **immutable limits**. The AI
+   add-strategy timelock, depeg/oracle-deviation guard) are **timelocked limits** (one-shot bootstrap at deploy; afterwards every change — tighten or loosen — queues behind the on-chain timelock, with a 1-hour hard floor on the delay and an explicit `cancelConfig`). The AI
    **proposes**; a **deterministic validator** checks against guardrails **before
    signing**; the on-chain guardrails are the final backstop. The LLM may only
    **tighten** risk, never loosen it. On-chain `Guardrails` and the TS validator

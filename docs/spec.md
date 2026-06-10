@@ -43,14 +43,15 @@ Concrete specifications for Custos. Three parts, in order:
 | `minRebalanceInterval` | `3600s` (1h) | Min seconds between **rebalances** (de-risk is exempt) |
 | `tvlCap` | `$50,000` | Max vault TVL for the mainnet demo (deposit cap) |
 | `perTxDepositCap` | `$10,000` | Max single deposit during demo |
-| `addStrategyTimelock` | `172800s` (2d) | Delay before a newly-added strategy is usable |
+| `addStrategyTimelock` | `172800s` (2d) | Delay before a newly-added strategy is usable; also the queue delay for config/guardrails changes |
+| `MIN_TIMELOCK` (constant) | `3600s` (1h) | Hard floor on `addStrategyTimelock` — the delay can never be queued below this (M5) |
 
 ### 1.4 USDY risk thresholds (initial defaults)
 | Param | Default | Action |
 |-------|---------|--------|
 | `pegWarnBps` | `30` (0.3%) | \|DEX spot − oracle NAV\| ≥ → surface a CAUTION signal |
 | `pegBlockBps` | `50` (0.5%) | ≥ → **block new USDY allocation** |
-| `pegDeRiskBps` | `100` (1.0%) | ≥ → **force de-risk** (rotate USDY → AUSD/USDC) |
+| `pegDeRiskBps` | `100` (1.0%) | ≥ → **force de-risk** (rotate USDY → USDC) |
 | `oracleMaxAge` | `100800s` (~28h)* | Beyond → treat NAV as stale → block + de-risk |
 | `oracleRangeEndBuffer` | `86400s` (24h) | If within 24h of `RWADynamicOracle` configured range end → CAUTION |
 
@@ -225,6 +226,9 @@ interface IGuardrails {
         uint256 aaveWithdrawable;
         uint256 totalAssets;
         uint64  lastRebalanceAt;
+        bool    oracleDown;      // set by the vault when oracleData() reverts while RWA
+                                 // exposure > 0 → forces de-risk so the autonomous
+                                 // defense still works during an oracle outage (M4)
     }
 
     function config() external view returns (Config memory);
@@ -232,8 +236,9 @@ interface IGuardrails {
     // Config governance (H3): setConfig is a one-shot bootstrap at deploy (applies
     // instantly, then seals); every later change — tighten OR loosen — is timelocked.
     function setConfig(Config calldata newConfig) external;   // ADMIN, one-shot bootstrap
-    function queueConfig(Config calldata newConfig) external; // ADMIN, queue
+    function queueConfig(Config calldata newConfig) external; // ADMIN, queue (delay >= MIN_TIMELOCK floor)
     function activateConfig() external;                       // ADMIN, after addStrategyTimelock
+    function cancelConfig() external;                         // ADMIN, abort a pending config (M5)
 
     /// @return ok / reason selector. Pure check of a proposed allocation vs config + state.
     function validateRebalance(

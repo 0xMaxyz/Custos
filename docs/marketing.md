@@ -47,7 +47,7 @@ mainnet deploy + public frontend are live.
 > 🏦 Aave v3 — instant-liquidity floor  
 > 🛡️ Agora AUSD — reserve-backed safety bucket
 >
-> Every allocation bounded by **immutable on-chain guardrails** the AI can never
+> Every allocation bounded by **hard on-chain guardrails** the AI can never
 > override.
 >
 > 3/8
@@ -192,7 +192,7 @@ to whatever the Demo-states panel actually seeds when you capture.
 >
 > The key insight: **the verifiable autonomous defense, not the swap-to-USDY, is the
 > product.** The AI (Anthropic Claude) reads attestation PDFs and headlines that
-> thresholds miss; a deterministic validator checks; immutable on-chain Guardrails
+> thresholds miss; a deterministic validator checks; timelocked on-chain Guardrails
 > backstop. The model is never the last line of defense.
 >
 > Built on Ondo USDY/mUSD + RWADynamicOracle, Agora AUSD, Aave v3, Odos, and the

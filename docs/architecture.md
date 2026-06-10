@@ -2,8 +2,8 @@
 
 > An AI risk-guardian real-yield account on Mantle. Users deposit USDC; an AI agent earns
 > tokenized-Treasury (USDY) yield while continuously watching real-world RWA risk and
-> **autonomously de-risking on-chain** — rotating into a DeFi yield floor (Aave) or a
-> reserve-backed safe asset (AUSD) when danger appears. Every decision and its triggering
+> **autonomously de-risking on-chain** — rotating to instantly-liquid USDC (with a
+> reserve-backed AUSD escape hatch for USDC-issuer risk) when danger appears. Every decision and its triggering
 > evidence are recorded on-chain under an ERC-8004 agent identity.
 
 ---
@@ -32,7 +32,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 3. **Judgment on novel/ambiguous issuer or regulatory events** — always bounded by on-chain guardrails; the AI may only tighten risk, never loosen it.
 4. **Conversational UX** — "why am I in AUSD right now?", "what changed today?".
 
-**Safety model:** the LLM **proposes** target weights + a de-risk verdict; a **deterministic validator** checks the proposal against guardrails **before** signing; **immutable on-chain guardrails** are the final backstop. The model is never the last line of defense.
+**Safety model:** the LLM **proposes** target weights + a de-risk verdict; a **deterministic validator** checks the proposal against guardrails **before** signing; **timelocked on-chain guardrails** are the final backstop. The model is never the last line of defense.
 
 ---
 
@@ -45,19 +45,19 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 | 0 | `IDLE` | USDC held in vault | Yes |
 | 1 | `AAVE` | USDC supplied to Aave v3 | Yes (pool liquidity permitting) |
 | 2 | `USDY` | RWA yield core — USDY or mUSD (Ondo; convertible via Ondo Token Converter) | No (DEX unwind) |
-| 3 | `AUSD` | Reserve-backed safe asset | Partial (DEX) |
+| 3 | `AUSD` | Reserve-backed escape hatch (guardian-managed; not an autonomous de-risk target) | Partial (DEX) |
 
 - **USDY / mUSD (Ondo)** — RWA yield core (tokenized US Treasuries, ~4.5%). USDY is NAV/price-accruing; **mUSD** is its $1-pegged rebasing form on Mantle. The two are convertible on-chain via the **Ondo Token Converter** (the mUSD contract's `wrap`/`unwrap`), so the vault treats them as a single bucket.
 - **Aave v3 USDC supply** — DeFi-yield leg **and** instant withdrawal liquidity (deep, redeemable on demand).
 - **Idle USDC buffer** — instant small withdrawals.
-- **AUSD (Agora)** — flight-to-safety leg (reserve-backed: cash + T-bills + repo; on-chain proof-of-reserves).
+- **AUSD (Agora)** — escape-hatch leg for USDC-issuer risk (reserve-backed: cash + T-bills + repo; on-chain proof-of-reserves). Guardian-managed: the autonomous de-risk lands in USDC; rotating onward to AUSD is a deliberate (manual/guardian) action.
 
 ### 3.2 The managed-allocation mechanism
 
 1. User deposits **USDC**, receives ERC-4626 **shares**.
 2. The AI sets **target weights** across the buckets from (a) the **yield spread** (USDY Treasury yield vs Aave supply APY, risk-adjusted) and (b) **RWA risk signals**.
 3. **Yield reaches users via share-price appreciation** (USDY NAV accrual + Aave interest) — no rebasing, no claim step.
-4. **Risk-guardian action:** on a danger signal (USDY DEX price vs `RWADynamicOracle` NAV deviation = depeg, oracle staleness, attestation/regulatory shock), the agent **auto-rotates out of USDY into AUSD/USDC**, or **pauses**, and writes the decision + **evidence hash/URI** on-chain.
+4. **Risk-guardian action:** on a danger signal (USDY DEX price vs `RWADynamicOracle` NAV deviation = depeg, oracle staleness, attestation/regulatory shock), the agent **auto-rotates out of USDY into USDC** (the instantly-liquid safe state), or **pauses**, and writes the decision + **evidence hash/URI** on-chain.
 5. **Withdrawals** are served from **idle + Aave first** (instant); only large redemptions unwind USDY via DEX. The buffer is sized so normal withdrawals never wait on USDY liquidity.
 
 ### 3.3 Smart contracts (Foundry)
@@ -67,7 +67,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
   - `UsdyAdapter` — USDC↔USDY/mUSD via Odos aggregator, oracle-derived `minOut`, blocklist-aware; USDY↔mUSD conversion via Ondo `wrap`/`unwrap`.
   - `AaveV3Adapter` — supply/withdraw USDC on Aave v3 Mantle.
   - `AusdAdapter` — USDC↔AUSD via Odos aggregator, oracle-derived `minOut`.
-- **`Guardrails`** (immutable params): max weight per bucket, min idle/Aave liquidity buffer, max slippage, token/venue whitelist, max rebalance frequency, per-tx caps, pause/kill switch, add-strategy timelock, and a **depeg/oracle-deviation guard** that can force de-risk.
+- **`Guardrails`** (timelocked params — one-shot bootstrap config at deploy, then **every** change queues behind the on-chain timelock, with a 1h hard floor on the delay and an explicit `cancelConfig`): max weight per bucket, min idle/Aave liquidity buffer, max slippage, token/venue whitelist, max rebalance frequency, per-tx caps, pause/kill switch, add-strategy timelock, and a **depeg/oracle-deviation guard** that can force de-risk.
 - **`AgentBenchmark`** — logs each decision + the triggering evidence + later the realized outcome (APY, drawdown avoided) → the **on-chain benchmarking** record vs a passive 100%-USDY holder.
 - **ERC-8004 registries** — register the agent in Identity (ERC-721) + Reputation registries. Uses the canonical 0x8004 singletons deployed on Mantle.
 - **`CustosJobEscrow` / `CustosDeRiskEvaluator`** — ERC-8183 escrowed jobs: each de-risk is modelled as a verifiable job whose Evaluator is the deterministic guardrail check. Outside the vault custody path.
@@ -173,5 +173,5 @@ RWA looping/leverage (no market on Mantle supports it); cross-chain; KYC'd USDY 
 | AUSD is not yield-bearing | AUSD is a safety leg, not the yield core; yield comes from USDY + Aave. |
 | USDY blocklist hook may revert vault transfers | Vault address confirmed non-blocked; hook reverts handled gracefully; tests on fork. |
 | 1delta outage / rate limits | Data-only dependency; RPC ground-truth fallback for all held assets. |
-| AI proposes unsafe allocation | Deterministic validator + immutable on-chain guardrails + kill switch. |
+| AI proposes unsafe allocation | Deterministic validator + timelocked on-chain guardrails + kill switch. |
 | Anthropic API down / timeout | LLM is advisory only; on failure the agent falls back to the deterministic allocation. The model is never the last line of defense. |

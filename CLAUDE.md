@@ -9,7 +9,7 @@ This file restates only the non-negotiables so they are never missed.
 **Custos** — an **AI risk-guardian real-yield account** on **Mantle** (chain ID
 5000). Users deposit **USDC**; an AI agent (Anthropic API (Claude)) earns tokenized-Treasury
 (**USDY**) yield with an **Aave v3** USDC liquidity floor, and **autonomously
-de-risks on-chain** into **AUSD**/USDC on RWA danger (depeg, oracle staleness,
+de-risks on-chain** to **USDC** (with **AUSD** as a guardian-managed escape hatch) on RWA danger (depeg, oracle staleness,
 issuer/regulatory shock), recording every decision **and its evidence** on-chain
 under an **ERC-8004** identity. Track: **AI × RWA (Application path)**. The
 verifiable autonomous defense — not the swap-to-USDY — is the product.
@@ -29,7 +29,7 @@ verifiable autonomous defense — not the swap-to-USDY — is the product.
    (the "Ondo Token Converter" — it has no separate contract), oracle-priced and
    value-neutral, with the same balance-delta `minOut`. See `docs/agents.md` §2.1.
 2. **Guardrails are final.** LLM proposes → deterministic validator checks →
-   immutable on-chain guardrails (incl. depeg/oracle guard) backstop. The model is
+   timelocked on-chain guardrails (incl. depeg/oracle guard) backstop. The model is
    never the last line of defense. The LLM may only **tighten** risk, never loosen
    it (see `docs/spec.md` §3). On-chain `Guardrails` and the TS validator share constants
    from `packages/shared`.

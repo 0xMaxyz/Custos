@@ -58,8 +58,8 @@ The submission demo video. Screen recording + voiceover is sufficient (no on-cam
 ### 1:25–2:05 — HERO: the autonomous de-risk
 - **VO:** "Now watch what makes this different. USDY's market price drops below its
   Treasury value — a depeg. The agent detects it, and because the deviation crosses
-  the guardrail, it automatically rotates out of USDY into AUSD — a reserve-backed
-  safe asset — and writes the decision on-chain."
+  the guardrail, it automatically rotates out of USDY into USDC — instantly liquid
+  and safe — and writes the decision on-chain."
 - **SCR:** Trigger the event (§4) → Agent status flips to **De-risking** (amber/red)
   → Activity feed shows a new **De-risk** entry appearing → open the decision:
   plain-language rationale + **evidence chips** (peg reading, source) + before→after
@@ -107,8 +107,8 @@ The submission demo video. Screen recording + voiceover is sufficient (no on-cam
    freshness, Aave liquidity."
 5. "Now watch what makes this different. USDY's market price drops below its Treasury
    value — a depeg. The agent detects it, and because the deviation crosses the
-   guardrail, it automatically rotates out of USDY into AUSD — a reserve-backed safe
-   asset — and writes the decision on-chain."
+   guardrail, it automatically rotates out of USDY into USDC — instantly liquid and
+   safe — and writes the decision on-chain."
 6. "Every decision is benchmarked on-chain, and the agent itself has an on-chain
    identity — an ERC-8004 NFT that builds a verifiable track record of how well it
    manages risk over time."

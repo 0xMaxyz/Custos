@@ -2,7 +2,7 @@
 
 **AI risk-guardian real-yield account on Mantle.** Deposit USDC; an AI agent earns
 tokenized-Treasury (USDY) yield with an Aave v3 USDC liquidity floor, and
-**autonomously de-risks on-chain** into AUSD/USDC when RWA danger appears (depeg,
+**autonomously de-risks on-chain** to USDC (AUSD as a guardian-managed escape hatch) when RWA danger appears (depeg,
 oracle staleness, issuer/regulatory shock) — recording every decision **and its
 evidence** on-chain under an ERC-8004 identity.
 
@@ -25,7 +25,7 @@ evidence** on-chain under an ERC-8004 identity.
    **immutable on-chain guardrails**.
 3. It continuously monitors **peg deviation, oracle freshness, liquidity** (deterministic)
    and reads **attestations / regulatory news** (the LLM) for threats a threshold misses.
-4. On danger it calls **`deRisk`**: rotates USDY → AUSD/USDC and emits a
+4. On danger it calls **`deRisk`**: rotates USDY → USDC and emits a
    **`DecisionRecorded`** event with a `rationaleHash` + an IPFS evidence bundle (`decisionURI`).
 5. An on-chain **`AgentBenchmark`** records the bps delta vs a **passive 100%-USDY
    holder** — the "can the AI actually beat passive?" answer, verifiable by anyone.

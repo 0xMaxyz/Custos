@@ -242,11 +242,13 @@ contract Phase2bTest is Test {
         vm.prank(allocator);
         uint256 did = vault.rebalance(target, sd, "ipfs://bm2", bytes32(0), NAV);
 
+        // L8: caller supplies a bogus measuredAt (12345); the contract must IGNORE it
+        // and stamp block.timestamp instead.
         IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
             realizedYieldBps: 120,
             drawdownAvoidedUsdc: 5000e6,
             passiveDeltaBps: -30,
-            measuredAt: uint64(block.timestamp)
+            measuredAt: 12_345
         });
 
         vm.prank(allocator);
@@ -256,7 +258,61 @@ contract Phase2bTest is Test {
         assertEq(stored.realizedYieldBps, 120);
         assertEq(stored.drawdownAvoidedUsdc, 5000e6);
         assertEq(stored.passiveDeltaBps, -30);
+        // measuredAt is stamped in-contract from block.timestamp, NOT the caller's 12345.
         assertEq(stored.measuredAt, uint64(block.timestamp));
+        assertTrue(stored.measuredAt != 12_345, "caller measuredAt must be ignored");
+    }
+
+    /// L8: passing measuredAt == 0 must NOT leave the record overwritable. The contract
+    /// stamps a non-zero block.timestamp, so the append-only "already set" guard seals it
+    /// and a second updateOutcome reverts OutcomeAlreadySet.
+    function test_BenchmarkOutcomeMeasuredAtZeroStillSeals() public {
+        uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
+        bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
+        vm.prank(allocator);
+        uint256 did = vault.rebalance(target, sd, "ipfs://bm-zero", bytes32(0), NAV);
+
+        // First write with measuredAt == 0 (the L8 attack value).
+        IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
+            realizedYieldBps: 77, drawdownAvoidedUsdc: 0, passiveDeltaBps: 0, measuredAt: 0
+        });
+        vm.prank(allocator);
+        bm.updateOutcome(did, o);
+
+        // Despite the caller's 0, the stored record carries a non-zero stamp.
+        IAgentBenchmark.Outcome memory stored = bm.outcomeOf(did);
+        assertEq(stored.measuredAt, uint64(block.timestamp));
+        assertTrue(stored.measuredAt != 0, "record must be stamped, not left at 0");
+
+        // A second write — even with measuredAt 0 again — must revert: record is sealed.
+        vm.prank(allocator);
+        vm.expectRevert(AgentBenchmark.OutcomeAlreadySet.selector);
+        bm.updateOutcome(did, o);
+    }
+
+    /// L8: the in-contract stamp tracks block.timestamp at write time, not the caller's
+    /// value (proven by warping the clock between the rebalance and the outcome write).
+    function test_BenchmarkOutcomeStampsCurrentTimestamp() public {
+        uint16[4] memory target = [uint16(4_000), 0, 6_000, 0];
+        bytes[] memory sd = new bytes[](3);
+        sd[2] = _buyUsdy(60_000e6);
+        vm.prank(allocator);
+        uint256 did = vault.rebalance(target, sd, "ipfs://bm-warp", bytes32(0), NAV);
+
+        vm.warp(block.timestamp + 7 days);
+        uint64 expected = uint64(block.timestamp);
+
+        IAgentBenchmark.Outcome memory o = IAgentBenchmark.Outcome({
+            realizedYieldBps: 1,
+            drawdownAvoidedUsdc: 0,
+            passiveDeltaBps: 0,
+            measuredAt: 999 // ignored
+        });
+        vm.prank(allocator);
+        bm.updateOutcome(did, o);
+
+        assertEq(bm.outcomeOf(did).measuredAt, expected);
     }
 
     function test_BenchmarkUpdateOutcomeOnlyAllocator() public {

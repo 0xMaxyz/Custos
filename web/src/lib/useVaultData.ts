@@ -40,11 +40,15 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   const { data: vaultData } = useReadContracts({
     contracts: [
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "totalAssets", chainId },
-      { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "convertToAssets", args: [1_000_000n], chainId },
+      // Assets backing ONE whole share (1e{shareDecimals}). Drives the human-facing
+      // "USDC per share" price. Uses 1e18 because vault shares are 18-dec post-offset
+      // (contract I1); decimals() below confirms the scale rather than hardcoding it.
+      { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "convertToAssets", args: [10n ** 18n], chainId },
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "balanceOf", args: [account ?? ZERO], chainId },
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "asset", chainId },
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "benchmark", chainId },
       { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "isKilled", chainId },
+      { address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "decimals", chainId },
     ],
     query: {
       enabled: isDeployed,
@@ -57,6 +61,12 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   const usdcAddrEntry  = vaultData?.[3];
   const benchmarkEntry = vaultData?.[4];
   const killedEntry    = vaultData?.[5];
+  const decimalsEntry  = vaultData?.[6];
+
+  // Vault share decimals (18 post-offset; see contract I1). Read on-chain — never
+  // hardcoded — so share<->raw conversions track the deployed token.
+  const shareDecimals: number =
+    decimalsEntry?.status === "success" ? Number(decimalsEntry.result as number) : 18;
 
   const usdcAddress: `0x${string}` | "" =
     usdcAddrEntry?.status === "success" ? (usdcAddrEntry.result as `0x${string}`) : "";
@@ -115,6 +125,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   const sharePxRaw = sharePxEntry.result as bigint;
 
   const tvlUsdc    = formatUnits(tvlRaw, 6);
+  // sharePxRaw = convertToAssets(1e18) = USDC (6-dec) backing one whole share.
   const sharePrice = formatUnits(sharePxRaw, 6);
 
   let positionShares = 0n;
@@ -123,7 +134,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
     positionShares = balEntry.result as bigint;
   }
   const posValueRaw = positionShares > 0n
-    ? (positionShares * sharePxRaw) / 1_000_000n
+    ? (positionShares * sharePxRaw) / (10n ** 18n)
     : 0n;
 
   // Live allocation: idle = TVL not held by any adapter (clamped at 0).
@@ -148,9 +159,10 @@ export function useVaultData(account?: `0x${string}`): VaultData {
 
   const livePosition: PositionState = {
     ...posFixture,
-    shares: formatUnits(positionShares, 6),
+    shares: formatUnits(positionShares, shareDecimals),
     valueUsdc: formatUnits(posValueRaw, 6),
     sharePrice,
+    shareDecimals,
   };
 
   // Build live baseline from the latest on-chain outcome when available.

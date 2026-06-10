@@ -262,7 +262,10 @@ export function WithdrawModal({ position, vault, onClose, onToast }: {
     if (!userAddress) return;
     try {
       setPhase("withdrawing");
-      const shares = parseUnits(String(sharesIn), 6);
+      // Convert the human share amount to raw share-wei using the vault's actual share
+      // decimals (18 post-offset; contract I1) — NOT a hardcoded 6, which would under-
+      // redeem by 1e12x.
+      const shares = parseUnits(String(sharesIn), position.shareDecimals);
       const hash = await writeRedeem({ address: VAULT_ADDRESS, abi: VAULT_ABI, functionName: "redeem", args: [shares, userAddress, userAddress] });
       setTxHash(hash);
     } catch {

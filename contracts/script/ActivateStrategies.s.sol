@@ -2,11 +2,13 @@
 pragma solidity 0.8.28;
 
 /**
- * @title ActivateStrategies — Activate queued adapters after the timelock elapses
- *        on mainnet (task 5.2). Run ~48h after Deploy.s.sol on mainnet.
+ * @title ActivateStrategies — Activate queued adapters after the add-strategy
+ *        timelock elapses (task 5.2). TESTNET / dev only: on mainnet the deployer
+ *        renounces ADMIN at the end of Deploy.s.sol (H4), so activation must be
+ *        executed from the Safe instead — see docs/deploy.md §3.4.
  *
- * Usage:
- *   forge script script/ActivateStrategies.s.sol --rpc-url $MANTLE_RPC_URL \
+ * Usage (testnet, ~1h after Deploy.s.sol):
+ *   forge script script/ActivateStrategies.s.sol --rpc-url $MANTLE_TESTNET_RPC_URL \
  *     --private-key $DEPLOYER_PRIVATE_KEY --broadcast -vvv
  */
 

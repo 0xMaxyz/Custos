@@ -122,6 +122,22 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     // ── ERC-4626 overrides ────────────────────────────────────────────────────
 
     /**
+     * @notice Virtual-shares decimals offset (ERC-4626 inflation defense, I1).
+     * @dev OZ ERC4626 mitigates first-depositor share-price inflation grief with
+     *      virtual shares/assets. The offset scales that virtual buffer by `1e6`,
+     *      making the classic "deposit 1 wei, donate a large sum, then let the
+     *      victim's deposit round to 0 shares" attack economically pointless: the
+     *      attacker would have to donate ~1e6x the victim's deposit to steal a single
+     *      rounding unit, and even then captures only dust. Combined with the per-tx
+     *      deposit cap and TVL cap (see {_checkDepositCaps}), the griefing surface is
+     *      closed. Side effects: share decimals become 18 (asset 6 + offset 6) and the
+     *      initial share:asset rate is 1e6:1 (1 USDC -> 1e6 vault shares at genesis).
+     */
+    function _decimalsOffset() internal pure override returns (uint8) {
+        return 6;
+    }
+
+    /**
      * @notice Total USDC value controlled by this vault.
      *         idle (in vault) + sum of adapter totalAssets().
      */

@@ -417,6 +417,47 @@ contract Phase1Test is Test {
         assertEq(vault.totalAssets(), USDC_1K);
     }
 
+    /// I1: first-depositor share-price inflation grief is neutered by the 1e6
+    /// `_decimalsOffset`. Classic attack: attacker mints 1 share with 1 wei, donates a
+    /// large sum directly to the vault to inflate the share price, then the victim's
+    /// deposit rounds down to 0 shares and the attacker redeems everything. With virtual
+    /// shares/assets scaled by 1e6 the victim still receives shares worth (within rounding
+    /// dust) their deposit, and the attacker cannot profit from the donation.
+    function test_InflationGriefIsNeutered() public {
+        uint256 donation = 5_000e6; // attacker donates $5k directly to the vault
+        uint256 victimDeposit = USDC_1K; // victim deposits $1k
+
+        usdc.mint(attacker, donation + 1);
+
+        // 1) Attacker mints the first share with 1 wei.
+        vm.startPrank(attacker);
+        usdc.approve(address(vault), donation + 1);
+        uint256 attackerShares = vault.deposit(1, attacker);
+        // 2) Attacker donates a large sum directly (bypasses ERC-4626 accounting).
+        usdc.transfer(address(vault), donation);
+        vm.stopPrank();
+
+        // 3) Victim deposits. Must receive shares worth ~their deposit, NOT 0.
+        vm.startPrank(user);
+        usdc.approve(address(vault), victimDeposit);
+        uint256 victimShares = vault.deposit(victimDeposit, user);
+        vm.stopPrank();
+
+        assertGt(victimShares, 0, "victim must not be griefed to 0 shares");
+        // Victim's redeemable value is within a tiny rounding dust of their deposit.
+        // Loss is bounded to rounding dust: ceil(donation / 1e6) ~ a few thousand wei out
+        // of a $1k (1e9 wei) deposit, i.e. < 0.001% — not the total wipeout of the attack.
+        uint256 victimValue = vault.convertToAssets(victimShares);
+        assertApproxEqAbs(victimValue, victimDeposit, 5_000, "victim keeps ~all value (dust loss)");
+        // Sanity: the dust is a negligible fraction of the deposit.
+        assertGt(victimValue, victimDeposit - victimDeposit / 100_000, "loss < 0.001%");
+
+        // Attacker gains nothing: their redeemable value cannot exceed what they put in
+        // (1 wei principal + their own donation). They cannot skim the victim's deposit.
+        uint256 attackerValue = vault.convertToAssets(attackerShares);
+        assertLe(attackerValue, donation + 1, "attacker cannot profit from the donation");
+    }
+
     // =========================================================================
     // Task 1.4 — Strategy adapter interface + registry
     // =========================================================================

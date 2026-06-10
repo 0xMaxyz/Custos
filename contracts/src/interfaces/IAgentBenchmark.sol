@@ -31,6 +31,9 @@ interface IAgentBenchmark {
 
     /**
      * @notice Write realized outcome for a decision.  Called by ALLOCATOR/keeper.
+     * @dev Append-only: callable once per decision. The implementation stamps
+     *      `measuredAt` from `block.timestamp`; the caller-supplied `o.measuredAt`
+     *      is ignored.
      */
     function updateOutcome(uint256 decisionId, Outcome calldata o) external;
 

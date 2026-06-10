@@ -73,6 +73,14 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
     }
 
     /// @inheritdoc IAgentBenchmark
+    /// @dev The ledger is append-only: an outcome may be written exactly once.
+    ///      `measuredAt` is stamped from `block.timestamp` in-contract and the
+    ///      caller-supplied `o.measuredAt` is IGNORED. This closes L8: trusting the
+    ///      caller's `measuredAt` would let a caller pass `measuredAt == 0`, which
+    ///      leaves the "already set" guard tripping on a zero sentinel and so leaves
+    ///      the record overwritable — breaking the append-only claim. Stamping the
+    ///      timestamp here guarantees every recorded outcome has a non-zero
+    ///      `measuredAt`, so the guard below permanently seals the slot.
     function updateOutcome(uint256 decisionId, Outcome calldata o)
         external
         override
@@ -80,9 +88,11 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
     {
         if (!_recorded[decisionId]) revert DecisionNotFound();
         if (_outcomes[decisionId].measuredAt != 0) revert OutcomeAlreadySet();
-        _outcomes[decisionId] = o;
+        Outcome memory rec = o;
+        rec.measuredAt = uint64(block.timestamp); // stamped in-contract; caller value ignored
+        _outcomes[decisionId] = rec;
         emit OutcomeUpdated(
-            decisionId, o.realizedYieldBps, o.drawdownAvoidedUsdc, o.passiveDeltaBps
+            decisionId, rec.realizedYieldBps, rec.drawdownAvoidedUsdc, rec.passiveDeltaBps
         );
     }
 

@@ -12,6 +12,8 @@ export interface SchedulerOptions {
   readonly onCycle?: (result: CycleResult) => void;
   /** Called on unexpected errors (default: console.error). */
   readonly onError?: (err: unknown) => void;
+  /** Called at debug verbosity (default: no-op). Used for skipped-cycle traces. */
+  readonly onDebug?: (msg: string) => void;
 }
 
 /**
@@ -37,6 +39,7 @@ export class Scheduler {
   private readonly pollMs: number;
   private readonly onCycle: (r: CycleResult) => void;
   private readonly onError: (e: unknown) => void;
+  private readonly onDebug: (msg: string) => void;
 
   private _running = false;
   private _periodicTimer: ReturnType<typeof setTimeout> | undefined;
@@ -45,12 +48,20 @@ export class Scheduler {
   // Demo-trigger: set to true by injectBreachCondition() to force an immediate poll.
   private _breachPending = false;
 
+  // Single in-flight guard (O3): the periodic and breach-poll loops share no
+  // mutex, so a poll fired by injectBreachCondition() mid-interval could otherwise
+  // run runCycle() concurrently with the periodic loop. While a cycle is in
+  // flight, any other trigger skips (with a debug log) rather than queuing — the
+  // next scheduled tick will pick up fresh state.
+  private _inFlight = false;
+
   constructor(executor: Executor, opts: SchedulerOptions = {}) {
     this.executor = executor;
     this.intervalMs = opts.intervalMs ?? 60 * 60 * 1_000;
     this.pollMs = opts.pollMs ?? 30_000;
     this.onCycle = opts.onCycle ?? (() => {});
     this.onError = opts.onError ?? ((e) => console.error("[scheduler]", e));
+    this.onDebug = opts.onDebug ?? (() => {});
   }
 
   /** Start both loops. Idempotent — safe to call multiple times. */
@@ -83,6 +94,32 @@ export class Scheduler {
     void this._runPoll();
   }
 
+  /**
+   * Run a cycle iff none is already in flight (O3). Returns true if it ran the
+   * cycle (the caller owns onCycle/onError dispatch), false if it skipped because
+   * a cycle was already running. The in-flight flag is held for the whole
+   * `runCycle()` so the two loops can never invoke the executor concurrently.
+   */
+  private async _runGuarded(
+    label: "periodic" | "poll",
+    handle: (result: CycleResult) => void,
+  ): Promise<boolean> {
+    if (this._inFlight) {
+      this.onDebug(`[scheduler] ${label} tick skipped: a cycle is already in flight`);
+      return false;
+    }
+    this._inFlight = true;
+    try {
+      const result = await this.executor.runCycle();
+      handle(result);
+    } catch (e) {
+      this.onError(e);
+    } finally {
+      this._inFlight = false;
+    }
+    return true;
+  }
+
   // ── Private ──────────────────────────────────────────────────────────────
 
   private _schedulePeriodic(): void {
@@ -100,27 +137,19 @@ export class Scheduler {
   }
 
   private async _runPeriodic(): Promise<void> {
-    try {
-      const result = await this.executor.runCycle();
-      this.onCycle(result);
-    } catch (e) {
-      this.onError(e);
-    }
+    await this._runGuarded("periodic", (result) => this.onCycle(result));
     this._schedulePeriodic();
   }
 
   private async _runPoll(): Promise<void> {
     const wasBreachPending = this._breachPending;
     this._breachPending = false;
-    try {
-      // Only run if a breach was injected or this is a routine poll.
-      const result = await this.executor.runCycle();
+    await this._runGuarded("poll", (result) => {
+      // Notify on a submitted decision, or whenever a breach was explicitly injected.
       if (result.submitted || wasBreachPending) {
         this.onCycle(result);
       }
-    } catch (e) {
-      this.onError(e);
-    }
+    });
     this._schedulePoll();
   }
 }

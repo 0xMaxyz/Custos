@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { AlertNotifier, formatAlert, type DeRiskAlert } from "./alerts.js";
+import { AlertNotifier, formatAlert, formatFailureAlert, type DeRiskAlert, type FailureAlert } from "./alerts.js";
 
 const ALERT: DeRiskAlert = {
   riskLevel: "DERISK",
@@ -133,5 +133,57 @@ describe("AlertNotifier", () => {
     const [, init] = mockFetch.mock.calls[0]! as [string, RequestInit];
     const body = JSON.parse(init.body as string) as Record<string, string>;
     expect(body.content).toContain("de-risk triggered");
+  });
+
+  // ── O1: CRITICAL failure alert (required de-risk did not confirm) ─────────────
+
+  it("notifyFailure() sends a CRITICAL message distinct from the success alert (O1)", async () => {
+    const { notifier, mockFetch } = makeNotifier();
+    const failure: FailureAlert = {
+      stage: "receipt",
+      cause: "timeout waiting for receipt",
+      txHash: "0xfeedface",
+      asOf: "2026-06-01T12:00:00.000Z",
+    };
+    await notifier.notifyFailure(failure);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const body = JSON.parse((mockFetch.mock.calls[0]![1] as RequestInit).body as string) as Record<string, string>;
+    const text = body.text ?? body.content;
+    expect(text).toContain("CRITICAL");
+    expect(text).toContain("FAILED");
+    expect(text).toContain("receipt");
+    expect(text).toContain("0xfeedface");
+    expect(text).not.toContain("de-risk triggered"); // not the success message
+  });
+
+  it("notifyFailure() never throws when delivery fails", async () => {
+    const failFetch = vi.fn().mockResolvedValue({ ok: false, text: async () => "boom" });
+    const notifier = new AlertNotifier(
+      { telegramBotToken: "t", telegramChatId: "c", discordWebhookUrl: "https://discord.com/api/webhooks/x" },
+      failFetch,
+    );
+    await expect(
+      notifier.notifyFailure({ stage: "submit", cause: "revert", asOf: "2026-06-01T12:00:00.000Z" }),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("formatFailureAlert", () => {
+  it("renders a CRITICAL message with stage, cause and tx", () => {
+    const msg = formatFailureAlert({
+      stage: "receipt",
+      cause: "tx never confirmed",
+      txHash: "0xabc",
+      asOf: "2026-06-01T12:00:00.000Z",
+    });
+    expect(msg).toContain("CRITICAL");
+    expect(msg).toContain("Stage: receipt");
+    expect(msg).toContain("Cause: tx never confirmed");
+    expect(msg).toContain("Tx: 0xabc");
+  });
+
+  it("omits the Tx line when no hash is present", () => {
+    const msg = formatFailureAlert({ stage: "submit", cause: "reverted", asOf: "2026-06-01T12:00:00.000Z" });
+    expect(msg).not.toContain("Tx:");
   });
 });

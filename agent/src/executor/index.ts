@@ -10,6 +10,7 @@ import { runSignalLayer } from "../llm/signals.js";
 import { AnthropicClient } from "../llm/anthropic.js";
 import { buildEvidenceFetcher, CURATED_EVIDENCE_SOURCES } from "../llm/evidence.js";
 import { pinRationale, type RationaleBundle, type PaidEvidenceReceipt } from "./ipfs.js";
+import { CycleFailureError } from "./errors.js";
 import type { PaidEvidenceFetcher } from "../payments/evidence.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
@@ -170,7 +171,11 @@ export class Executor {
       return { submitted: false, reason: "No allocation change needed" };
     }
 
-    return this._sendRebalance(snapshot, assessment, effectiveVerdict, evidence, finalWeights, payments);
+    // An LLM `deRisk` verdict routed through rebalance is still a REQUIRED de-risk:
+    // a failure here must page the operator (O1), not log quietly.
+    return this._sendRebalance(
+      snapshot, assessment, effectiveVerdict, evidence, finalWeights, payments, llmDeRisk,
+    );
   }
 
   private async _sendRebalance(
@@ -180,6 +185,7 @@ export class Executor {
     evidence: EvidenceItem[],
     weights: WeightsBps,
     payments: PaidEvidenceReceipt[] = [],
+    deRiskRequired = false,
   ): Promise<CycleResult> {
     const bundle: RationaleBundle = {
       rationale: verdict?.rationale ?? buildDeterministicRationale(assessment),
@@ -195,16 +201,16 @@ export class Executor {
     const weightsArray = toWeightsArray(weights);
     const swapData = await this._buildSwapData(snapshot, weights);
 
-    const hash = await this.wallet.writeContract({
-      address: this.vault,
-      abi: yieldVaultWriteAbi,
-      functionName: "rebalance",
-      args: [weightsArray, swapData, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
-      chain: this.wallet.chain,
-      account: this.wallet.account!,
-    });
-
-    const receipt = await this.public.waitForTransactionReceipt({ hash });
+    const receipt = await this._submitAndAwait(
+      {
+        address: this.vault,
+        abi: yieldVaultWriteAbi,
+        functionName: "rebalance",
+        args: [weightsArray, swapData, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
+      },
+      { kind: "rebalance", deRiskRequired },
+    );
+    const hash = receipt.transactionHash;
     const decisionId = extractDecisionId(receipt);
 
     const decision: Decision = {
@@ -248,16 +254,16 @@ export class Executor {
     };
     const swapData = await this._buildSwapData(snapshot, zeroWeights);
 
-    const hash = await this.wallet.writeContract({
-      address: this.vault,
-      abi: yieldVaultWriteAbi,
-      functionName: "deRisk",
-      args: [0, swapData, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
-      chain: this.wallet.chain,
-      account: this.wallet.account!,
-    });
-
-    const receipt = await this.public.waitForTransactionReceipt({ hash });
+    const receipt = await this._submitAndAwait(
+      {
+        address: this.vault,
+        abi: yieldVaultWriteAbi,
+        functionName: "deRisk",
+        args: [0, swapData, uri, rationaleHash, snapshot.usdyDexSpotUsdc],
+      },
+      { kind: "derisk", deRiskRequired: true },
+    );
+    const hash = receipt.transactionHash;
     const decisionId = extractDecisionId(receipt);
 
     const decision: Decision = {
@@ -268,6 +274,54 @@ export class Executor {
       signals: bundle.signals,
     };
     return { submitted: true, kind: "derisk", decisionId, txHash: hash, reason: "De-risk executed", decision };
+  }
+
+  /**
+   * Submit a vault write and await its receipt under tx-lifecycle bounds (O2):
+   *   - `writeContract` failure → typed `CycleFailureError` at the `submit` stage.
+   *   - receipt wait is bounded by `config.txReceiptTimeoutMs` with a retry; on
+   *     timeout/failure → typed `CycleFailureError` at the `receipt` stage,
+   *     carrying the broadcast tx hash so the operator can investigate.
+   *
+   * The `deRiskRequired` flag rides on the thrown error so the scheduler's failure
+   * path (O1) can fire a CRITICAL alert when a *required* de-risk does not confirm.
+   * Full fee-bump/replacement is out of scope — this is bounded waiting + loud failure.
+   */
+  private async _submitAndAwait(
+    call: {
+      address: `0x${string}`;
+      abi: typeof yieldVaultWriteAbi;
+      functionName: "rebalance" | "deRisk";
+      args: readonly unknown[];
+    },
+    meta: { kind: "derisk" | "rebalance"; deRiskRequired: boolean },
+  ) {
+    let hash: `0x${string}`;
+    try {
+      hash = await this.wallet.writeContract({
+        address: call.address,
+        abi: call.abi,
+        functionName: call.functionName,
+        args: call.args,
+        chain: this.wallet.chain,
+        account: this.wallet.account!,
+      } as Parameters<WalletClient["writeContract"]>[0]);
+    } catch (cause) {
+      // Never broadcast — no tx hash to report.
+      throw new CycleFailureError({ ...meta, stage: "submit", cause });
+    }
+
+    try {
+      return await this.public.waitForTransactionReceipt({
+        hash,
+        timeout: this.config.txReceiptTimeoutMs,
+        retryCount: 3,
+      });
+    } catch (cause) {
+      // Tx was broadcast but the receipt never confirmed within the bound (or
+      // confirmed reverted). Surface the hash so the failure can be traced.
+      throw new CycleFailureError({ ...meta, stage: "receipt", cause, txHash: hash });
+    }
   }
 
   /**

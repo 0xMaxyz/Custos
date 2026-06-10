@@ -90,4 +90,61 @@ describe("Scheduler", () => {
     expect(onError).toHaveBeenCalled();
     scheduler.stop();
   });
+
+  // ── O3: single in-flight guard — loops never run runCycle concurrently ────────
+
+  it("skips a second trigger while a cycle is in flight (O3)", async () => {
+    // A long-running cycle that resolves only when we release it.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let started = 0;
+    const runCycle = vi.fn(async (): Promise<CycleResult> => {
+      started += 1;
+      await gate;
+      return { submitted: false, reason: "done" };
+    });
+    const executor = makeExecutor({ runCycle });
+    const onDebug = vi.fn();
+    // Poll fires fast; periodic also fires — but only one cycle may run at a time.
+    const scheduler = new Scheduler(executor, { intervalMs: 50, pollMs: 50, onDebug });
+    scheduler.start();
+
+    // Let the first tick start the cycle; a concurrent tick fires while it's held.
+    await vi.advanceTimersByTimeAsync(120);
+    expect(started).toBe(1); // second tick was skipped, not run concurrently
+    expect(onDebug).toHaveBeenCalled(); // skip was logged at debug
+
+    // Release the in-flight cycle and let timers settle.
+    release();
+    await vi.advanceTimersByTimeAsync(60);
+    scheduler.stop();
+  });
+
+  it("injectBreachCondition() skips (with debug log) when a cycle is already in flight (O3)", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let started = 0;
+    const runCycle = vi.fn(async (): Promise<CycleResult> => {
+      started += 1;
+      await gate;
+      return { submitted: true, kind: "derisk", reason: "Breach" };
+    });
+    const executor = makeExecutor({ runCycle });
+    const onDebug = vi.fn();
+    const scheduler = new Scheduler(executor, { intervalMs: 60_000, pollMs: 60_000, onDebug });
+    scheduler.start();
+
+    // First breach starts a (held) cycle; the second must be skipped, not queued.
+    scheduler.injectBreachCondition();
+    await vi.advanceTimersByTimeAsync(1);
+    scheduler.injectBreachCondition();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(started).toBe(1);
+    expect(onDebug).toHaveBeenCalled();
+
+    release();
+    await vi.advanceTimersByTimeAsync(1);
+    scheduler.stop();
+  });
 });

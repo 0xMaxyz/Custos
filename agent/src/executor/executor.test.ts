@@ -676,6 +676,114 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
   });
 });
 
+// ── O2: tx-lifecycle failures surface as typed CycleFailureError ───────────────
+
+describe("Executor tx-lifecycle failures (O2 → O1)", () => {
+  function makeSnapshotter(snap: MarketSnapshot) {
+    return { snapshot: vi.fn(async () => snap), invalidate: vi.fn() } as never;
+  }
+
+  async function makeExecutorWith(
+    snap: MarketSnapshot,
+    waitForTransactionReceipt: () => Promise<unknown>,
+    writeContract: () => Promise<`0x${string}`> = async () => "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as `0x${string}`,
+  ) {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const readContract = vi.fn(async (opts: { functionName: string }) => {
+      if (opts.functionName === "lastRebalanceAt") return 0n;
+      return 0n;
+    });
+    const publicClient = { readContract, waitForTransactionReceipt: vi.fn(waitForTransactionReceipt) } as never;
+    const walletClient = {
+      writeContract: vi.fn(writeContract),
+      chain: { id: 5000 },
+      account: { address: "0x1234" as `0x${string}` },
+    } as never;
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      TX_RECEIPT_TIMEOUT_MS: "1000",
+    });
+    return new Executor({ config, clients: { publicClient, walletClient } as never, snapshotter: makeSnapshotter(snap) });
+  }
+
+  it("receipt timeout on a forced de-risk → CycleFailureError(deRiskRequired, stage=receipt, txHash)", async () => {
+    const { CycleFailureError, isCycleFailure } = await import("./errors.js");
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // depeg → deRisk
+    const txHash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as `0x${string}`;
+    const executor = await makeExecutorWith(
+      snap,
+      async () => { throw new Error("Timed out while waiting for transaction"); },
+      async () => txHash,
+    );
+
+    const err = await executor.runCycle().then(
+      () => { throw new Error("expected runCycle to throw"); },
+      (e: unknown) => e,
+    );
+
+    expect(isCycleFailure(err)).toBe(true);
+    const f = err as InstanceType<typeof CycleFailureError>;
+    expect(f.deRiskRequired).toBe(true);
+    expect(f.stage).toBe("receipt");
+    expect(f.kind).toBe("derisk");
+    expect(f.txHash).toBe(txHash); // hash carried for tracing
+  });
+
+  it("writeContract failure on a forced de-risk → CycleFailureError(stage=submit, no txHash)", async () => {
+    const { CycleFailureError, isCycleFailure } = await import("./errors.js");
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
+    const executor = await makeExecutorWith(
+      snap,
+      async () => ({ logs: [] }),
+      async () => { throw new Error("nonce too low"); },
+    );
+
+    const err = await executor.runCycle().then(
+      () => { throw new Error("expected runCycle to throw"); },
+      (e: unknown) => e,
+    );
+
+    expect(isCycleFailure(err)).toBe(true);
+    const f = err as InstanceType<typeof CycleFailureError>;
+    expect(f.stage).toBe("submit");
+    expect(f.deRiskRequired).toBe(true);
+    expect(f.txHash).toBeUndefined();
+  });
+
+  it("passes a bounded timeout + retryCount to waitForTransactionReceipt (O2)", async () => {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n });
+    let receiptArgs: { timeout?: number; retryCount?: number } | undefined;
+    const waitForTransactionReceipt = vi.fn(async (args: { timeout?: number; retryCount?: number }) => {
+      receiptArgs = args;
+      return { logs: [], transactionHash: "0xabc" };
+    });
+    const readContract = vi.fn(async () => 0n);
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+      TX_RECEIPT_TIMEOUT_MS: "1000",
+    });
+    const executor = new Executor({
+      config,
+      clients: {
+        publicClient: { readContract, waitForTransactionReceipt } as never,
+        walletClient: { writeContract: vi.fn(async () => "0xabc"), chain: { id: 5000 }, account: { address: "0x1234" } } as never,
+      } as never,
+      snapshotter: makeSnapshotter(snap),
+    });
+
+    await executor.runCycle();
+    expect(receiptArgs?.timeout).toBe(1000);
+    expect(receiptArgs?.retryCount).toBe(3);
+  });
+});
+
 // ── extractDecisionId — malformed-topic robustness (L3) ────────────────────────
 
 describe("extractDecisionId", () => {

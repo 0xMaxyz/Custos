@@ -31,10 +31,14 @@ describe("loadConfig", () => {
     expect(cfg.allocatorPrivateKey).toBeUndefined();
   });
 
-  it("coerces numeric and bigint env values", () => {
-    const cfg = loadConfig({ ...minimalEnv, AGENT_PORT: "9090", FORK_BLOCK_NUMBER: "12345678" });
+  it("coerces numeric env values", () => {
+    const cfg = loadConfig({ ...minimalEnv, AGENT_PORT: "9090" });
     expect(cfg.agentPort).toBe(9090);
-    expect(cfg.forkBlockNumber).toBe(12345678n);
+  });
+
+  it("defaults TX_RECEIPT_TIMEOUT_MS to 120000 and coerces overrides", () => {
+    expect(loadConfig(minimalEnv).txReceiptTimeoutMs).toBe(120_000);
+    expect(loadConfig({ ...minimalEnv, TX_RECEIPT_TIMEOUT_MS: "60000" }).txReceiptTimeoutMs).toBe(60_000);
   });
 
   it("accepts a well-formed allocator private key", () => {

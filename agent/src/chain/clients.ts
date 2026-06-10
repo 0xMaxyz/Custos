@@ -64,3 +64,21 @@ export function makeClients(config: AgentConfig): ChainClients {
     allocatorAddress: account.address,
   };
 }
+
+/**
+ * Startup safety check (O6): verify the configured RPC actually serves Mantle
+ * mainnet (chainId 5000) before any scheduler / execution path can sign a tx.
+ *
+ * The chain object is hardcoded to 5000, but nothing forces the RPC URL to match —
+ * a stale `.env` pointing at a fork, testnet, or unrelated node would otherwise let
+ * the agent sign real-money txs against the wrong network silently. Fail fast.
+ */
+export async function assertChainId(publicClient: PublicClient): Promise<void> {
+  const id = await publicClient.getChainId();
+  if (id !== MANTLE_MAINNET_CHAIN_ID) {
+    throw new Error(
+      `RPC chain-id mismatch: expected Mantle mainnet (${MANTLE_MAINNET_CHAIN_ID}), got ${id}. ` +
+        `Check MANTLE_RPC_URL points at the right network.`,
+    );
+  }
+}

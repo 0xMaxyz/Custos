@@ -24,6 +24,13 @@ interface IUsdyAdapter is IStrategyAdapter {
     ///         disabled (USDY-only adapter).
     function MUSD() external view returns (address);
 
+    /// @notice Raw held RWA token balances, oracle-independent (M4). Lets the vault
+    ///         compute a DEX-spot-derived de-risk floor when the oracle is down (so the
+    ///         NAV-based valuation reads 0 yet the position is real).
+    /// @return usdyBal Held USDY (18-dec).
+    /// @return musdBal Held mUSD (18-dec); 0 when the mUSD leg is disabled.
+    function heldRwaBalances() external view returns (uint256 usdyBal, uint256 musdBal);
+
     /// @notice Convert `usdyAmount` of held USDY into mUSD. Value-neutral; enforces an
     ///         oracle-derived balance-delta minOut (stricter of `minMusdOut`/floor).
     /// @return musdOut mUSD (18-dec) received by the adapter.

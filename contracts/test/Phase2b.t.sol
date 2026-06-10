@@ -65,7 +65,7 @@ contract Phase2bTest is Test {
         cfg.minRebalanceInterval = 0; // disable frequency cap for tests
         cfg.tvlCap = 10_000_000e6; // $10M
         cfg.perTxDepositCap = 1_000_000e6; // $1M
-        cfg.addStrategyTimelock = 0;
+        cfg.addStrategyTimelock = 1 hours; // M5: must be >= Guardrails.MIN_TIMELOCK
         cfg.pegWarnBps = 30;
         cfg.pegBlockBps = 50;
         cfg.pegDeRiskBps = 100;
@@ -94,9 +94,12 @@ contract Phase2bTest is Test {
         vault.grantRole(Roles.ALLOCATOR, allocator);
         vault.grantRole(Roles.GUARDIAN, guardian);
         vault.addStrategy(2, address(usdyAdapter)); // USDY bucket
-        vault.activateStrategy(2);
         vault.setBenchmark(address(bm));
         vm.stopPrank();
+
+        vm.warp(block.timestamp + 1 hours + 1); // elapse the add-strategy timelock
+        vm.prank(admin);
+        vault.activateStrategy(2);
 
         vm.prank(admin);
         bm.grantRole(Roles.ALLOCATOR, allocator);

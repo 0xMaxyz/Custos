@@ -54,10 +54,25 @@ export async function pinRationale(
 }
 
 /**
+ * Resolve the pin endpoint for the configured backend. Pinata's pinning API is
+ * not Kubo-RPC compatible (different path + CID field), so route Pinata hosts to
+ * `/pinning/pinFileToIPFS` and everything else to the Kubo `/api/v0/add` API.
+ */
+function pinEndpoint(apiUrl: string): string {
+  const base = apiUrl.replace(/\/+$/, "");
+  if (/(^|\.)pinata\.cloud$/i.test(new URL(apiUrl).hostname)) {
+    return `${base}/pinning/pinFileToIPFS`;
+  }
+  return `${base}/api/v0/add?pin=true`;
+}
+
+/**
  * Pin an arbitrary JSON object to IPFS, returning the resolvable URI and the
  * keccak256 of its canonical (2-space) serialization. Shared by the rationale
- * bundle and the ERC-8004 agent card. Falls back to a `data:` URI when no IPFS
- * backend is configured so the caller always has a non-empty URI + stable hash.
+ * bundle and the ERC-8004 agent card. When `IPFS_PINNING_JWT` is set it's sent
+ * as a `Bearer` token (required by Pinata; ignored by an open Kubo node).
+ * Falls back to a `data:` URI when no IPFS backend is configured so the caller
+ * always has a non-empty URI + stable hash.
  */
 export async function pinJson(
   value: unknown,
@@ -74,9 +89,16 @@ export async function pinJson(
     return { uri: `data:application/json;base64,${encoded}`, rationaleHash };
   }
 
-  // POST to IPFS HTTP API (Kubo-compatible: /api/v0/add).
+  // Multipart body. Both Kubo `/api/v0/add` and Pinata `pinFileToIPFS` take a `file` field.
   const form = new FormData();
   form.append("file", new Blob([json], { type: "application/json" }), filename);
+
+  // Authenticated pinning services (Pinata) require a bearer JWT; an open Kubo node
+  // ignores it. Don't set Content-Type — fetch derives the multipart boundary.
+  const headers: Record<string, string> = {};
+  if (config.ipfsPinningJwt) {
+    headers.Authorization = `Bearer ${config.ipfsPinningJwt}`;
+  }
 
   // Bound the pin so a slow/hung pinning provider can't block the decision cycle (L2).
   // The pin is fail-open in the executor, so an abort surfaces as a thrown error there.
@@ -84,9 +106,10 @@ export async function pinJson(
   const timer = setTimeout(() => controller.abort(), PIN_TIMEOUT_MS);
   let res: Awaited<ReturnType<typeof fetchImpl>>;
   try {
-    res = await fetchImpl(`${config.ipfsApiUrl}/api/v0/add?pin=true`, {
+    res = await fetchImpl(pinEndpoint(config.ipfsApiUrl), {
       method: "POST",
       body: form,
+      headers,
       signal: controller.signal,
     });
   } finally {
@@ -95,8 +118,10 @@ export async function pinJson(
 
   if (!res.ok) throw new Error(`IPFS pin failed: HTTP ${res.status}`);
 
-  const data = (await res.json()) as { Hash?: string };
-  if (!data.Hash) throw new Error("IPFS response missing Hash field");
+  // Kubo returns `Hash`; Pinata returns `IpfsHash`.
+  const data = (await res.json()) as { Hash?: string; IpfsHash?: string };
+  const cid = data.Hash ?? data.IpfsHash;
+  if (!cid) throw new Error("IPFS response missing CID (Hash/IpfsHash) field");
 
-  return { uri: `ipfs://${data.Hash}`, rationaleHash };
+  return { uri: `ipfs://${cid}`, rationaleHash };
 }

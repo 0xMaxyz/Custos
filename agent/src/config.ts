@@ -39,6 +39,10 @@ const configSchema = z.object({
 
   // ── Signer (optional until execution path; guardrail-bounded hot key) ──
   allocatorPrivateKey: privateKey.optional(),
+  // ALLOCATOR address without the key — lets keyless runs (read-only mode,
+  // `card:pin`) still enforce the never-pay-the-allocator guard and supply the
+  // agent card's `wallet` field (identity/payee.ts, scripts/pinAgentCard.ts).
+  allocatorAddress: hexString.optional(),
 
   // ── IPFS pinning (optional until execution path) ──
   ipfsApiUrl: z.string().url().optional(),
@@ -49,6 +53,10 @@ const configSchema = z.object({
   vaultAddress: hexString.optional(),
   guardrailsAddress: hexString.optional(),
   benchmarkAddress: hexString.optional(),
+  // ERC-8004 agent token id (printed by RegisterIdentity.s.sol). Token ids are
+  // uint256, so parse as bigint (ids start at 1). Used to reconcile/derive the
+  // x402 sell-side payee from the on-chain agent-NFT owner (identity/payee.ts).
+  agentId: z.coerce.bigint().positive().optional(),
 
   // ── Alerts (optional; A3.2) ──
   telegramBotToken: z.string().min(1).optional(),
@@ -136,12 +144,14 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),
+    allocatorAddress: pick("ALLOCATOR_ADDRESS"),
     ipfsApiUrl: pick("IPFS_API_URL"),
     ipfsPinningJwt: pick("IPFS_PINNING_JWT"),
     ipfsGatewayUrl: pick("IPFS_GATEWAY_URL"),
     vaultAddress: pick("VAULT_ADDRESS"),
     guardrailsAddress: pick("GUARDRAILS_ADDRESS"),
     benchmarkAddress: pick("BENCHMARK_ADDRESS"),
+    agentId: pick("AGENT_ID"),
     telegramBotToken: pick("TELEGRAM_BOT_TOKEN"),
     telegramChatId: pick("TELEGRAM_CHAT_ID"),
     discordWebhookUrl: pick("DISCORD_WEBHOOK_URL"),

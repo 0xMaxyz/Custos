@@ -13,6 +13,7 @@ import { reconcileJournal } from "./executor/txjournal.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
 import { onChainSettlingVerifier, replayGuardedVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
+import { makeIdentityOwnerReader, resolveX402PayTo } from "./identity/payee.js";
 import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
 import type { Decision } from "./types.js";
 
@@ -82,8 +83,25 @@ const alertNotifier = new AlertNotifier({
   discordWebhookUrl: config.discordWebhookUrl,
 });
 
-// x402 paid risk-score endpoint (A4.1). Enabled when payTo + asset are configured.
-// The verifier recovers the EIP-712 signature (real authorization check). With
+// x402 sell-side payee, bound to the agent's ERC-8004 identity (spec §2.7):
+// X402_PAY_TO when set (warning if it differs from ownerOf(AGENT_ID)), else derived
+// from the on-chain agent-NFT owner. Refuses to start if the payee would be the
+// ALLOCATOR hot key. X402_ASSET is the opt-in — without it nothing is sold and no
+// RPC read happens here.
+const x402Payee = await resolveX402PayTo({
+  config,
+  readOwner:
+    config.agentId !== undefined && config.x402Asset
+      ? makeIdentityOwnerReader(pipeline?.clients.publicClient ?? makeClients(config).publicClient)
+      : undefined,
+  warn: (msg) => process.stderr.write(`x402 payee: ${msg}\n`),
+}).catch((err: unknown) => {
+  process.stderr.write(`Invalid x402 payee: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.exit(1);
+});
+
+// x402 paid risk-score endpoint (A4.1). Enabled when a payee resolves + an asset is
+// configured. The verifier recovers the EIP-712 signature (real authorization check). With
 // X402_SETTLE_ONCHAIN=true and an ALLOCATOR wallet, it also SETTLES on-chain via
 // transferWithAuthorization; otherwise settlement is delegated to a facilitator.
 const x402Verify =
@@ -97,7 +115,7 @@ const x402Verify =
       // off-chain (N3); the on-chain path above is single-use via the EIP-3009 nonce.
       replayGuardedVerifier(signatureVerifyingVerifier());
 const x402 =
-  config.x402PayTo && config.x402Asset
+  x402Payee.payTo && config.x402Asset
     ? {
         requirements: (resourceUrl: string): PaymentRequirements => ({
           scheme: "exact",
@@ -107,7 +125,7 @@ const x402 =
           resource: resourceUrl,
           description: "Custos RWA risk score",
           mimeType: "application/json",
-          payTo: config.x402PayTo as `0x${string}`,
+          payTo: x402Payee.payTo as `0x${string}`,
           maxTimeoutSeconds: config.x402TimeoutSeconds,
           asset: config.x402Asset as `0x${string}`,
           extra: { name: config.x402TokenName, version: config.x402TokenVersion },
@@ -151,6 +169,17 @@ const buildGovernanceWatcher = (): GovernanceWatcher | undefined => {
 
 const allowedOrigins = config.corsAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean);
 const app = buildServer({ explainClient, getContext, x402, allowedOrigins });
+
+if (x402) {
+  app.log.info(
+    { payTo: x402Payee.payTo, source: x402Payee.source },
+    "x402 paid /risk-score enabled (payee bound to ERC-8004 identity)",
+  );
+} else if (config.x402Asset) {
+  app.log.warn(
+    "X402_ASSET is set but no payee resolved — set X402_PAY_TO or AGENT_ID to enable /risk-score",
+  );
+}
 
 // Wire the autonomous loop when execution prerequisites are configured.
 // Graceful read-only mode: if ALLOCATOR_PRIVATE_KEY or VAULT_ADDRESS are absent,

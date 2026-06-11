@@ -2,6 +2,7 @@
  * Agent-card builder + pin tests (task 4.2). No network — IPFS pin is mocked.
  */
 import { describe, it, expect, vi } from "vitest";
+import { getAddress } from "viem";
 
 import { buildAgentCard, pinAgentCard, agentCardSchema } from "./agentCard.js";
 import { loadConfig } from "../config.js";
@@ -85,6 +86,46 @@ describe("buildAgentCard", () => {
 
   it("rejects a malformed api endpoint", () => {
     expect(() => buildAgentCard(configWith(), { ...baseOpts, apiUrl: "not-a-url" })).toThrow();
+  });
+
+  describe("sells (x402 offer)", () => {
+    const PAY_TO = "0x4444444444444444444444444444444444444444";
+    const ASSET = `0x${"a0".repeat(20)}`;
+    const x402Env = { X402_PAY_TO: PAY_TO.toLowerCase(), X402_ASSET: ASSET };
+
+    it("publishes the x402 offer when payTo + asset are configured", () => {
+      const card = buildAgentCard(configWith(x402Env), baseOpts);
+      expect(() => agentCardSchema.parse(card)).not.toThrow();
+      expect(card.sells).toEqual({
+        endpoint: "/risk-score",
+        payTo: getAddress(PAY_TO), // EIP-55 checksummed
+        asset: getAddress(ASSET),
+        priceBaseUnits: "10000", // config default, bigint → decimal string
+      });
+    });
+
+    it("prefers the resolved payee (opts.x402PayTo) over raw config", () => {
+      const owner = "0x5555555555555555555555555555555555555555";
+      const card = buildAgentCard(configWith(x402Env), { ...baseOpts, x402PayTo: owner });
+      expect(card.sells?.payTo).toBe(owner);
+    });
+
+    it("carries a configured price as base units", () => {
+      const card = buildAgentCard(configWith({ ...x402Env, X402_PRICE_BASE_UNITS: "250000" }), baseOpts);
+      expect(card.sells?.priceBaseUnits).toBe("250000");
+    });
+
+    it("omits sells when x402 is not configured (schemaVersion stays 1)", () => {
+      const card = buildAgentCard(configWith(), baseOpts);
+      expect(card.sells).toBeUndefined();
+      expect(card.schemaVersion).toBe(1);
+      expect(() => agentCardSchema.parse(card)).not.toThrow();
+    });
+
+    it("omits sells when only the asset is set (no payee resolved)", () => {
+      const card = buildAgentCard(configWith({ X402_ASSET: ASSET }), baseOpts);
+      expect(card.sells).toBeUndefined();
+    });
   });
 });
 

@@ -109,9 +109,18 @@ describe("resolveX402PayTo", () => {
     ).rejects.toThrow(/ALLOCATOR hot key/);
   });
 
-  it("skips the ALLOCATOR guard when no signer is configured (keyless card pinning)", async () => {
-    // Without the private key we cannot know the allocator address; the running
-    // agent (which always has the key in execution mode) still enforces the guard.
+  it("rejects the ALLOCATOR via plain ALLOCATOR_ADDRESS too (keyless card pinning)", async () => {
+    const config = configWith({
+      X402_PAY_TO: ALLOCATOR.toLowerCase(),
+      X402_ASSET: ASSET,
+      ALLOCATOR_ADDRESS: ALLOCATOR.toLowerCase(),
+    });
+    await expect(resolveX402PayTo({ config })).rejects.toThrow(/ALLOCATOR hot key/);
+  });
+
+  it("skips the ALLOCATOR guard only when neither key nor address is configured", async () => {
+    // Without either we cannot know the allocator address; the running agent
+    // (which always has the key in execution mode) still enforces the guard.
     const config = configWith({ X402_PAY_TO: ALLOCATOR, X402_ASSET: ASSET });
     const out = await resolveX402PayTo({ config });
     expect(out.payTo).toBe(ALLOCATOR);

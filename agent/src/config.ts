@@ -39,6 +39,10 @@ const configSchema = z.object({
 
   // ── Signer (optional until execution path; guardrail-bounded hot key) ──
   allocatorPrivateKey: privateKey.optional(),
+  // ALLOCATOR address without the key — lets keyless runs (read-only mode,
+  // `card:pin`) still enforce the never-pay-the-allocator guard and supply the
+  // agent card's `wallet` field (identity/payee.ts, scripts/pinAgentCard.ts).
+  allocatorAddress: hexString.optional(),
 
   // ── IPFS pinning (optional until execution path) ──
   ipfsApiUrl: z.string().url().optional(),
@@ -140,6 +144,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),
+    allocatorAddress: pick("ALLOCATOR_ADDRESS"),
     ipfsApiUrl: pick("IPFS_API_URL"),
     ipfsPinningJwt: pick("IPFS_PINNING_JWT"),
     ipfsGatewayUrl: pick("IPFS_GATEWAY_URL"),

@@ -80,12 +80,17 @@ export async function resolveX402PayTo(opts: ResolvePayeeOptions): Promise<Resol
   // X402_ASSET is the opt-in: no asset → endpoint disabled, nothing to resolve.
   if (!config.x402Asset) return { source: "none" };
 
-  // The guard is a no-op without a signer (read-only runs / keyless card pinning).
-  const allocator = config.allocatorPrivateKey
-    ? privateKeyToAccount(config.allocatorPrivateKey as `0x${string}`).address
-    : undefined;
+  // Enforce the guard from whichever allocator identity is available: the signer
+  // key (running agent) and/or the plain ALLOCATOR_ADDRESS env, so keyless runs
+  // (`card:pin`) can't publish a card paying the hot key either. No-op only when
+  // neither is configured.
+  const allocators = new Set<string>();
+  if (config.allocatorPrivateKey) {
+    allocators.add(privateKeyToAccount(config.allocatorPrivateKey as `0x${string}`).address);
+  }
+  if (config.allocatorAddress) allocators.add(getAddress(config.allocatorAddress));
   const rejectAllocator = (payTo: `0x${string}`): void => {
-    if (allocator && payTo === allocator) {
+    if (allocators.has(payTo)) {
       throw new Error(
         `x402 payee ${payTo} is the ALLOCATOR hot key — revenue must never accrue ` +
           `on the guardrail-bounded gas key. Point X402_PAY_TO at the agent owner ` +

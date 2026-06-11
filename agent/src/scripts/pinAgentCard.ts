@@ -63,9 +63,8 @@ async function main(): Promise<void> {
 
   // Card `wallet` = the ALLOCATOR (the key that signs decisions). Allow a plain
   // address so the card can be pinned from a machine that never holds the key.
-  const walletEnv = process.env.ALLOCATOR_ADDRESS;
-  const wallet = walletEnv
-    ? getAddress(walletEnv)
+  const wallet = config.allocatorAddress
+    ? getAddress(config.allocatorAddress)
     : config.allocatorPrivateKey
       ? privateKeyToAccount(config.allocatorPrivateKey as `0x${string}`).address
       : fail("Set ALLOCATOR_ADDRESS (or ALLOCATOR_PRIVATE_KEY) — the card's `wallet`");

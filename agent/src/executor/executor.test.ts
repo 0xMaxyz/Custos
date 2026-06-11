@@ -253,6 +253,39 @@ describe("pinRationale", () => {
     expect(result.uri).toBe("ipfs://QmTestCid123");
     expect(result.rationaleHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
+
+  it("uses the Pinata endpoint, bearer JWT, and IpfsHash field", async () => {
+    const { pinRationale } = await import("./ipfs.js");
+    const { loadConfig } = await import("../config.js");
+
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      IPFS_API_URL: "https://api.pinata.cloud",
+      IPFS_PINNING_JWT: "test-jwt-token",
+    });
+
+    const mockFetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ IpfsHash: "QmPinataCid" }),
+    })) as unknown as typeof fetch;
+
+    const bundle = {
+      rationale: "Pinata pin",
+      signals: [],
+      evidence: [],
+      candidateWeightsBps: weights(200, 4_800, 5_000, 0),
+      riskLevel: "NORMAL",
+      asOf: new Date(NOW * 1000).toISOString(),
+    };
+
+    const result = await pinRationale(bundle, config, mockFetch);
+    expect(result.uri).toBe("ipfs://QmPinataCid");
+
+    const calls = (mockFetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls;
+    const [url, init] = calls[0]!;
+    expect(url).toBe("https://api.pinata.cloud/pinning/pinFileToIPFS");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer test-jwt-token");
+  });
 });
 
 // ── Mocked Executor.runCycle() ────────────────────────────────────────────────

@@ -83,6 +83,14 @@ describe("loadConfig", () => {
   it("leaves X402_MAX_PRICE_BASE_UNITS optional when no premium feed is set", () => {
     expect(loadConfig(minimalEnv).x402MaxPriceBaseUnits).toBeUndefined();
   });
+
+  it("parses AGENT_ID as a positive bigint (uint256 token id)", () => {
+    expect(loadConfig(minimalEnv).agentId).toBeUndefined();
+    expect(loadConfig({ ...minimalEnv, AGENT_ID: "42" }).agentId).toBe(42n);
+    // Registry ids start at 1; 0 would only ever make ownerOf revert confusingly.
+    expect(() => loadConfig({ ...minimalEnv, AGENT_ID: "0" })).toThrow();
+    expect(() => loadConfig({ ...minimalEnv, AGENT_ID: "not-a-number" })).toThrow();
+  });
 });
 
 describe("tryLoadConfig", () => {

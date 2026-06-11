@@ -174,11 +174,14 @@ config can be aborted with `cancelConfig()` if a value is wrong.
 ## 4. ERC-8004 identity
 
 Register the agent in the canonical Identity Registry (the deployer or any key can own
-the agent NFT — decide deliberately; the allocator is a reasonable owner):
+the agent NFT — decide deliberately; prefer the admin Safe / a treasury key, NOT the
+allocator: with `X402_PAY_TO` unset the x402 payee is derived from `ownerOf(AGENT_ID)`,
+and a payee equal to the ALLOCATOR hot key is hard-rejected at agent startup):
 
 ```bash
-# Pin the agent card JSON first (see agent/src/identity/agentCard.ts → /agent-card output),
-# set AGENT_CARD_URI to the pinned ipfs:// URI, then:
+# Build + pin the agent card (publishes the x402 `sells` offer when configured):
+cd agent && pnpm card:pin            # needs AGENT_API_URL (+ wallet via ALLOCATOR_ADDRESS or key)
+# set AGENT_CARD_URI to the printed ipfs:// URI, then:
 cd contracts
 forge script script/RegisterIdentity.s.sol --rpc-url $MANTLE_RPC_URL \
   --private-key $DEPLOYER_PRIVATE_KEY --broadcast -vvv
@@ -209,7 +212,8 @@ node agent/dist/index.js   # or: docker compose up agent
 Add to `.env`: `ALLOCATOR_PRIVATE_KEY`, `VAULT_ADDRESS`, alert channels
 (`TELEGRAM_*` / `DISCORD_WEBHOOK_URL` — do not skip these on mainnet), optionally
 `TX_RECEIPT_TIMEOUT_MS` (default 120000 ms) and the x402 block
-(`X402_PAY_TO`, `X402_ASSET`, … see `.env.example`). Restart. You should see
+(`X402_ASSET` is the opt-in; `X402_PAY_TO` = owner/treasury or blank to derive from
+`ownerOf(AGENT_ID)`, never the allocator — see `.env.example`). Restart. You should see
 `autonomous scheduler started (periodic=60m, poll=30s)` in the logs.
 
 Operational behavior to know:

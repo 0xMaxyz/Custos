@@ -13,7 +13,7 @@ import { reconcileJournal } from "./executor/txjournal.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
 import { onChainSettlingVerifier, replayGuardedVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
-import { makeIdentityOwnerReader, resolveX402PayTo } from "./identity/payee.js";
+import { makeIdentityOwnerReader, resolveX402PayTo, PayeeConfigError, type ResolvedPayee } from "./identity/payee.js";
 import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
 import type { Decision } from "./types.js";
 
@@ -85,9 +85,12 @@ const alertNotifier = new AlertNotifier({
 
 // x402 sell-side payee, bound to the agent's ERC-8004 identity (spec §2.7):
 // X402_PAY_TO when set (warning if it differs from ownerOf(AGENT_ID)), else derived
-// from the on-chain agent-NFT owner. Refuses to start if the payee would be the
-// ALLOCATOR hot key. X402_ASSET is the opt-in — without it nothing is sold and no
-// RPC read happens here.
+// from the on-chain agent-NFT owner. X402_ASSET is the opt-in — without it nothing
+// is sold and no RPC read happens here. Two failure modes, handled differently:
+//  - a misconfigured payee (== ALLOCATOR hot key) is an operator error → fail fast;
+//  - a transient owner-read failure (derive mode) must NOT kill the agent — selling
+//    is an addon, autonomous de-risking is the mission — so disable /risk-score for
+//    this run and warn loudly (a restart retries once the RPC recovers).
 const x402Payee = await resolveX402PayTo({
   config,
   readOwner:
@@ -95,9 +98,16 @@ const x402Payee = await resolveX402PayTo({
       ? makeIdentityOwnerReader(pipeline?.clients.publicClient ?? makeClients(config).publicClient)
       : undefined,
   warn: (msg) => process.stderr.write(`x402 payee: ${msg}\n`),
-}).catch((err: unknown) => {
-  process.stderr.write(`Invalid x402 payee: ${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(1);
+}).catch((err: unknown): ResolvedPayee => {
+  if (err instanceof PayeeConfigError) {
+    process.stderr.write(`Invalid x402 payee: ${err.message}\n`);
+    process.exit(1);
+  }
+  process.stderr.write(
+    `x402 payee unresolved (${err instanceof Error ? err.message : String(err)}); ` +
+      `/risk-score selling disabled this run — restart once the owner read recovers.\n`,
+  );
+  return { source: "none" };
 });
 
 // x402 paid risk-score endpoint (A4.1). Enabled when a payee resolves + an asset is
@@ -177,7 +187,8 @@ if (x402) {
   );
 } else if (config.x402Asset) {
   app.log.warn(
-    "X402_ASSET is set but no payee resolved — set X402_PAY_TO or AGENT_ID to enable /risk-score",
+    "X402_ASSET is set but /risk-score is not selling — no payee resolved " +
+      "(set X402_PAY_TO or AGENT_ID; if owner derivation failed, see the payee warning above)",
   );
 }
 

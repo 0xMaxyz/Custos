@@ -27,8 +27,8 @@ import { getAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 import { loadConfig } from "../config.js";
-import { makeClients } from "../chain/clients.js";
-import { makeIdentityOwnerReader, resolveX402PayTo } from "../identity/payee.js";
+import { assertChainId, makeClients } from "../chain/clients.js";
+import { makeIdentityOwnerReader, resolveX402PayTo, type OwnerReader } from "../identity/payee.js";
 import { pinAgentCard } from "../identity/agentCard.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -71,12 +71,19 @@ async function main(): Promise<void> {
 
   // Resolve the x402 payee exactly as the running agent will (incl. the ALLOCATOR
   // guard), so the pinned `sells.payTo` and the live 402 challenge can't diverge.
+  // The reconcile/derive read MUST hit Mantle mainnet — the only chain the agent
+  // serves — or it would query the wrong IdentityRegistry; assert chain-id first so
+  // a stale/testnet RPC fails loudly instead of pinning a card with a bogus owner.
+  // No identity read (no AGENT_ID, or selling off) → no RPC, no assert.
+  let readOwner: OwnerReader | undefined;
+  if (config.agentId !== undefined && config.x402Asset) {
+    const publicClient = makeClients(config).publicClient;
+    await assertChainId(publicClient);
+    readOwner = makeIdentityOwnerReader(publicClient);
+  }
   const payee = await resolveX402PayTo({
     config,
-    readOwner:
-      config.agentId !== undefined && config.x402Asset
-        ? makeIdentityOwnerReader(makeClients(config).publicClient)
-        : undefined,
+    readOwner,
     warn: (msg) => process.stderr.write(`! x402 payee: ${msg}\n`),
   });
 

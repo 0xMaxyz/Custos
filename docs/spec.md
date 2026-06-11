@@ -422,8 +422,15 @@ revenue to a separate treasury), else derived directly from the on-chain agent-N
 The resolved payee feeds BOTH the live 402 challenge and the pinned agent card's `sells`
 block (§2.5), so payers can verify them against each other. The payee must **never** be
 the ALLOCATOR hot key (a guardrail-bounded, minimal-balance gas key) — the agent (and
-`card:pin`) hard-reject that at startup. The inbound verifier already enforces
-`authorization.to == payTo`, so binding the challenge binds the settled funds.
+`card:pin`) hard-reject that at startup (a typed `PayeeConfigError`). The inbound verifier
+already enforces `authorization.to == payTo`, so binding the challenge binds the settled
+funds. Two operational caveats: (1) failure handling differs by cause — a payee equal to
+the ALLOCATOR fails the process fast (operator error), whereas a transient `ownerOf` read
+failure when deriving only disables `/risk-score` for that run (selling is an addon; the
+de-risk mission must still boot). (2) An owner-derived payee tracks NFT ownership: a
+transfer of the agent NFT silently moves the runtime payee on the next restart, while the
+pinned card's `sells.payTo` stays stale until re-pinned — re-run `card:pin` + `setAgentURI`
+after any transfer.
 
 ---
 

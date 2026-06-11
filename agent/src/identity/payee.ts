@@ -25,6 +25,18 @@ import type { AgentConfig } from "../config.js";
  * (same pattern as the payment verifiers / Eip3009Signer).
  */
 
+/**
+ * Misconfiguration that must fail the process fast (e.g. the payee resolves to the
+ * ALLOCATOR hot key). Distinct from a transient owner-read failure so callers can
+ * exit on operator error but degrade gracefully (disable selling) on a flaky RPC.
+ */
+export class PayeeConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PayeeConfigError";
+  }
+}
+
 /** Minimal ERC-721 `ownerOf` ABI for the ERC-8004 IdentityRegistry. */
 const ownerOfAbi = [
   {
@@ -91,7 +103,7 @@ export async function resolveX402PayTo(opts: ResolvePayeeOptions): Promise<Resol
   if (config.allocatorAddress) allocators.add(getAddress(config.allocatorAddress));
   const rejectAllocator = (payTo: `0x${string}`): void => {
     if (allocators.has(payTo)) {
-      throw new Error(
+      throw new PayeeConfigError(
         `x402 payee ${payTo} is the ALLOCATOR hot key — revenue must never accrue ` +
           `on the guardrail-bounded gas key. Point X402_PAY_TO at the agent owner ` +
           `or treasury (or unset it with AGENT_ID set to derive from ownerOf).`,

@@ -48,7 +48,10 @@ export const agentCardSchema = z.object({
    * identity so a payer can verify the live 402 challenge's `payTo` against the
    * pinned card. Additive + optional, so schemaVersion stays 1. NOTE: the card is
    * immutable once pinned — changing the payee requires re-running `card:pin` and
-   * `setAgentURI`, or the published card lies.
+   * `setAgentURI`, or the published card lies. This applies to an owner-DERIVED
+   * payee too (X402_PAY_TO unset): transferring the agent NFT moves the runtime
+   * payee on the next restart while this pinned `payTo` stays stale until re-pinned,
+   * so re-pin + setAgentURI after any agent-NFT transfer.
    */
   sells: z
     .object({

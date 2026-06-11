@@ -349,7 +349,7 @@ is absent. Custos publishes each decision outcome (e.g. passive-baseline delta) 
 `giveFeedback` with `tag1 = decision kind`, `tag2 = metric`, `value/valueDecimals` the
 signed score, and `feedbackURI/feedbackHash` binding the IPFS evidence.
 
-- **Agent card** (`agentURI` → IPFS JSON): `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault, benchmark }` (Custos-specific shape; canonical explorer interop via `services[]`/`registrations[]` is mapped at deploy time).
+- **Agent card** (`agentURI` → IPFS JSON): `{ schemaVersion, name, description, endpoints, wallet, supportedTrust, vault, benchmark, sells? }` (Custos-specific shape; canonical explorer interop via `services[]`/`registrations[]` is mapped at deploy time). The optional `sells: { endpoint, payTo, asset, priceBaseUnits }` block publishes the x402 sell-side offer (§2.7) so a payer can verify the live 402 challenge's `payTo` against the agent's pinned identity. Built + pinned via `pnpm card:pin` (agent), which prints the `AGENT_CARD_URI` consumed by `RegisterIdentity.s.sol`; the card is immutable once pinned, so a payee/price change requires re-pinning + `setAgentURI`.
 
 ### 2.6 ERC-8183 verifiable de-risk jobs
 
@@ -413,6 +413,17 @@ verify-only mode nothing consumes the EIP-3009 nonce on-chain, so `replayGuarded
 tracks spent `(from, nonce)` pairs in memory until `validBefore` and rejects replays (N3);
 the on-chain path needs no guard since the consumed nonce makes settlement single-use. The
 dev-only `shapeOnlyVerifier` is retained for tests, never wired into the running agent.
+
+**Sell-side payee binding** (`identity/payee.ts`): the address collecting `/risk-score`
+revenue is bound to the agent's ERC-8004 identity, not a free-form env var. `X402_ASSET`
+is the explicit opt-in for selling; the payee then resolves as `X402_PAY_TO` when set
+(reconciled against `ownerOf(AGENT_ID)` with a warning on mismatch — owners may route
+revenue to a separate treasury), else derived directly from the on-chain agent-NFT owner.
+The resolved payee feeds BOTH the live 402 challenge and the pinned agent card's `sells`
+block (§2.5), so payers can verify them against each other. The payee must **never** be
+the ALLOCATOR hot key (a guardrail-bounded, minimal-balance gas key) — the agent (and
+`card:pin`) hard-reject that at startup. The inbound verifier already enforces
+`authorization.to == payTo`, so binding the challenge binds the settled funds.
 
 ---
 

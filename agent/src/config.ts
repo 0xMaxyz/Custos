@@ -49,6 +49,10 @@ const configSchema = z.object({
   vaultAddress: hexString.optional(),
   guardrailsAddress: hexString.optional(),
   benchmarkAddress: hexString.optional(),
+  // ERC-8004 agent token id (printed by RegisterIdentity.s.sol). Token ids are
+  // uint256, so parse as bigint (ids start at 1). Used to reconcile/derive the
+  // x402 sell-side payee from the on-chain agent-NFT owner (identity/payee.ts).
+  agentId: z.coerce.bigint().positive().optional(),
 
   // ── Alerts (optional; A3.2) ──
   telegramBotToken: z.string().min(1).optional(),
@@ -142,6 +146,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     vaultAddress: pick("VAULT_ADDRESS"),
     guardrailsAddress: pick("GUARDRAILS_ADDRESS"),
     benchmarkAddress: pick("BENCHMARK_ADDRESS"),
+    agentId: pick("AGENT_ID"),
     telegramBotToken: pick("TELEGRAM_BOT_TOKEN"),
     telegramChatId: pick("TELEGRAM_CHAT_ID"),
     discordWebhookUrl: pick("DISCORD_WEBHOOK_URL"),

@@ -43,6 +43,25 @@ export const agentCardSchema = z.object({
   vault: addressSchema,
   /** AgentBenchmark ledger — the verifiable decision/outcome track record. */
   benchmark: addressSchema,
+  /**
+   * x402 sell-side offer (spec §2.7): publishes the payee under the agent's
+   * identity so a payer can verify the live 402 challenge's `payTo` against the
+   * pinned card. Additive + optional, so schemaVersion stays 1. NOTE: the card is
+   * immutable once pinned — changing the payee requires re-running `card:pin` and
+   * `setAgentURI`, or the published card lies.
+   */
+  sells: z
+    .object({
+      /** Path of the paid endpoint, relative to `endpoints.api`. */
+      endpoint: z.string().min(1),
+      /** Payment recipient — the agent owner/treasury, NEVER the ALLOCATOR. */
+      payTo: addressSchema,
+      /** EIP-3009 token payments settle in. */
+      asset: addressSchema,
+      /** Price in token base units, as a decimal string (bigint, JSON-safe). */
+      priceBaseUnits: z.string().regex(/^\d+$/, "must be a base-10 integer string"),
+    })
+    .optional(),
 });
 
 export type AgentCard = z.infer<typeof agentCardSchema>;
@@ -56,6 +75,12 @@ export interface BuildAgentCardOptions {
   readonly dashboardUrl?: string;
   readonly name?: string;
   readonly description?: string;
+  /**
+   * Resolved x402 payee (identity/payee.ts) — overrides `config.x402PayTo` so the
+   * pinned card carries the SAME payee the live 402 challenge will use (e.g. one
+   * derived from `ownerOf(agentId)`).
+   */
+  readonly x402PayTo?: string;
 }
 
 const DEFAULT_NAME = "Custos";
@@ -89,6 +114,19 @@ export function buildAgentCard(config: AgentConfig, opts: BuildAgentCardOptions)
     vault: getAddress(config.vaultAddress),
     benchmark: getAddress(config.benchmarkAddress),
   };
+
+  // Publish the x402 offer under the same gate that enables the paid endpoint
+  // (a payee + an asset), so the card never advertises an endpoint that won't
+  // answer. The resolved payee (opts) wins over raw config.
+  const sellsPayTo = opts.x402PayTo ?? config.x402PayTo;
+  if (sellsPayTo && config.x402Asset) {
+    card.sells = {
+      endpoint: "/risk-score",
+      payTo: getAddress(sellsPayTo),
+      asset: getAddress(config.x402Asset),
+      priceBaseUnits: config.x402PriceBaseUnits.toString(),
+    };
+  }
 
   // Validate before returning — fail loudly on a malformed card.
   return agentCardSchema.parse(card);

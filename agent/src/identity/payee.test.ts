@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import { getAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-import { resolveX402PayTo, type OwnerReader } from "./payee.js";
+import { resolveX402PayTo, PayeeConfigError, type OwnerReader } from "./payee.js";
 import { loadConfig } from "../config.js";
 
 const ASSET = `0x${"a0".repeat(20)}`;
@@ -116,6 +116,25 @@ describe("resolveX402PayTo", () => {
       ALLOCATOR_ADDRESS: ALLOCATOR.toLowerCase(),
     });
     await expect(resolveX402PayTo({ config })).rejects.toThrow(/ALLOCATOR hot key/);
+  });
+
+  it("tags the ALLOCATOR guard as a PayeeConfigError (fatal misconfig, not transient)", async () => {
+    // index.ts exits on PayeeConfigError but degrades (disables selling) on any other
+    // throw, so the class — not just the message — is part of the resolver's contract.
+    const config = configWith({
+      X402_PAY_TO: ALLOCATOR.toLowerCase(),
+      X402_ASSET: ASSET,
+      ALLOCATOR_PRIVATE_KEY: ALLOCATOR_KEY,
+    });
+    await expect(resolveX402PayTo({ config })).rejects.toBeInstanceOf(PayeeConfigError);
+  });
+
+  it("a failed owner derivation rejects with a transient error, NOT a PayeeConfigError", async () => {
+    const readOwner: OwnerReader = vi.fn(async () => {
+      throw new Error("rpc down");
+    });
+    const config = configWith({ X402_ASSET: ASSET, AGENT_ID: "7" });
+    await expect(resolveX402PayTo({ config, readOwner })).rejects.not.toBeInstanceOf(PayeeConfigError);
   });
 
   it("skips the ALLOCATOR guard only when neither key nor address is configured", async () => {

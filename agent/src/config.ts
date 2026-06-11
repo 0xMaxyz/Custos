@@ -54,8 +54,11 @@ const configSchema = z.object({
   guardrailsAddress: hexString.optional(),
   benchmarkAddress: hexString.optional(),
   // ERC-8004 agent token id (printed by RegisterIdentity.s.sol). Token ids are
-  // uint256, so parse as bigint (ids start at 1). Used to reconcile/derive the
-  // x402 sell-side payee from the on-chain agent-NFT owner (identity/payee.ts).
+  // uint256, so parse as bigint. Used to reconcile/derive the x402 sell-side payee
+  // from the on-chain agent-NFT owner (identity/payee.ts).
+  // ASSUMPTION: the canonical IdentityRegistry mints ids from 1 (0 = "no agent", and
+  // ownerOf(0) reverts), so `.positive()` rejects a 0 that could only be a misconfig.
+  // If a registry is ever observed to issue id 0, relax this to `.nonnegative()`.
   agentId: z.coerce.bigint().positive().optional(),
 
   // ── Alerts (optional; A3.2) ──

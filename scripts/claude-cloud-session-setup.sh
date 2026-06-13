@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Custos — per-repo SessionStart hook (requires cloned repository)
-#
-# Wired from .claude/settings.json. Runs after Claude Code launches on every
-# session start/resume. Skips docker compose locally; runs full stack in cloud.
-#
-# Cloud environment tools (Foundry, solc, Playwright) are installed separately —
-# copy scripts/claude-cloud-environment-setup.sh into your cloud environment UI.
 
 set -euo pipefail
 

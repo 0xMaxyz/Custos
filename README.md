@@ -162,7 +162,7 @@ _(AaveV3Adapter skipped on testnet — no Aave v3 pool on Mantle Sepolia.)_
 ```bash
 pnpm install                 # JS/TS workspaces
 cp .env.example .env         # fill in RPC, LLM, 1delta, signer keys
-forge build --root contracts # Solidity (installs solc 0.8.28 on first run)
+forge build --root contracts # Solidity (installs solc 0.8.35 on first run)
 ```
 
 All configuration is documented in [`.env.example`](./.env.example), grouped by concern:
@@ -221,10 +221,10 @@ If `forge build` cannot reach `binaries.soliditylang.org`, install solc from Git
 releases (one-time per container):
 
 ```bash
-mkdir -p ~/.svm/0.8.28
-curl -sSL -o ~/.svm/0.8.28/solc-0.8.28 \
-  https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux
-chmod +x ~/.svm/0.8.28/solc-0.8.28
+mkdir -p ~/.svm/0.8.35
+curl -sSL -o ~/.svm/0.8.35/solc-0.8.35 \
+  https://github.com/ethereum/solidity/releases/download/v0.8.35/solc-static-linux
+chmod +x ~/.svm/0.8.35/solc-0.8.35
 forge build --root contracts --offline
 ```
 

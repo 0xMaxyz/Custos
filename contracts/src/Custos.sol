@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /// @title Custos scaffold marker
 /// @notice Placeholder so the Foundry project compiles before Phase 1 lands the

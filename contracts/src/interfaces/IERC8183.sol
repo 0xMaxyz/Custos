@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title IERC8183 — Agentic Commerce (verifiable escrowed jobs)

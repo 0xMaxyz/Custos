@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title AusdAdapter.t.sol — Unit tests for task A1.1 (offline, no fork)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title ForkPhase4a.t.sol — Fork tests for task 4.1 (canonical ERC-8004 path)

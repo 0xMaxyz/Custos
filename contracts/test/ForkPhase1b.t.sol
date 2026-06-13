@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title ForkPhase1b.t.sol — Fork tests for task 1.5 (AaveV3Adapter on Mantle)

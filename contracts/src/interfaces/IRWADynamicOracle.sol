@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Custos — AI risk-guardian real-yield account on Mantle.
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /// @notice Ondo USDY on-chain price oracle — returns NAV per token scaled to 18 dec.
 interface IRWADynamicOracle {

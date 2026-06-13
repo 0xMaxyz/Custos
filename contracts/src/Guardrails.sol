@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Custos — AI risk-guardian real-yield account on Mantle.
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 import { Roles } from "./Roles.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";

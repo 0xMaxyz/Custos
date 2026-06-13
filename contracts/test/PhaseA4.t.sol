@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title PhaseA4.t.sol — ERC-8183 verifiable de-risk jobs (task A4.2, offline)

@@ -1,3 +1,5 @@
+<p align="center"><img src="web/public/custos.svg" alt="Custos" width="120" /></p>
+
 # Custos
 
 **AI risk-guardian real-yield account on Mantle.** Deposit USDC; an AI agent earns

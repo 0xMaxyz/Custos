@@ -22,7 +22,7 @@ export type NetKey = "mainnet" | "testnet";
 function Brand({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
     <a className="brand" href="#dashboard" onClick={onClick}>
-      <span className="brand-mark"><Icon name="shield-check" size={18} /></span>
+      <img src="/custos.svg" alt="" width={26} height={26} style={{ display: "block" }} />
       Custos
     </a>
   );

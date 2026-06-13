@@ -2,16 +2,34 @@
 
 # Custos
 
-**AI risk-guardian real-yield account on Mantle.** Deposit USDC; an AI agent earns
-tokenized-Treasury (USDY) yield with an Aave v3 USDC liquidity floor, and
-**autonomously de-risks on-chain** to USDC (AUSD as a guardian-managed escape hatch)
-when RWA danger appears — recording every decision **and its evidence** on-chain under
-a verifiable ERC-8004 identity.
+**Custos is an AI risk-guardian vault on Mantle.** You deposit USDC; an autonomous AI
+agent puts it to work earning tokenized-US-Treasury yield (Ondo **USDY**) over an Aave v3
+USDC liquidity floor — and the moment RWA danger appears (a depeg, a stale oracle, an
+issuer or regulatory shock) it **de-risks on-chain by itself**, rotating back to USDC
+before losses land. Every move is bounded by **immutable on-chain guardrails**, and every
+decision is recorded **with its evidence** under a verifiable **ERC-8004** identity — so
+anyone can audit *what* the agent did and *why*, and prove on-chain that it beats simply
+holding USDY through the dip.
 
-> **One-line pitch:** Custos earns tokenized-Treasury yield and **autonomously de-risks
-> on-chain before RWA danger hits** — recording every decision and its evidence under a
-> verifiable ERC-8004 identity, and proving on-chain that it beats a passive USDY holder.
-> The verifiable autonomous defense — not the swap-to-USDY — is the product.
+---
+
+## What is Custos, in simple terms
+
+Think of it as a **savings account that defends itself.**
+
+- You put in USDC (a dollar stablecoin).
+- Custos earns yield from **short-term US Treasuries** (via Ondo's tokenized USDY) on top
+  of on-chain lending (Aave) — aiming to beat just parking cash.
+- A **24/7 AI agent** watches for trouble. If the Treasury token slips off its peg, its
+  price oracle goes stale, or bad news breaks, the agent **automatically pulls the money
+  back to safe USDC** — no human in the loop, no waiting for a multisig.
+- It **can't go rogue.** Hard-coded on-chain rules cap how much risk it may take, and the
+  agent can only ever *reduce* risk, never increase it.
+- Everything is **on the public ledger, with receipts** — the reasoning plus the evidence
+  behind each move — so you can verify it actually protected you.
+
+The product isn't the yield (lots of things earn yield); the product is the **verifiable,
+autonomous defense.**
 
 ---
 
@@ -35,17 +53,17 @@ a verifiable ERC-8004 identity.
 ```
         deposit / withdraw (viem)          rebalance / deRisk  (ALLOCATOR, guardrail-gated)
  ┌───────────────┐   reads (wagmi)   ┌──────────────────────────────────────────────┐
- │   Web app     │◀─────────────────▶│                 Mantle (5000 / 5003)          │
+ │   Web app     │◀─────────────────▶│                 Mantle (5000)                 │
  │ React · Vite  │                   │  YieldVault  (ERC-4626, asset = USDC)         │
  │ RainbowKit    │                   │   ├─ AaveV3Adapter   → Aave v3 (USDC floor)   │
- └──────┬────────┘                   │   ├─ UsdyAdapter     → 1delta executor (USDC↔ │
+ └──────┬────────┘                   │   ├─ UsdyAdapter     → 1delta Composer (USDC↔ │
         │ /snapshot /ask              │   │                     USDY) + Ondo mUSD     │
         │ /risk-score (x402)          │   │                     wrap/unwrap converter │
  ┌──────┴────────┐                    │   └─ AusdAdapter     → 1delta (USDC↔AUSD)     │
  │  Agent (TS)   │  rebalance/deRisk   │  Guardrails        (immutable limits)         │
  │ Fastify       │───────────────────▶│  AgentBenchmark    (decisions + passive Δ)    │
  │  risk engine  │                    │  ERC-8004 identity + reputation (canonical)   │
- │  LLM (Claude) │◀── data (1delta    │  ERC-8183 job escrow + guardrail Evaluator    │
+ │  LLM (SDK)    │◀── data (1delta    │  ERC-8183 job escrow + guardrail Evaluator    │
  │  validator    │     + Mantle RPC)  └──────────────────────────────────────────────┘
  │  executor     │   evidence → IPFS (decisionURI) · premium feeds via x402 (EIP-3009)
  └───────────────┘
@@ -53,12 +71,82 @@ a verifiable ERC-8004 identity.
 
 The LLM **proposes**, a **deterministic validator** checks against guardrails before
 signing, and **immutable on-chain `Guardrails`** are the final backstop. The model is
-never the last line of defense. **1delta is data + swap routing/quoting only — never in
-the custody/execution path.**
+never the last line of defense. **1delta provides data + swap routing/quoting; the
+calldata it returns executes only against the pinned 1delta Composer, under an
+oracle-derived balance-delta `minOut`.**
+
+---
+
+## The AI agent
+
+A standalone Node/TypeScript service — the vault's **ALLOCATOR** — is the brain. Each
+cycle it:
+
+1. **Reads ground truth on-chain** — USDY NAV from Ondo's `RWADynamicOracle`, the
+   USDY/mUSD DEX spot (peg deviation), Aave reserve data, AUSD reserves, and the vault's
+   own state.
+2. **Runs a deterministic risk engine** — peg, oracle-freshness, liquidity and slippage
+   checks that need no AI at all.
+3. **Calls an LLM only where an algorithm can't help** — turning unstructured inputs
+   (reserve attestations, proof-of-reserves reports, regulatory/issuer headlines, and
+   x402-paid premium feeds) into a **bounded, structured risk verdict + plain-language
+   rationale**, catching threats a pure threshold would miss.
+4. **Proposes an allocation** that a deterministic validator re-checks against the
+   guardrails *before signing* — immutable on-chain `Guardrails` are the final backstop.
+5. **Executes within custody** — `rebalance` / `deRisk` on the vault — recording a
+   `DecisionRecorded` event (rationale hash + IPFS evidence bundle) and an `AgentBenchmark`
+   outcome vs a passive 100%-USDY holder.
+
+**The AI can only tighten risk** — lower USDY weight, raise the risk level — never loosen a
+guardrail or add exposure. On any LLM/API failure it falls back to the deterministic
+allocation, so it degrades safely instead of stalling.
+
+**Provider-agnostic LLM.** The agent talks to the model through the **Anthropic SDK**
+(`@anthropic-ai/sdk`), so it runs against Anthropic's Claude **or any Anthropic-compatible
+endpoint** via `ANTHROPIC_BASE_URL` — this deployment uses **[z.ai](https://z.ai)** (GLM).
+To switch providers, change the base URL, key, and model name; nothing else changes.
 
 ---
 
 ## Contracts
+
+### Contract architecture
+
+How the on-chain pieces interact — who can call what, and what each adapter talks to:
+
+```
+   CALLERS                                                        EXTERNAL PROTOCOLS
+   ───────                                                        ──────────────────
+   Depositor ──── deposit / withdraw (USDC) ─────┐
+   ALLOCATOR ──── rebalance / deRisk / convert ──┤   (agent hot key, guardrail-gated)
+   GUARDIAN  ──── pause / kill / emergencyExit ──┤
+   ADMIN     ──── setConfig / addStrategy ───────┤   (timelocked)
+                                                 ▼
+                  ┌─────────────────────────────────────────────────┐
+                  │           YieldVault  (ERC-4626, asset = USDC)   │
+                  │                                                  │
+                  │   every move is CHECKED by  ─►  Guardrails       │  immutable limits +
+                  │                                 (+ Roles)        │  depeg/oracle guard + timelock
+                  │   every move is RECORDED in ─►  AgentBenchmark   │  decision + outcome ledger
+                  └───────┬──────────────┬──────────────┬───────────┘
+                          │ supply/        │ swap calldata│ swap calldata
+                          │ withdraw       │ (minOut)     │ (minOut)
+                          ▼                ▼              ▼
+                    AaveV3Adapter     UsdyAdapter    AusdAdapter
+                          │                │              │
+                          ▼                ▼              ▼
+                     Aave v3 pool    1delta Composer  1delta Composer
+                                     Ondo RWADynamicOracle (NAV)
+                                     Ondo mUSD converter (wrap/unwrap)
+
+   Each adapter derives its own oracle-based balance-delta minOut — the Composer's
+   reported output is never trusted, and swap output must land on the adapter or revert.
+
+   Off the custody path (verifiable identity + economics):
+     • ERC-8004 Identity + Reputation (canonical Mantle singletons) — agent identity & reputation
+     • CustosJobEscrow + CustosDeRiskEvaluator (ERC-8183) — each de-risk as a guardrail-evaluated job
+     • x402 (EIP-3009) — the agent sells GET /risk-score and pays for premium evidence feeds
+```
 
 ### Core contracts
 
@@ -68,14 +156,14 @@ the custody/execution path.**
 | **`Guardrails`** | Immutable allocation limits: max weight per bucket, min liquidity buffer, max slippage, depeg/oracle-staleness guard, add-strategy timelock, pause/kill switch. Every post-bootstrap change is timelocked. The model is never the last line of defense — `Guardrails` is. |
 | **`AgentBenchmark`** | On-chain decision ledger. Records each decision, its rationaleHash + decisionURI, and later the realized outcome bps delta vs a passive 100%-USDY holder. |
 | **`AaveV3Adapter`** | Supplies and withdraws USDC on Aave v3 Mantle — the DeFi yield leg and instant-liquidity floor. Calls the Aave pool directly with on-chain `minOut`. |
-| **`UsdyAdapter`** | USDC↔USDY swaps via the pinned 1delta swap executor, oracle-derived balance-delta `minOut`. Also converts USDY↔mUSD via the Ondo Token Converter (`wrap`/`unwrap` on the mUSD contract). |
-| **`AusdAdapter`** | USDC↔AUSD swaps via the same pinned 1delta swap executor, oracle-derived `minOut`. The reserve-backed safety bucket. |
+| **`UsdyAdapter`** | USDC↔USDY swaps via the pinned 1delta Composer, oracle-derived balance-delta `minOut`. Also converts USDY↔mUSD via the Ondo Token Converter (`wrap`/`unwrap` on the mUSD contract). |
+| **`AusdAdapter`** | USDC↔AUSD swaps via the same pinned 1delta Composer, oracle-derived `minOut`. The reserve-backed safety bucket. |
 | **`CustosJobEscrow`** | ERC-8183 job escrow: each de-risk is modelled as a verifiable escrowed job. Outside the vault custody path — escrows per-job bounties, never vault deposits. |
 | **`CustosDeRiskEvaluator`** | ERC-8183 evaluator. Its success criterion IS the deterministic guardrail check, feeding ERC-8004 reputation. |
 | **`CustosIdentityRegistry`** | ERC-8004 fallback identity registry for environments where canonical singletons are unavailable. Production uses the canonical Mantle singletons. |
 | **`CustosReputationRegistry`** | ERC-8004 fallback reputation registry. Same fallback rationale. |
 | **`Guardrails` / `Roles`** | Role constants: `ADMIN`, `ALLOCATOR`, `GUARDIAN`. |
-| **`AggregatorSwapLib`** | Library: enforces the balance-delta `minOut` pattern for 1delta swap calldata. |
+| **`AggregatorSwapLib`** | Library: enforces the balance-delta `minOut` pattern for 1delta Composer swap calldata. |
 
 ### Allocation buckets
 
@@ -132,24 +220,10 @@ Authoritative record: [`deployments/5000.json`](./deployments/5000.json) and
 | Ondo mUSD (Token Converter) | `0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3` | [mantlescan](https://mantlescan.xyz/address/0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3) |
 | Agora AUSD | `0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a` | [mantlescan](https://mantlescan.xyz/address/0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a) |
 | Ondo `RWADynamicOracle` | `0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f` | [mantlescan](https://mantlescan.xyz/address/0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f) |
-| 1delta swap executor (pinned) | `0x5C019a146758287C614FE654CaEC1ba1CaF05F4E` | [mantlescan](https://mantlescan.xyz/address/0x5C019a146758287C614FE654CaEC1ba1CaF05F4E) |
+| 1delta Composer (pinned) | `0x5C019a146758287C614FE654CaEC1ba1CaF05F4E` | [mantlescan](https://mantlescan.xyz/address/0x5C019a146758287C614FE654CaEC1ba1CaF05F4E) |
 | Aave v3 `PoolAddressesProvider` | `0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f` | [mantlescan](https://mantlescan.xyz/address/0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f) |
 | ERC-8004 Identity registry | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | [mantlescan](https://mantlescan.xyz/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432) |
 | ERC-8004 Reputation registry | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | [mantlescan](https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63) |
-
-### Mantle Sepolia testnet (chain ID 5003)
-
-| Contract | Address |
-|---|---|
-| `Guardrails` | `0xc3D287D35DCb6945d93c246dbE610C9AF5106E9c` |
-| `YieldVault` | `0xC2009De9C72EfAfAeeD8Ceac2960A9B6eFEeAc85` |
-| `AgentBenchmark` | `0xCd3EcF4d092eE73Ac4882c61b5f114588B6B122a` |
-| `UsdyAdapter` | `0xd420Bdf2a7eab8F86DE12f06728342b7243101C9` |
-| USDC (mock) | `0x6969D583f2b2e68c2f6f1A2E883aeC4dA96A3297` |
-| USDY (mock) | `0x921689faCB514812F671194Db21014109354B5f6` |
-
-_(AaveV3Adapter and AusdAdapter are skipped on testnet — no Aave v3 pool or thin AUSD
-liquidity on Mantle Sepolia.)_
 
 ---
 
@@ -173,7 +247,8 @@ Minimum `.env` for read-only / dev mode:
 
 ```bash
 MANTLE_RPC_URL=https://rpc.mantle.xyz   # required for on-chain reads
-ANTHROPIC_API_KEY=                       # required for LLM rationale (agent hero path)
+ANTHROPIC_API_KEY=                       # LLM key (Anthropic, or any compatible provider)
+ANTHROPIC_BASE_URL=                      # optional — point the Anthropic SDK at e.g. z.ai
 # Leave ALLOCATOR_PRIVATE_KEY and VAULT_ADDRESS blank for read-only mode
 ```
 
@@ -296,35 +371,6 @@ docker compose config   # validate the Docker deploy stack
   regulatory/issuer headlines — including **x402-paid premium feeds** whose settlement
   receipts are pinned into the decision evidence bundle.
 
-### The role of AI (and where we deliberately don't use it)
-
-The LLM (Anthropic **Claude**) owns exactly the task an algorithm can't: turning
-**unstructured documents + headlines** into a **bounded, structured risk verdict +
-plain-language rationale**. This is the hero path — catching a threat a pure threshold
-would miss.
-
-- **The AI may only tighten risk** — lower USDY weight, raise the risk level. It can
-  never loosen a guardrail or raise exposure.
-- **These stay deterministic:** yield optimization, peg/oracle deviation, liquidity
-  buffers, slippage, and execution.
-- **The pipeline:** LLM proposes → deterministic validator checks → immutable on-chain
-  `Guardrails` backstop. On any API failure the agent falls back to the deterministic
-  allocation.
-- **Verifiable:** every decision + evidence is recorded on-chain (`DecisionRecorded`
-  event + IPFS `decisionURI`); the agent holds an ERC-8004 identity and accrues
-  reputation; each de-risk is an ERC-8183 escrowed job whose Evaluator IS the
-  deterministic guardrail check.
-
-### Why Mantle
-
-- **Mantle-only** (mainnet 5000 / testnet 5003) — no other execution chains.
-- Built on Mantle-native RWA + DeFi: Ondo USDY/mUSD + `RWADynamicOracle`, Agora AUSD
-  + Chaos Labs PoR, Aave v3 on Mantle, and the pinned 1delta swap executor.
-- USDY/AUSD liquidity on Mantle is thin and fragmented (~$1.5k across pools), so the
-  adapters enforce an **oracle-derived balance-delta `minOut`** on every swap — the
-  aggregator's output is never trusted.
-- The agent registers against the **canonical ERC-8004 singletons live on Mantle**.
-
 ---
 
 ## Repo layout
@@ -344,5 +390,6 @@ See each package's `README.md` for per-component setup and source structure, and
 ## Stack
 
 Solidity + Foundry · React + Vite + Tailwind + daisyUI · RainbowKit + wagmi + viem
-(frontend) · Node/TS + Fastify + viem (backend) · Anthropic API (Claude,
-`@anthropic-ai/sdk`) · 1delta API + Mantle RPC.
+(frontend) · Node/TS + Fastify + viem (backend) · Anthropic SDK
+(`@anthropic-ai/sdk`; Claude or any compatible endpoint, e.g. z.ai/GLM) · 1delta API +
+Mantle RPC.

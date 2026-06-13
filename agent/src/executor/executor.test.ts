@@ -522,7 +522,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     );
     const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
       .mockResolvedValue({
-        // Pinned Odos router so the quote is accepted and getSwapQuote is reached.
+        // Pinned 1delta executor so the quote is accepted and getSwapQuote is reached.
         router: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E" as `0x${string}`,
         calldata: "0xdeadbeef" as `0x${string}`,
         amountOut: 9_000n * 10n ** 6n,
@@ -639,8 +639,8 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     expect(swapData[2]).toBe("0x");
   });
 
-  it("rebalance: swapData[2] stays 0x when quote.router != pinned Odos address (wrong-router rejection)", async () => {
-    // Quote returns a DIFFERENT router than the pinned Odos address.
+  it("rebalance: swapData[2] stays 0x when quote.router != pinned 1delta address (wrong-router rejection)", async () => {
+    // Quote returns a DIFFERENT router than the pinned 1delta executor.
     // The executor must reject it and leave swapData[2] = "0x" (fail-closed at quote time).
     const snap = baseSnapshot();
 
@@ -659,7 +659,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     const buildEvidenceFetcherSpy = vi.spyOn(evidenceMod, "buildEvidenceFetcher").mockReturnValue(
       async () => [],
     );
-    // Quote returns a WRONG router address (not the pinned Odos one).
+    // Quote returns a WRONG router address (not the pinned 1delta one).
     const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
       .mockResolvedValue({
         router: "0x1111111111111111111111111111111111111111" as `0x${string}`,

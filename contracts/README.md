@@ -29,14 +29,14 @@ src/
   Guardrails.sol              Immutable on-chain allocation limits + depeg guard
   AgentBenchmark.sol          Decision + passive-USDY baseline ledger
   AaveV3Adapter.sol           Aave v3 USDC supply/withdraw
-  UsdyAdapter.sol             USDC↔USDY/mUSD via pinned Odos aggregator
-  AusdAdapter.sol             USDC↔AUSD via pinned Odos aggregator
+  UsdyAdapter.sol             USDC↔USDY/mUSD via pinned 1delta swap executor
+  AusdAdapter.sol             USDC↔AUSD via pinned 1delta swap executor
   CustosJobEscrow.sol         ERC-8183 job escrow (outside custody path)
   CustosDeRiskEvaluator.sol   Guardrail-gated evaluator for ERC-8183 jobs
   CustosIdentityRegistry.sol  ERC-8004 fallback identity registry
   CustosReputationRegistry.sol ERC-8004 fallback reputation registry
   Roles.sol                   ADMIN / ALLOCATOR / GUARDIAN role constants
-  AggregatorSwapLib.sol       Balance-delta minOut helper for Odos swap calldata
+  AggregatorSwapLib.sol       Balance-delta minOut helper for 1delta swap calldata
   interfaces/                 Canonical ABIs (ERC-8004, ERC-8183, IMusd, IStrategyAdapter…)
 
 script/

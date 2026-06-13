@@ -38,10 +38,10 @@ evidence** on-chain under an ERC-8004 identity.
  │   Web app     │◀─────────────────▶│                 Mantle (5000 / 5003)          │
  │ React · Vite  │                   │  YieldVault  (ERC-4626, asset = USDC)         │
  │ RainbowKit    │                   │   ├─ AaveV3Adapter   → Aave v3 (USDC floor)   │
- └──────┬────────┘                   │   ├─ UsdyAdapter     → Odos aggregator (USDC↔ │
+ └──────┬────────┘                   │   ├─ UsdyAdapter     → 1delta executor (USDC↔ │
         │ /snapshot /ask              │   │                     USDY) + Ondo mUSD     │
         │ /risk-score (x402)          │   │                     wrap/unwrap converter │
- ┌──────┴────────┐                    │   └─ AusdAdapter     → Odos (USDC↔AUSD)       │
+ ┌──────┴────────┐                    │   └─ AusdAdapter     → 1delta (USDC↔AUSD)     │
  │  Agent (TS)   │  rebalance/deRisk   │  Guardrails        (immutable limits)         │
  │ Fastify       │───────────────────▶│  AgentBenchmark    (decisions + passive Δ)    │
  │  risk engine  │                    │  ERC-8004 identity + reputation (canonical)   │
@@ -98,7 +98,7 @@ the custody/execution path.**
 - **Mantle-only** (mainnet **5000** / testnet **5003**) — no other execution chains.
 - Built on Mantle-native RWA + DeFi: Ondo **USDY/mUSD** + `RWADynamicOracle` (+ on-chain
   converter), Agora **AUSD** (+ Chaos Labs PoR), **Aave v3** on Mantle, and the pinned
-  **Odos** aggregator. USDY/AUSD liquidity on Mantle is thin and fragmented (~$1.5k
+  **1delta** swap executor. USDY/AUSD liquidity on Mantle is thin and fragmented (~$1.5k
   across pools), so the adapter splits orders across venues and enforces an
   **oracle-derived balance-delta `minOut`** (the router's output is never trusted) — the
   reason an aggregator is used inside the custody boundary at all.
@@ -142,7 +142,7 @@ _(AaveV3Adapter skipped on testnet — no Aave v3 pool on Mantle Sepolia.)_
 | Ondo mUSD (wrap/unwrap converter) | `0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3` |
 | Agora AUSD | `0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a` |
 | Ondo `RWADynamicOracle` | `0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f` |
-| Odos aggregator router | `0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745` |
+| 1delta swap executor | `0x5C019a146758287C614FE654CaEC1ba1CaF05F4E` |
 | Aave v3 `PoolAddressesProvider` | `0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f` |
 | ERC-8004 Identity (canonical) | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
 | ERC-8004 Reputation (canonical) | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` |

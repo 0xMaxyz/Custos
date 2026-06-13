@@ -8,14 +8,14 @@ pragma solidity 0.8.35;
  *   forge test --fork-url $MANTLE_RPC_URL --match-contract ForkPhaseA1Test -vv
  *
  * Verifies the pieces that depend on **live on-chain state but not on a live swap**:
- *   - AUSD + USDC + pinned Odos router exist on-chain (extcodesize) with the
- *     expected token decimals.
+ *   - AUSD + USDC + the pinned 1delta swap executor exist on-chain (extcodesize)
+ *     with the expected token decimals.
  *   - AusdAdapter constructs against the pinned aggregator + live tokens, registers
  *     in bucket 3, and values an empty position at 0.
  *
  * NOTE — why there is no live USDC→AUSD swap here:
- *   AUSD execution routes through the same single pinned DEX **aggregator** (Odos on
- *   Mantle) as USDY: the adapter runs aggregator calldata and enforces a balance-delta
+ *   AUSD execution routes through the same single pinned router (the 1delta swap
+ *   executor on Mantle) as USDY: the adapter runs aggregator calldata and enforces a balance-delta
  *   minOut. Reproducing that on a fork requires the aggregator's signed route calldata
  *   for the exact fork block, which can't be fetched deterministically in Foundry. The
  *   swap execution path (deposit/withdraw/emergency, minOut enforcement, pinned-recipient
@@ -42,10 +42,9 @@ contract ForkPhaseA1Test is Test {
     // AUSD: Agora USD — verified via Fork.t.sol Phase 0.3 gate.
     address internal constant AUSD = 0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a;
 
-    // Odos V2 router on Mantle — the single pinned aggregator the adapter executes
-    // against (shared with UsdyAdapter). MUST be re-verified on-chain (Phase 0.3
-    // gate) before any deployment; only used for construction here (no live swap).
-    address internal constant ODOS_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
+    // 1delta swap executor on Mantle — the single pinned router the adapter executes
+    // against (shared with UsdyAdapter). Only used for construction here (no live swap).
+    address internal constant ONEDELTA_EXECUTOR = 0x5C019a146758287C614FE654CaEC1ba1CaF05F4E;
 
     // ── Actors ────────────────────────────────────────────────────────────────
 
@@ -66,7 +65,7 @@ contract ForkPhaseA1Test is Test {
         vault = new YieldVault(USDC, admin, address(gr));
 
         adapter = new AusdAdapter(
-            ODOS_ROUTER,
+            ONEDELTA_EXECUTOR,
             USDC,
             AUSD,
             address(vault),
@@ -89,8 +88,8 @@ contract ForkPhaseA1Test is Test {
     function testForkAusdAndRouterHaveCode() public view {
         assertGt(_codeSize(USDC), 0, "USDC has no code");
         assertGt(_codeSize(AUSD), 0, "AUSD has no code");
-        assertGt(_codeSize(ODOS_ROUTER), 0, "Odos router has no code");
-        console2.log("[A1.1] USDC/AUSD/Odos all present on-chain");
+        assertGt(_codeSize(ONEDELTA_EXECUTOR), 0, "1delta executor has no code");
+        console2.log("[A1.1] USDC/AUSD/1delta executor all present on-chain");
     }
 
     function testForkAusdDecimals() public view {
@@ -105,7 +104,11 @@ contract ForkPhaseA1Test is Test {
     function testForkAdapterWiring() public view {
         assertEq(adapter.underlying(), USDC, "underlying should be USDC");
         assertEq(adapter.AUSD(), AUSD, "AUSD address mismatch");
-        assertEq(adapter.AGGREGATOR(), ODOS_ROUTER, "aggregator should be pinned Odos");
+        assertEq(
+            adapter.AGGREGATOR(),
+            ONEDELTA_EXECUTOR,
+            "aggregator should be the pinned 1delta executor"
+        );
         assertEq(address(vault.adapters(3)), address(adapter), "adapter not registered in bucket 3");
     }
 

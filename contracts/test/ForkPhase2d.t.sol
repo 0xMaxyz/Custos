@@ -34,7 +34,7 @@ contract ForkPhase2dTest is Test {
     address internal constant USDY = 0x5bE26527e817998A7206475496fDE1E68957c5A6;
     address internal constant MUSD = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
     address internal constant USDY_ORACLE = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
-    address internal constant ODOS_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
+    address internal constant ONEDELTA_EXECUTOR = 0x5C019a146758287C614FE654CaEC1ba1CaF05F4E;
 
     address internal admin = makeAddr("admin");
     address internal allocator = makeAddr("allocator");
@@ -51,7 +51,8 @@ contract ForkPhase2dTest is Test {
 
         gr = new Guardrails(admin);
         vault = new YieldVault(USDC, admin, address(gr));
-        adapter = new UsdyAdapter(ODOS_ROUTER, USDC, USDY, MUSD, USDY_ORACLE, address(vault), 50);
+        adapter =
+            new UsdyAdapter(ONEDELTA_EXECUTOR, USDC, USDY, MUSD, USDY_ORACLE, address(vault), 50);
 
         vm.startPrank(admin);
         vault.grantRole(Roles.ALLOCATOR, allocator);

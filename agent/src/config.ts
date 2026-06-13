@@ -32,6 +32,9 @@ const configSchema = z.object({
   // ── LLM (optional until PR-3b) ──
   anthropicApiKey: z.string().min(1).optional(),
   anthropicModel: z.string().min(1).default("claude-haiku-4-5-20251001"),
+  // Optional override of the Anthropic-compatible API base URL (e.g. to point the
+  // SDK at a GLM/other Anthropic-compatible gateway). Unset = the SDK default.
+  anthropicBaseUrl: z.string().url().optional(),
 
   // ── 1delta data (optional; data + swap routing/quoting, output never trusted) ──
   oneDeltaApiKey: z.string().min(1).optional(),
@@ -144,6 +147,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     agentStatePath: pick("AGENT_STATE_PATH"),
     anthropicApiKey: pick("ANTHROPIC_API_KEY"),
     anthropicModel: pick("ANTHROPIC_MODEL"),
+    anthropicBaseUrl: pick("ANTHROPIC_BASE_URL"),
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),

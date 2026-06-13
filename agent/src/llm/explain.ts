@@ -156,7 +156,7 @@ export class AnthropicExplainer implements ExplainClient {
 
   constructor(config: AgentConfig) {
     if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY is required for the explainer");
-    this.client = new Anthropic({ apiKey: config.anthropicApiKey });
+    this.client = new Anthropic({ apiKey: config.anthropicApiKey, baseURL: config.anthropicBaseUrl });
     this.model = config.anthropicModel ?? "claude-haiku-4-5-20251001";
   }
 

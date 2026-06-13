@@ -33,9 +33,9 @@ const configSchema = z.object({
   anthropicApiKey: z.string().min(1).optional(),
   anthropicModel: z.string().min(1).default("claude-haiku-4-5-20251001"),
 
-  // ── 1delta data (optional; data + optional swap routing ONLY) ──
+  // ── 1delta data (optional; data + swap routing/quoting, output never trusted) ──
   oneDeltaApiKey: z.string().min(1).optional(),
-  oneDeltaBaseUrl: z.string().url().default("https://api.1delta.io"),
+  oneDeltaBaseUrl: z.string().url().default("https://portal.1delta.io"),
 
   // ── Signer (optional until execution path; guardrail-bounded hot key) ──
   allocatorPrivateKey: privateKey.optional(),

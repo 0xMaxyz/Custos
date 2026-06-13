@@ -11,7 +11,7 @@ describe("loadConfig", () => {
     const cfg = loadConfig(minimalEnv);
     expect(cfg.mantleRpcUrl).toBe("https://rpc.mantle.xyz");
     expect(cfg.anthropicModel).toBe("claude-haiku-4-5-20251001");
-    expect(cfg.oneDeltaBaseUrl).toBe("https://api.1delta.io");
+    expect(cfg.oneDeltaBaseUrl).toBe("https://portal.1delta.io");
     expect(cfg.agentPort).toBe(8080);
     expect(cfg.agentLogLevel).toBe("info");
     expect(cfg.allocatorPrivateKey).toBeUndefined();

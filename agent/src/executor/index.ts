@@ -379,8 +379,8 @@ export class Executor {
 
     const oneDelta = new OneDeltaClient(this.config);
 
-    // Pinned Odos aggregator address — must match what UsdyAdapter.AGGREGATOR was
-    // deployed with. Reject any quote targeting a different router before signing.
+    // Pinned 1delta swap executor address — must match what UsdyAdapter.AGGREGATOR
+    // was deployed with. Reject any quote targeting a different router before signing.
     const pinnedRouter = (PROTOCOLS.usdyAggregatorRouter as string).toLowerCase();
 
     try {

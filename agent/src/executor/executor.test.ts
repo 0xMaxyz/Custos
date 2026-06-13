@@ -442,7 +442,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     // Mock 1delta getSwapQuote on the prototype so the executor's new instance picks it up.
     const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
       .mockResolvedValue({
-        router: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745" as `0x${string}`,
+        router: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E" as `0x${string}`,
         calldata: MOCK_CALLDATA,
         amountOut: 4_600n * 10n ** 18n,
       });
@@ -523,7 +523,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     const getSwapQuoteSpy = vi.spyOn(oneDeltaMod.OneDeltaClient.prototype, "getSwapQuote")
       .mockResolvedValue({
         // Pinned Odos router so the quote is accepted and getSwapQuote is reached.
-        router: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745" as `0x${string}`,
+        router: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E" as `0x${string}`,
         calldata: "0xdeadbeef" as `0x${string}`,
         amountOut: 9_000n * 10n ** 6n,
       });

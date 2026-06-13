@@ -64,9 +64,9 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 
 - **`YieldVault`** — ERC-4626, asset = **USDC**. `rebalance(targetWeights, decisionURI, rationaleHash)` is the AI-powered on-chain function, callable **only by the ALLOCATOR role**, emitting a `DecisionRecorded` event.
 - **Strategy adapters (trustless, protocol-direct execution):**
-  - `UsdyAdapter` — USDC↔USDY/mUSD via Odos aggregator, oracle-derived `minOut`, blocklist-aware; USDY↔mUSD conversion via Ondo `wrap`/`unwrap`.
+  - `UsdyAdapter` — USDC↔USDY/mUSD via the pinned 1delta swap executor, oracle-derived `minOut`, blocklist-aware; USDY↔mUSD conversion via Ondo `wrap`/`unwrap`.
   - `AaveV3Adapter` — supply/withdraw USDC on Aave v3 Mantle.
-  - `AusdAdapter` — USDC↔AUSD via Odos aggregator, oracle-derived `minOut`.
+  - `AusdAdapter` — USDC↔AUSD via the pinned 1delta swap executor, oracle-derived `minOut`.
 - **`Guardrails`** (timelocked params — one-shot bootstrap config at deploy, then **every** change queues behind the on-chain timelock, with a 1h hard floor on the delay and an explicit `cancelConfig`): max weight per bucket, min idle/Aave liquidity buffer, max slippage, token/venue whitelist, max rebalance frequency, per-tx caps, pause/kill switch, add-strategy timelock, and a **depeg/oracle-deviation guard** that can force de-risk.
 - **`AgentBenchmark`** — logs each decision + the triggering evidence + later the realized outcome (APY, drawdown avoided) → the **on-chain benchmarking** record vs a passive 100%-USDY holder.
 - **ERC-8004 registries** — register the agent in Identity (ERC-721) + Reputation registries. Uses the canonical 0x8004 singletons deployed on Mantle.

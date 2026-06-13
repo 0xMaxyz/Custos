@@ -7,14 +7,14 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 /**
  * @title AggregatorSwapLib
- * @notice Executes a swap through a SINGLE pinned, allow-listed DEX aggregator
- *         router (e.g. Odos on Mantle) and enforces slippage with an on-chain
+ * @notice Executes a swap through a SINGLE pinned, allow-listed router (the 1delta
+ *         swap executor on Mantle) and enforces slippage with an on-chain
  *         **balance-delta** check the caller computed itself.
  *
- * Why an aggregator at all (and why this is still safe):
+ * Why route through an aggregator at all (and why this is still safe):
  * - USDY liquidity on Mantle is fragmented across thin pools (Agni USDY/USDT,
  *   iZiSwap USDY/USDC, Butter USDY/USDC — together ~$1.5k). No single router has
- *   a usable direct USDC/USDY route. An aggregator splits across them.
+ *   a usable direct USDC/USDY route. 1delta's executor splits across them.
  * - The "never execute arbitrary third-party calldata" rule is preserved by
  *   three constraints, all enforced here / by the adapter:
  *     1. **Pinned router** — `router` is an immutable, allow-listed address set
@@ -27,10 +27,11 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
  *        (`address(this)`). If the calldata pays anyone else, the measured delta
  *        is 0 and the swap reverts (fail-closed).
  *
- * The off-chain agent obtains `routerData` from 1delta's swap-routing endpoint
- * (which itself aggregates Odos/Eisen/Nordstern). That is "data + optional swap
- * routing" — the permitted lane. The router address it targets must equal the
- * pinned `router` or the call reverts.
+ * The off-chain agent obtains `routerData` from 1delta's `/actions/swap` endpoint
+ * (which itself aggregates Odos/Eisen/Nordstern/…). That is "data + optional swap
+ * routing" — the permitted lane. The `to` address it targets must equal the pinned
+ * `router` (the 1delta executor) or the call reverts, and the quote must be built
+ * with `account = address(this)` so the executor pays this adapter.
  */
 library AggregatorSwapLib {
     using SafeERC20 for IERC20;

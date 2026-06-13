@@ -14,17 +14,17 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
 /**
  * @title UsdyAdapter
  * @notice Allocates USDC into the Ondo tokenized-Treasury RWA core (held as USDY
- *         and/or its rebasing $1 form **mUSD**) via a single, allow-listed DEX
- *         aggregator (e.g. Odos on Mantle), and values holdings through the Ondo
+ *         and/or its rebasing $1 form **mUSD**) via a single, allow-listed router
+ *         (the 1delta composer on Mantle), and values holdings through the Ondo
  *         RWADynamicOracle. USDY and mUSD are the two on-chain forms of the SAME
  *         bucket (bucket 2) — no separate bucket; the adapter converts between them
  *         on-chain via the Ondo mUSD `wrap`/`unwrap` converter (see IMusd).
  *
- * Why an aggregator instead of a direct single-pool router: USDY liquidity on
- * Mantle is fragmented across thin pools (Agni USDY/USDT ~$0.97k, iZiSwap
- * USDY/USDC ~$0.40k, Butter USDY/USDC ~$0.23k). No single DEX has a usable direct
- * USDC/USDY route, so a single-pool swap reverts at any meaningful size. An
- * aggregator splits the order across all venues. It stays inside the custody
+ * Why route through an aggregator instead of a direct single-pool router: USDY
+ * liquidity on Mantle is fragmented across thin pools (Agni USDY/USDT ~$0.97k,
+ * iZiSwap USDY/USDC ~$0.40k, Butter USDY/USDC ~$0.23k). No single DEX has a usable
+ * direct USDC/USDY route, so a single-pool swap reverts at any meaningful size.
+ * 1delta's composer splits the order across all venues. It stays inside the custody
  * boundary via a pinned router + an oracle-derived balance-delta minOut.
  *
  * Why also hold mUSD (the Ondo Token Converter leg): mUSD is the
@@ -71,7 +71,7 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
 
     // ── Immutables ────────────────────────────────────────────────────────────
 
-    /// @notice Pinned, allow-listed DEX aggregator router (e.g. Odos on Mantle).
+    /// @notice Pinned, allow-listed swap router (1delta composer on Mantle).
     ///         The only address swap calldata may target.
     address public immutable AGGREGATOR;
 
@@ -98,7 +98,7 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /**
-     * @param aggregator      Pinned, allow-listed DEX aggregator router (e.g. Odos).
+     * @param aggregator      Pinned, allow-listed swap router (the 1delta composer).
      * @param usdc            USDC token address (6 dec).
      * @param usdy            USDY token address (18 dec).
      * @param musd            Ondo mUSD converter/token (18 dec). Pass `address(0)`

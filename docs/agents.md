@@ -29,22 +29,25 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
 ## 2. Non-negotiable rules
 
 1. **Data vs. execution boundary.** The **1delta API** may be used for **reading
-   data** and **swap routing/quoting only** (it aggregates Odos/Eisen/Nordstern).
-   It must **NEVER** be in the custody/execution path. The vault must **never
+   data** and **swap routing/quoting only** (it aggregates Odos/Eisen/Nordstern/…).
+   Its returned values are **never trusted for custody**. The vault must **never
    execute arbitrary third-party calldata.** Execution happens only through our own
    audited adapters (`UsdyAdapter`, `AaveV3Adapter`, `AusdAdapter`).
-   **Aggregator exception (USDY only):** because USDY liquidity on Mantle is
+   **Aggregator exception (USDY/AUSD):** because USDY/AUSD liquidity on Mantle is
    fragmented across thin pools (Agni USDY/USDT, iZiSwap & Butter USDY/USDC —
-   together ~$1.5k), no single-pool route is usable. `UsdyAdapter` may run swap
-   calldata against **one pinned, allow-listed aggregator router** (Odos on Mantle,
-   immutable at deploy) — but this is *not* "arbitrary calldata", because the
-   adapter (a) only ever targets that single pinned address, (b) enforces a
-   **balance-delta `minOut`** it derives itself from the Ondo oracle NAV (the
-   router's reported output is never trusted), and (c) requires output to land on
-   the adapter, so calldata paying anyone else nets a 0 delta and reverts
-   (fail-closed). Aave/AUSD adapters still call their protocols/DEXs directly with
-   on-chain `minOut`. The aggregator router address is verified on-chain and pinned;
-   changing it requires a redeploy.
+   together ~$1.5k), no single-pool route is usable. `UsdyAdapter`/`AusdAdapter` may
+   run swap calldata against **one pinned, allow-listed router** — the **1delta swap
+   executor** (`0x5C019a…F05F4E` on Mantle, immutable at deploy), through which
+   1delta's `/actions/swap` routes every trade now that Odos v2 is retired. This is
+   *not* "arbitrary calldata", because the adapter (a) only ever targets that single
+   pinned address and pre-approves only it, (b) enforces a **balance-delta `minOut`**
+   it derives itself from the Ondo oracle NAV (the executor's reported output is never
+   trusted), and (c) requires output to land on the adapter, so calldata paying anyone
+   else nets a 0 delta and reverts (fail-closed). The agent MUST request quotes with
+   `account = <adapter address>` so the executor pulls from / pays the adapter (and the
+   adapter's standing approval covers the quote's `permissions` step). Aave adapters
+   still call the pool directly with on-chain `minOut`. The pinned router address is
+   verified on-chain; changing it requires a redeploy.
    **mUSD converter leg (USDY↔mUSD):** the RWA core (bucket 2) may be held as USDY or
    its rebasing $1 form mUSD. `UsdyAdapter` converts between them via the **Ondo mUSD
    contract's `wrap`/`unwrap`** — which IS the "Ondo Token Converter" (verified

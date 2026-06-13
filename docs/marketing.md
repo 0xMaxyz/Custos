@@ -99,7 +99,7 @@ mainnet deploy + public frontend are live.
 > • Ondo USDY/mUSD + RWADynamicOracle
 > • Agora AUSD + Chaos Labs PoR
 > • Aave v3 (Mantle)
-> • Odos aggregator (pinned, oracle-derived minOut — not trusted calldata)
+> • 1delta swap executor (pinned, oracle-derived minOut — not trusted calldata)
 > • Canonical ERC-8004 singletons on Mantle
 >
 > Contracts: [PUBLIC_URL] | Repo: github.com/0xMaxyz/miu 7/8
@@ -195,7 +195,7 @@ to whatever the Demo-states panel actually seeds when you capture.
 > thresholds miss; a deterministic validator checks; timelocked on-chain Guardrails
 > backstop. The model is never the last line of defense.
 >
-> Built on Ondo USDY/mUSD + RWADynamicOracle, Agora AUSD, Aave v3, Odos, and the
+> Built on Ondo USDY/mUSD + RWADynamicOracle, Agora AUSD, Aave v3, 1delta, and the
 > canonical ERC-8004 singletons — exclusively on Mantle.
 >
 > - Live app: [PUBLIC_URL]

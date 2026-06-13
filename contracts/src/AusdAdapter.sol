@@ -12,12 +12,12 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
 /**
  * @title AusdAdapter
  * @notice Allocates USDC into AUSD (Agora USD, a fiat-backed $1 stablecoin) via a
- *         single, allow-listed DEX aggregator (Odos on Mantle) — the safety bucket
- *         the vault de-risks into when RWA (USDY) risk appears.
+ *         single, allow-listed router (the 1delta composer on Mantle) — the
+ *         safety bucket the vault de-risks into when RWA (USDY) risk appears.
  *
- * Why an aggregator (and why this stays inside the custody boundary):
+ * Why route through an aggregator (and why this stays inside the custody boundary):
  * - AUSD liquidity on Mantle is fragmented across thin pools, so no single-pool
- *   USDC/AUSD route is usable at size. An aggregator splits the order across venues.
+ *   USDC/AUSD route is usable at size. 1delta's composer splits the order across venues.
  * - The "never execute arbitrary calldata" rule is preserved by three constraints
  *   enforced in `AggregatorSwapLib`: (1) the router is a pinned immutable address,
  *   (2) `minOut` is a balance-delta the adapter derives itself (the router's output
@@ -46,7 +46,7 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
 
     // ── Immutables ────────────────────────────────────────────────────────────
 
-    /// @notice Pinned, allow-listed DEX aggregator router (e.g. Odos on Mantle).
+    /// @notice Pinned, allow-listed swap router (the 1delta composer on Mantle).
     ///         The only address swap calldata may target.
     address public immutable AGGREGATOR;
 
@@ -65,7 +65,7 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /**
-     * @param aggregator      Pinned, allow-listed DEX aggregator router (e.g. Odos).
+     * @param aggregator      Pinned, allow-listed swap router (the 1delta composer).
      * @param usdc            USDC token address (6 dec).
      * @param ausd            AUSD token address (6 dec).
      * @param vault           YieldVault address (sole permitted caller).

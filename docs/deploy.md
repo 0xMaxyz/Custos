@@ -28,7 +28,7 @@ backend agent, frontend, and the Caddy reverse proxy. Written for Mantle mainnet
 | Allocator hot key | `ALLOCATOR_PRIVATE_KEY` / `ALLOCATOR_ADDRESS` | The agent's tx signer. Guardrail-bounded; fund with a small amount of MNT (it only pays gas). Use a dedicated fresh key, never the deployer. |
 | Guardian | `GUARDIAN_ADDRESS` | Can `pause`/`unpause`/`kill`/`emergencyExit`. Recommended: the Safe, or a hardware-wallet EOA that is NOT the allocator. |
 | Anthropic API | `ANTHROPIC_API_KEY` | LLM signal layer + `/ask`. Agent degrades gracefully (deterministic-only) without it, but the hero path needs it. |
-| 1delta API | `ONEDELTA_API_KEY` | Data + swap routing/quoting only (never custody). From auth.1delta.io. |
+| 1delta API | `ONEDELTA_API_KEY` | Data + swap routing/quoting; its output is never trusted for custody (the adapter re-derives `minOut` on-chain). From auth.1delta.io. |
 | Mantlescan | `MANTLESCAN_API_KEY` | Contract verification. |
 | IPFS pinning | `IPFS_API_URL` / `IPFS_PINNING_JWT` | Optional — falls back to `data:` URIs. Pinata or a Kubo node. |
 | WalletConnect | `VITE_WALLETCONNECT_PROJECT_ID` | Optional for injected-only wallets. |
@@ -54,7 +54,7 @@ cast call <MUSD> "usdy()(address)" --rpc-url $RPC
 cast call <MUSD> "oracle()(address)" --rpc-url $RPC
 # Aave v3 pool resolves from the PoolAddressesProvider (the script does this too):
 cast call <AAVE_PROVIDER> "getPool()(address)" --rpc-url $RPC
-# Odos router (USDY_AGGREGATOR_ROUTER): confirm it is the canonical Odos router on Mantle.
+# Swap router (USDY_AGGREGATOR_ROUTER): confirm it is the canonical 1delta swap executor on Mantle.
 ```
 
 Also sanity-check that the **ERC-8004 canonical singletons** exist on Mantle

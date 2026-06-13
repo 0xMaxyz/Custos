@@ -1,6 +1,9 @@
 // Vitest setup: mock wagmi + React hooks so pure-logic tests (useVaultData,
 // useGuardianData) can call hooks directly without a React/wagmi context.
 // The mocks return the "no data yet" shape so the fixture fallback path runs.
+// useChainId returns undefined (no connected wallet) so resolveDeployment()
+// returns EMPTY and hooks fall back to fixture data — the deployed-chain logic
+// is tested separately in chains.test.ts and deployment.test.ts.
 import { vi } from "vitest";
 
 vi.mock("wagmi", () => ({
@@ -11,7 +14,7 @@ vi.mock("wagmi", () => ({
   useWriteContract:       () => ({ writeContractAsync: vi.fn(), writeContract: vi.fn(), status: "idle", error: null }),
   useWaitForTransactionReceipt: () => ({ status: "idle", isLoading: false, isSuccess: false }),
   useAccount:             () => ({ address: undefined, isConnected: false }),
-  useChainId:             () => 5000,
+  useChainId:             () => undefined,
 }));
 
 // Stub React hooks so seam hooks work outside a component tree.

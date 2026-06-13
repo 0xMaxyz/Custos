@@ -6,11 +6,9 @@ Concrete specifications for Custos. Three parts, in order:
 2. Contract interfaces
 3. Anthropic API prompt + risk-signal schema
 
-> All numeric values are **initial defaults for the demo** — conservative on
-> purpose — to be tuned after the liquidity/oracle gate and mainnet deploy. **The
-> on-chain `Guardrails` values and the off-chain TS validator MUST stay byte-for-byte
-> in agreement** (same constants, single source in `packages/shared`). Solidity below
-> is a **proposed interface sketch**, not final.
+> These are the deployed values. **The on-chain `Guardrails` values and the off-chain
+> TS validator MUST stay byte-for-byte in agreement** (same constants, single source in
+> `packages/shared`). Contract interfaces in §2 reflect the deployed contracts.
 
 ---
 

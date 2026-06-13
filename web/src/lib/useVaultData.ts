@@ -13,9 +13,13 @@
 
 import { useReadContracts, useReadContract, useChainId } from "wagmi";
 import { formatUnits }      from "viem";
-import { vault as vaultFixture, position as posFixture, baseline as baselineFixture, type VaultState, type PositionState } from "./data";
+import { vault as vaultFixture, position as posFixture, baseline as baselineFixture, walletUsdcBalance, type VaultState, type PositionState } from "./data";
 import { VAULT_ABI, BENCHMARK_ABI, ADAPTER_ABI } from "./vaultAbi";
 import { resolveDeployment, computeWeightsBps } from "./deployment";
+
+const ERC20_ABI = [
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
+] as const;
 
 export interface VaultData {
   vault: VaultState;
@@ -23,6 +27,8 @@ export interface VaultData {
   baseline: typeof baselineFixture;
   /** Underlying ERC-20 (USDC) address — from vault.asset(); empty string before deploy. */
   usdcAddress: `0x${string}` | "";
+  /** Connected wallet's USDC balance (6-dec, formatted); fixture when not live. */
+  walletUsdc: string;
   /** true once reads come from chain; false while served from fixtures. */
   isLive: boolean;
 }
@@ -76,6 +82,17 @@ export function useVaultData(account?: `0x${string}`): VaultData {
       ? (benchmarkEntry.result as `0x${string}`)
       : "";
 
+  // Connected wallet's USDC balance (depends on the resolved asset address).
+  const walletUsdcRead = useReadContract({
+    address: usdcAddress || undefined,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: [account ?? ZERO],
+    chainId,
+    query: { enabled: isDeployed && usdcAddress.length > 2 && Boolean(account), refetchInterval: 15_000 },
+  });
+  const walletUsdc = walletUsdcRead.data !== undefined ? formatUnits(walletUsdcRead.data as bigint, 6) : "0.00";
+
   // Step 2: per-bucket valuation for the allocation donut. Each adapter values
   // its bucket in USDC; idle is whatever TVL isn't held by an adapter.
   const aaveTA = useReadContract({
@@ -118,7 +135,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
   });
 
   if (!isDeployed || !tvlEntry || !sharePxEntry || tvlEntry.status !== "success" || sharePxEntry.status !== "success") {
-    return { vault: vaultFixture, position: posFixture, baseline: baselineFixture, usdcAddress: "", isLive: false };
+    return { vault: vaultFixture, position: posFixture, baseline: baselineFixture, usdcAddress: "", walletUsdc: walletUsdcBalance, isLive: false };
   }
 
   const tvlRaw     = tvlEntry.result as bigint;
@@ -197,5 +214,5 @@ export function useVaultData(account?: `0x${string}`): VaultData {
     };
   }
 
-  return { vault: liveVault, position: livePosition, baseline: liveBaseline, usdcAddress, isLive: true };
+  return { vault: liveVault, position: livePosition, baseline: liveBaseline, usdcAddress, walletUsdc, isLive: true };
 }

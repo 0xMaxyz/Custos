@@ -88,6 +88,10 @@ interface AskBody {
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: { level: process.env.AGENT_LOG_LEVEL ?? "info" },
+    // Behind the Caddy reverse proxy: trust X-Forwarded-* so req.protocol reflects the
+    // original https scheme (not the http hop from Caddy → agent). The x402 challenge
+    // builds its `resource` URL from req.protocol, so without this it advertises http://.
+    trustProxy: true,
   });
 
   // CORS for the read-only public endpoints: the agent controls no funds via HTTP

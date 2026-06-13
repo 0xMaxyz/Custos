@@ -81,11 +81,11 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     Guardrails public guardrails;
 
-    /// Pending timelocked Guardrails swap (H3). address(0) = none queued.
+    /// Pending timelocked Guardrails swap. address(0) = none queued.
     address public pendingGuardrails;
     uint256 public guardrailsUnlocksAt;
 
-    /// Optional benchmark ledger (may be address(0) before Phase 2b is configured).
+    /// Optional benchmark ledger (may be address(0) until configured).
     IAgentBenchmark public benchmark;
 
     /// Strategy adapter for each bucket (address(0) = no adapter = idle-in-vault).
@@ -122,7 +122,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     // ── ERC-4626 overrides ────────────────────────────────────────────────────
 
     /**
-     * @notice Virtual-shares decimals offset (ERC-4626 inflation defense, I1).
+     * @notice Virtual-shares decimals offset (ERC-4626 inflation defense).
      * @dev OZ ERC4626 mitigates first-depositor share-price inflation grief with
      *      virtual shares/assets. The offset scales that virtual buffer by `1e6`,
      *      making the classic "deposit 1 wei, donate a large sum, then let the
@@ -273,7 +273,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         if (address(adapter) == address(0)) revert NothingToWithdraw();
         // Require that the adapter holds no underlying tokens before removal. Uses a
         // balance-based check (not totalAssets value) so a USDY position is never
-        // orphaned by an oracle outage that makes totalAssets() read 0 (M1).
+        // orphaned by an oracle outage that makes totalAssets() read 0.
         if (adapter.hasAssets()) revert AdapterStillHasAssets();
         delete adapters[bucket];
         emit StrategyRemoved(bucket);
@@ -281,7 +281,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     /// @notice Queue a new Guardrails contract behind the addStrategyTimelock. Swapping
     ///         the guardrail brain is the single most sensitive admin action, so it is
-    ///         timelocked rather than instant (H3). Only ADMIN.
+    ///         timelocked rather than instant. Only ADMIN.
     /// @dev    To CANCEL a pending guardrails swap, re-queue with address(0): that
     ///         overwrites pendingGuardrails to the zero address, and activateGuardrails
     ///         then reverts NoPendingGuardrails. No dedicated cancel function is needed.
@@ -485,7 +485,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         uint256 idleBefore = IERC20(asset()).balanceOf(address(this));
 
         IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
-        // M4: gate on hasAssets() (balance-based) not totalAssets() (NAV-based, reads 0 on
+        // Gate on hasAssets() (balance-based) not totalAssets() (NAV-based, reads 0 on
         // an oracle outage) so a de-risk during a dead oracle still unwinds the position.
         if (address(usdyAdapter) != address(0) && usdyAdapter.hasAssets()) {
             bytes memory sd = swapData.length > BUCKET_USDY ? swapData[BUCKET_USDY] : bytes("");
@@ -524,7 +524,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
         uint256 valueAtNav = usdyAdapter.totalAssets(); // 6-dec USDC, NAV-based
         if (valueAtNav == 0) {
-            // M4 -- oracle is down (NAV-based valuation reads 0) but the bucket may still
+            // Oracle is down (NAV-based valuation reads 0) but the bucket may still
             // hold USDY. The NAV floor source is gone, so fall back to a DEX-spot-derived
             // floor computed from the actual held balances (oracle-independent). When the
             // allocator supplies a spot this still blocks gross slippage/MEV on the exit;
@@ -549,7 +549,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @notice DEX-spot-derived USDC floor for a de-risk exit when the oracle is down (M4).
+     * @notice DEX-spot-derived USDC floor for a de-risk exit when the oracle is down.
      * @dev Values held USDY at the agent-supplied spot and held mUSD at 1-USD face (mUSD is
      *      a 1-USD-pegged token, valued at face as the adapter accounts it), then applies
      *      the slippage haircut. Returns 0 when no spot is supplied (GUARDIAN path --
@@ -642,9 +642,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         s.lastRebalanceAt = lastRebalanceAt;
 
         // USDY oracle values: populated when the USDY adapter (bucket 2) is registered.
-        // H1: s.oracleUpdatedAt is intentionally left 0 — Mantle's Ondo oracle exposes no
+        // s.oracleUpdatedAt is intentionally left 0 — Mantle's Ondo oracle exposes no
         // on-chain updatedAt, and oracleData() returns rangeEnd=0 (currentRange() reverts),
-        // so the Guardrails staleness checks are inert here by design (see Guardrails §H1).
+        // so the Guardrails staleness checks are inert here by design.
         IStrategyAdapter usdyAdapter = adapters[BUCKET_USDY];
         if (address(usdyAdapter) != address(0)) {
             try IUsdyAdapter(address(usdyAdapter)).oracleData() returns (
@@ -653,7 +653,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
                 s.usdyOracleNav = nav;
                 s.oracleRangeEnd = rangeEnd;
             } catch {
-                // M4 -- oracle read reverted. Flag oracleDown only when the USDY bucket
+                // Oracle read reverted. Flag oracleDown only when the USDY bucket
                 // still holds assets (balance-based, oracle-independent): otherwise a dead
                 // oracle with no exposure must NOT force a de-risk. With exposure, the
                 // Guardrails oracleDown branch forces a de-risk so the allocator can exit
@@ -664,10 +664,9 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
                 }
             }
         }
-        // H2: usdyDexSpot is a TRUSTED allocator-supplied input (the same hot key the depeg
-        // guard constrains). The $5k notional / 60% weight caps bound the exposure; an
-        // on-chain TWAP cross-check is deferred to Phase 2b. The guard only fires when both
-        // nav and spot are non-zero.
+        // usdyDexSpot is a TRUSTED allocator-supplied input (the same hot key the depeg
+        // guard constrains). The $5k notional / 60% weight caps bound the exposure. The
+        // guard only fires when both nav and spot are non-zero.
         s.usdyDexSpot = usdyDexSpotUsdc;
     }
 

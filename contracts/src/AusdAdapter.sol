@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,7 +15,7 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
  *         single, allow-listed DEX aggregator (Odos on Mantle) — the safety bucket
  *         the vault de-risks into when RWA (USDY) risk appears.
  *
- * Why an aggregator (and why this stays inside the custody boundary, AGENTS.md §2.1):
+ * Why an aggregator (and why this stays inside the custody boundary):
  * - AUSD liquidity on Mantle is fragmented across thin pools, so no single-pool
  *   USDC/AUSD route is usable at size. An aggregator splits the order across venues.
  * - The "never execute arbitrary calldata" rule is preserved by three constraints
@@ -25,11 +26,10 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
  *
  * Accounting — why 1:1 and not a DEX/oracle mark:
  * - AUSD is a fiat-backed stablecoin redeemable 1:1 for USD, with off-chain
- *   proof-of-reserves (Chaos Labs) feeding the risk engine separately (task A1.2).
+ *   proof-of-reserves (Chaos Labs) feeding the risk engine separately.
  *   For on-chain vault accounting we value the AUSD balance at face (1:1 with USDC,
- *   both 6 decimals) — never a DEX spot, per AGENTS.md §7 ground-truth reads. A
- *   depeg shows up via the risk engine + Guardrails, not by silently marking the
- *   bucket up or down on a thin-pool quote.
+ *   both 6 decimals) — never a DEX spot. A depeg shows up via the risk engine +
+ *   Guardrails, not by silently marking the bucket up or down on a thin-pool quote.
  * - USDC and AUSD are both 6-decimal, so the deposit/withdraw expected output is
  *   ~1:1 before slippage.
  *
@@ -108,8 +108,7 @@ contract AusdAdapter is IStrategyAdapter, ReentrancyGuard {
     }
 
     /**
-     * @notice Maximum USDC withdrawable via DEX swap. Face value of the AUSD
-     *         balance; Phase 2b-style DEX liquidity caps can refine this later.
+     * @notice Maximum USDC withdrawable via DEX swap. Face value of the AUSD balance.
      */
     function maxWithdrawable() external view override returns (uint256) {
         return IERC20(AUSD).balanceOf(address(this));

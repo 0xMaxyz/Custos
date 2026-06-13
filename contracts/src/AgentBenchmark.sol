@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -75,12 +76,12 @@ contract AgentBenchmark is IAgentBenchmark, AccessControl {
     /// @inheritdoc IAgentBenchmark
     /// @dev The ledger is append-only: an outcome may be written exactly once.
     ///      `measuredAt` is stamped from `block.timestamp` in-contract and the
-    ///      caller-supplied `o.measuredAt` is IGNORED. This closes L8: trusting the
-    ///      caller's `measuredAt` would let a caller pass `measuredAt == 0`, which
-    ///      leaves the "already set" guard tripping on a zero sentinel and so leaves
-    ///      the record overwritable — breaking the append-only claim. Stamping the
-    ///      timestamp here guarantees every recorded outcome has a non-zero
-    ///      `measuredAt`, so the guard below permanently seals the slot.
+    ///      caller-supplied `o.measuredAt` is IGNORED. Trusting the caller's
+    ///      `measuredAt` would let a caller pass `measuredAt == 0`, which leaves the
+    ///      "already set" guard tripping on a zero sentinel and so leaves the record
+    ///      overwritable — breaking the append-only claim. Stamping the timestamp here
+    ///      guarantees every recorded outcome has a non-zero `measuredAt`, so the guard
+    ///      below permanently seals the slot.
     function updateOutcome(uint256 decisionId, Outcome calldata o)
         external
         override

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { Roles } from "./Roles.sol";
@@ -8,9 +9,8 @@ import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol"
  * @title Guardrails
  * @notice On-chain guardrail parameter store and pure validation helpers.
  *
- * Numeric defaults mirror packages/shared/src/guardrails.ts exactly — the TS
- * validator and this contract share the same source of truth so they never
- * drift. Any change here must be reflected in the TS constants.
+ * Numeric defaults match the off-chain validator exactly so the two never drift;
+ * any change here must be reflected there.
  *
  * The LLM/agent may only TIGHTEN risk (lower caps, raise minimums). It never
  * calls this contract directly — only ADMIN can reconfigure.
@@ -71,7 +71,7 @@ contract Guardrails is AccessControl {
         uint256 aaveWithdrawable; // current USDC withdrawable from Aave (6-dec)
         uint256 totalAssets; // vault TVL in 6-dec USDC
         uint64 lastRebalanceAt; // unix timestamp of last rebalance
-        // M4 -- set true by YieldVault when the USDY oracle read reverts AND the USDY
+        // Set true by YieldVault when the USDY oracle read reverts AND the USDY
         // bucket still holds assets. The peg/staleness branches below need a live NAV
         // and are inert on Mantle's Ondo oracle (no on-chain updatedAt/range), so a
         // dead oracle while exposed to USDY would otherwise leave forceDeRisk=false and
@@ -80,7 +80,7 @@ contract Guardrails is AccessControl {
         bool oracleDown;
     }
 
-    // ── Constants (default values — match packages/shared/src/guardrails.ts) ──
+    // ── Constants (default values) ────────────────────────────────────────────
 
     uint16 private constant _IDLE = 0;
     uint16 private constant _AAVE = 1;
@@ -88,22 +88,21 @@ contract Guardrails is AccessControl {
     uint16 private constant _AUSD = 3;
     uint16 private constant _BPS = 10_000;
 
-    /// @notice Floor for `Config.addStrategyTimelock` (M5). Every timelocked governance
+    /// @notice Floor for `Config.addStrategyTimelock`. Every timelocked governance
     ///         action (queueConfig, YieldVault.addStrategy/queueGuardrails) derives its
     ///         delay from this value, so without a floor a queued config could ratchet the
-    ///         delay toward zero and neuter the timelock. Mirrored in
-    ///         packages/shared/src/guardrails.ts (MIN_TIMELOCK).
+    ///         delay toward zero and neuter the timelock.
     uint32 public constant MIN_TIMELOCK = 1 hours;
 
     // ── State ─────────────────────────────────────────────────────────────────
 
     Config private _config;
 
-    /// One-shot bootstrap flag (H3): the first `setConfig` (at deploy) applies the
+    /// One-shot bootstrap flag: the first `setConfig` (at deploy) applies the
     /// config instantly; afterwards every change is timelocked via queue/activate.
     bool private _initialized;
 
-    /// Pending timelocked config change (H3).
+    /// Pending timelocked config change.
     Config private _pendingConfig;
     bool private _hasPendingConfig;
     uint256 private _configUnlocksAt;
@@ -114,7 +113,7 @@ contract Guardrails is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(Roles.ADMIN, admin);
 
-        // Set defaults from packages/shared/src/guardrails.ts
+        // Default guardrail configuration.
         uint16[4] memory maxW;
         maxW[_IDLE] = 10_000; // no upper cap on idle
         maxW[_AAVE] = 9_000; // 90%
@@ -147,8 +146,8 @@ contract Guardrails is AccessControl {
 
     /// @notice One-shot bootstrap of the guardrail config at deploy time. Applies
     ///         instantly the first time, then seals: every subsequent change (tighten
-    ///         OR loosen) must go through queueConfig/activateConfig (H3 — the guardrail
-    ///         brain is the most sensitive surface). Only ADMIN.
+    ///         OR loosen) must go through queueConfig/activateConfig (the guardrail
+    ///         config is the most sensitive surface). Only ADMIN.
     function setConfig(Config calldata newConfig) external onlyRole(Roles.ADMIN) {
         if (_initialized) revert AlreadyInitialized();
         _requireValidConfig(newConfig);
@@ -158,7 +157,7 @@ contract Guardrails is AccessControl {
     }
 
     /// @notice Queue a full guardrail config change behind the addStrategyTimelock.
-    ///         Every post-bootstrap config change is timelocked (H3). Only ADMIN.
+    ///         Every post-bootstrap config change is timelocked. Only ADMIN.
     function queueConfig(Config calldata newConfig) external onlyRole(Roles.ADMIN) {
         _requireValidConfig(newConfig);
         _pendingConfig = newConfig;
@@ -167,7 +166,7 @@ contract Guardrails is AccessControl {
         emit ConfigQueued(newConfig, _configUnlocksAt);
     }
 
-    /// @notice Cancel a pending (queued) config change before it is activated (M5).
+    /// @notice Cancel a pending (queued) config change before it is activated.
     ///         Clears the pending config and its unlock time. Only ADMIN.
     function cancelConfig() external onlyRole(Roles.ADMIN) {
         if (!_hasPendingConfig) revert NoPendingChange();
@@ -193,7 +192,7 @@ contract Guardrails is AccessControl {
         return _config;
     }
 
-    /// @notice The pending (queued) config, whether one exists, and its unlock time (H3).
+    /// @notice The pending (queued) config, whether one exists, and its unlock time.
     function pendingConfig()
         external
         view
@@ -259,7 +258,7 @@ contract Guardrails is AccessControl {
         // 6. Max single-rebalance move size. Exempt pure risk-reductions (USDY weight
         //    strictly down, every other bucket non-decreasing) so an LLM-news de-risk of
         //    a >50% USDY position can fully exit into safe buckets without tripping the
-        //    cap (M2). Such moves never add RWA risk; all other guardrails still apply.
+        //    cap. Such moves never add RWA risk; all other guardrails still apply.
         uint256 totalMoveBps = 0;
         for (uint8 i = 0; i < 4; i++) {
             totalMoveBps += postWeightsBps[i] > preWeightsBps[i]
@@ -320,14 +319,15 @@ contract Guardrails is AccessControl {
         view
         returns (bool blockNewUsdy, bool forceDeRisk, uint8 riskLevel)
     {
-        // H1 — both staleness checks below are INERT on Mantle: the deployed Ondo
-        // oracle has no on-chain `updatedAt` (so oracleUpdatedAt is never fed → 0) and
-        // its `currentRange()` reverts (so oracleRangeEnd is 0). The real staleness
-        // guards are UsdyAdapter._requireOracleFresh / getPrice() reverting on a dead
-        // oracle, plus the off-chain engine's updatedAt check; the peg-deviation branch
-        // below stays active. Kept here so the backstop works on any chain whose oracle
-        // DOES expose range/updatedAt. See docs/spec.md §2.3.
-        // M4 -- Dead oracle while holding USDY. YieldVault sets `oracleDown` only when the
+        // Both staleness checks below are INERT on Mantle: the deployed Ondo oracle
+        // has no on-chain `updatedAt` (so oracleUpdatedAt is never fed → 0) and its
+        // `currentRange()` reverts (so oracleRangeEnd is 0). The real staleness guards
+        // are UsdyAdapter._requireOracleFresh / getPrice() reverting on a dead oracle,
+        // plus the off-chain engine's updatedAt check; the peg-deviation branch below
+        // stays active. Kept here so the backstop works on any chain whose oracle DOES
+        // expose range/updatedAt.
+        //
+        // Dead oracle while holding USDY: YieldVault sets `oracleDown` only when the
         // USDY oracle read reverted AND the USDY bucket still holds assets, so this flag
         // already encodes "no usable NAV + nonzero RWA exposure". The peg branch needs a
         // live NAV and the staleness branches are inert on Mantle's Ondo oracle, so this
@@ -385,7 +385,7 @@ contract Guardrails is AccessControl {
     /**
      * @notice True when a move only reduces USDY (RWA) exposure into safe buckets:
      *         USDY strictly decreases and IDLE/AAVE/AUSD are all non-decreasing. Such
-     *         de-risk moves are exempt from the per-rebalance move-size cap (M2) — they
+     *         de-risk moves are exempt from the per-rebalance move-size cap — they
      *         add no RWA risk, so the cap (which bounds fat-finger/MEV on reallocations)
      *         should not block a full USDY exit; every other guardrail still applies.
      */
@@ -408,7 +408,7 @@ contract Guardrails is AccessControl {
         if (c.minInstantLiquidityBps >= _BPS) revert InvalidConfig();
         if (c.pegWarnBps > c.pegBlockBps) revert InvalidConfig();
         if (c.pegBlockBps > c.pegDeRiskBps) revert InvalidConfig();
-        // M5 -- the add-strategy timelock is also the delay for every other timelocked
+        // The add-strategy timelock is also the delay for every other timelocked
         // governance action (config changes, guardrail swaps). Enforce a hard floor so a
         // queued config can never ratchet the delay to zero and neuter the timelock.
         if (c.addStrategyTimelock < MIN_TIMELOCK) revert TimelockBelowMinimum();

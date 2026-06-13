@@ -72,6 +72,7 @@ export const PROTOCOLS: Record<string, Address | null> = {
   // /actions/swap endpoint routes every swap through this single contract; the adapter
   // pre-approves it and runs its returned calldata under an oracle-derived balance-delta
   // minOut. Must equal the adapter's on-chain immutable AGGREGATOR.
+  // extcodesize = 1581 on Mantle mainnet (verified this review).
   usdyAggregatorRouter: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E",
   // AUSD swaps (AusdAdapter) reuse the same pinned 1delta executor as USDY — there is no
   // separate AUSD router. Kept as an explicit alias rather than null so callers don't

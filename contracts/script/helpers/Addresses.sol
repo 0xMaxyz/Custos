@@ -20,7 +20,11 @@ library Addresses {
 
     /// Ondo USDY Redemption Price Oracle — getPrice() returns 18-dec NAV.
     address internal constant MAINNET_USDY_ORACLE = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
-    /// 1delta composer
+    /// Pinned 1delta swap executor for USDC<->USDY/AUSD swaps (UsdyAdapter/AusdAdapter).
+    /// 1delta's /actions/swap routes every swap through this single contract; the adapter
+    /// pre-approves it and runs its returned calldata under an oracle-derived balance-delta
+    /// minOut (the executor's output is never trusted; output must land on the adapter).
+    /// extcodesize = 1581 on Mantle mainnet (verified this review).
     address internal constant MAINNET_USDY_ROUTER = 0x5C019a146758287C614FE654CaEC1ba1CaF05F4E;
     /// Aave v3 PoolAddressesProvider; Pool + aUSDC resolved dynamically.
     address internal constant MAINNET_AAVE_PROVIDER = 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f;

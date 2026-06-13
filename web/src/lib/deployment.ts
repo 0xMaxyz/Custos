@@ -22,13 +22,14 @@ const isAddr = (a: string | undefined | null): a is `0x${string}` =>
 
 export interface ResolvedDeployment {
   vault: `0x${string}` | "";
+  guardrails: `0x${string}` | "";
   benchmark: `0x${string}` | "";
   aaveAdapter: `0x${string}` | "";
   usdyAdapter: `0x${string}` | "";
   ausdAdapter: `0x${string}` | "";
 }
 
-const EMPTY: ResolvedDeployment = { vault: "", benchmark: "", aaveAdapter: "", usdyAdapter: "", ausdAdapter: "" };
+const EMPTY: ResolvedDeployment = { vault: "", guardrails: "", benchmark: "", aaveAdapter: "", usdyAdapter: "", ausdAdapter: "" };
 
 /** Resolve Custos contract addresses for a chain (see precedence above). */
 export function resolveDeployment(chainId: number | undefined): ResolvedDeployment {
@@ -41,6 +42,7 @@ export function resolveDeployment(chainId: number | undefined): ResolvedDeployme
   if (!vault) return EMPTY; // no vault for this chain -> fixtures
   return {
     vault,
+    guardrails:  isAddr(d.guardrails)  ? d.guardrails  : "",
     benchmark:   isAddr(d.benchmark)   ? d.benchmark   : "",
     aaveAdapter: isAddr(d.aaveAdapter) ? d.aaveAdapter : "",
     usdyAdapter: isAddr(d.usdyAdapter) ? d.usdyAdapter : "",

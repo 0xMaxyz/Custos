@@ -2,6 +2,7 @@
 // Connect / network / account flows are handled by RainbowKit's ConnectButton.
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../components/Icons";
 
 export function Modal({ title, icon, onClose, children, footer, size }: {
@@ -26,7 +27,10 @@ export function Modal({ title, icon, onClose, children, footer, size }: {
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; prev?.focus?.(); };
   }, []);
-  return (
+  // Render through a portal to <body> so the fixed overlay resolves against the
+  // viewport — an ancestor with transform/filter/contain (e.g. a provider wrapper)
+  // would otherwise become its containing block and the modal would render off-screen.
+  return createPortal(
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={"modal" + (size === "lg" ? " modal-lg" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
@@ -37,6 +41,7 @@ export function Modal({ title, icon, onClose, children, footer, size }: {
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

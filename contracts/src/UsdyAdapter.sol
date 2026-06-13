@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -23,10 +24,10 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
  * Mantle is fragmented across thin pools (Agni USDY/USDT ~$0.97k, iZiSwap
  * USDY/USDC ~$0.40k, Butter USDY/USDC ~$0.23k). No single DEX has a usable direct
  * USDC/USDY route, so a single-pool swap reverts at any meaningful size. An
- * aggregator splits the order across all venues. See AGENTS.md §2.1 for why this
- * stays inside the custody boundary (pinned router + balance-delta minOut).
+ * aggregator splits the order across all venues. It stays inside the custody
+ * boundary via a pinned router + an oracle-derived balance-delta minOut.
  *
- * Why also hold mUSD (the Ondo Token Converter leg, ROADMAP 2.7): mUSD is the
+ * Why also hold mUSD (the Ondo Token Converter leg): mUSD is the
  * rebasing, $1-pegged form of USDY and frequently trades against deeper DEX
  * liquidity on Mantle than raw USDY. Holding either form interchangeably lets the
  * agent enter/exit through whichever leg is deeper, while the USDY ↔ mUSD
@@ -38,8 +39,7 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
  *   $1-pegged token; valued at face exactly as AusdAdapter values AUSD, never a DEX
  *   mark). The two are value-equivalent across a `wrap`/`unwrap`, so `totalAssets()`
  *   is conserved by a conversion.
- * - `maxWithdrawable()` = totalAssets(). Phase 2b will add a per-rebalance DEX
- *   liquidity cap.
+ * - `maxWithdrawable()` = totalAssets().
  * - Slippage is enforced on-chain by a **balance-delta** check: minOut is derived
  *   from oracle NAV ± maxSlippageBps and measured against the actual tokenOut this
  *   adapter receives — the aggregator's (and converter's) reported output is never
@@ -55,8 +55,7 @@ import { AggregatorSwapLib } from "./AggregatorSwapLib.sol";
  * - Only the vault (VAULT immutable) can call fund-moving functions.
  * - **Blocklist**: USDY (and mUSD) enforce a transfer blocklist. The vault and this
  *   adapter must NOT be on the blocklist at deploy time, or swaps/conversions will
- *   revert. Verify with `USDY.isBlocked(adapter)` before activating (Phase 0.5 gate).
- *   Phase 2b will add an on-chain pre-swap blocklist check.
+ *   revert. Verify with `USDY.isBlocked(adapter)` before activating.
  */
 contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -158,8 +157,6 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
             // currentRange() absent on Mantle's Ondo oracle → rangeEnd=0 disables
             // the adapter-level range-staleness check. The Guardrails depeg guard
             // (evaluateUsdyRisk) remains the deterministic backstop.
-            // TODO(2b): when Guardrails gets a live DEX spot feed, verify oracleRangeEnd=0
-            // doesn't silently suppress the allocator de-risk condition path.
             rangeEnd = 0;
         }
     }
@@ -187,7 +184,7 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
 
     /// @notice Whether the adapter holds USDY or mUSD. Balance-based and
     ///         oracle-independent, so the vault never removes this adapter and orphans
-    ///         funds when the oracle is down (totalAssets() would read 0). See M1.
+    ///         funds when the oracle is down (totalAssets() would read 0).
     function hasAssets() external view override returns (bool) {
         if (IERC20(USDY).balanceOf(address(this)) > 0) return true;
         return MUSD != address(0) && IERC20(MUSD).balanceOf(address(this)) > 0;
@@ -224,7 +221,7 @@ contract UsdyAdapter is IUsdyAdapter, ReentrancyGuard {
 
     /**
      * @notice Maximum USDC withdrawable via DEX swap at current oracle price.
-     *         Phase 2a: equal to totalAssets(). Phase 2b will cap by DEX liquidity.
+     *         Equal to totalAssets().
      */
     function maxWithdrawable() external view override returns (uint256) {
         return _totalAssets();

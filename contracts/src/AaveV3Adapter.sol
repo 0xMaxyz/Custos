@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -18,7 +19,7 @@ import { IAaveV3Pool, ReserveData } from "./interfaces/IAaveV3Pool.sol";
  *   so the vault never tries to withdraw more than the pool can serve.
  * - Only the vault (owner) can call deposit/withdraw/emergencyWithdrawAll.
  *
- * Phase 1b: supports Aave USDC supply/withdraw. swapData is ignored (no swap).
+ * Supports Aave USDC supply/withdraw; swapData is ignored (no swap).
  */
 contract AaveV3Adapter is IStrategyAdapter, ReentrancyGuard {
     using SafeERC20 for IERC20;

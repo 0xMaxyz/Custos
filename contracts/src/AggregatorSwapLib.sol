@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -10,7 +11,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
  *         router (e.g. Odos on Mantle) and enforces slippage with an on-chain
  *         **balance-delta** check the caller computed itself.
  *
- * Why an aggregator at all (and why this is still safe under AGENTS.md §2.1):
+ * Why an aggregator at all (and why this is still safe):
  * - USDY liquidity on Mantle is fragmented across thin pools (Agni USDY/USDT,
  *   iZiSwap USDY/USDC, Butter USDY/USDC — together ~$1.5k). No single router has
  *   a usable direct USDC/USDY route. An aggregator splits across them.

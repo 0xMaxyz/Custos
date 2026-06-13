@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Custos — AI risk-guardian real-yield account on Mantle.
 pragma solidity 0.8.28;
 
 import { IStrategyAdapter } from "./IStrategyAdapter.sol";
@@ -7,7 +8,7 @@ import { IStrategyAdapter } from "./IStrategyAdapter.sol";
  * @title IUsdyAdapter
  * @notice Extends IStrategyAdapter with oracle data access (so YieldVault can
  *         populate Guardrails.MarketState without holding a direct oracle reference)
- *         and the USDY ↔ mUSD converter leg (ROADMAP 2.7). USDY and mUSD are the two
+ *         and the USDY ↔ mUSD converter leg. USDY and mUSD are the two
  *         on-chain forms of the same RWA bucket; conversion is value-neutral and
  *         oracle-priced via the Ondo mUSD `wrap`/`unwrap` (see IMusd).
  */
@@ -24,7 +25,7 @@ interface IUsdyAdapter is IStrategyAdapter {
     ///         disabled (USDY-only adapter).
     function MUSD() external view returns (address);
 
-    /// @notice Raw held RWA token balances, oracle-independent (M4). Lets the vault
+    /// @notice Raw held RWA token balances, oracle-independent. Lets the vault
     ///         compute a DEX-spot-derived de-risk floor when the oracle is down (so the
     ///         NAV-based valuation reads 0 yet the position is real).
     /// @return usdyBal Held USDY (18-dec).

@@ -46,8 +46,8 @@ export const MAINNET_DEPLOYMENT: DeploymentAddresses = {
   vault:       "0xc4dc4Bc6e7bF61300747b017C08Ae86b63F08d3F",
   benchmark:   "0xf1feCfc87fe4613AbCcd6B591884Ce12f272cb87",
   aaveAdapter: "0x158FDE048f7ecEDE51580B1e990dcaCB3125C0b6",
-  usdyAdapter: "0xE328746c01bED1F5EBd1fbd5f532c58533f0D8cb",
-  ausdAdapter: "0xFA8d098B1D59D0A927EBa7E902BceB24a4cf3939",
+  usdyAdapter: "0xFe58aaB3C14BB2Af5555c6753b2971d0ADfBfd9f",
+  ausdAdapter: "0x0E695Cdb8010Ca7D75F90860eCc63a569888484e",
   agentId: null,
 };
 

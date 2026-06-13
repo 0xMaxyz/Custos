@@ -11,12 +11,11 @@ const DOCS_URL = "https://github.com/0xMaxyz/Custos/tree/main/docs#docs";
 
 const NAV = [
   { route: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
-  { route: "activity", label: "Activity", icon: "scroll-text" },
   { route: "agent", label: "Agent", icon: "bot" },
-  { route: "insights", label: "Insights", icon: "line-chart" },
+  { route: "activity", label: "Activity", icon: "scroll-text" },
 ] as const;
 
-export type Route = "dashboard" | "activity" | "agent" | "insights";
+export type Route = "dashboard" | "activity" | "agent";
 export type NetKey = "mainnet" | "testnet";
 
 function Brand({ onClick }: { onClick: (e: React.MouseEvent) => void }) {

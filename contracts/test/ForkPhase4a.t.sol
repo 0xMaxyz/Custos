@@ -101,12 +101,13 @@ contract ForkPhase4aTest is Test {
             keccak256("ipfs://QmOutcome")
         );
 
-        // The feedback is indexed per (agentId, client); index 0 is the first entry.
+        // The feedback is indexed per (agentId, client); the canonical registry is
+        // 1-based (index 0 reverts "index must be > 0"), so the first entry is index 1.
         uint64 lastIndex = reputation.getLastIndex(agentId, client);
         assertEq(lastIndex, 1, "one feedback entry recorded for this client");
 
         (int128 readValue, uint8 readDecimals, string memory tag1,, bool isRevoked) =
-            reputation.readFeedback(agentId, client, 0);
+            reputation.readFeedback(agentId, client, lastIndex);
         assertEq(readValue, value, "feedback value round-trips");
         assertEq(readDecimals, decimals, "feedback decimals round-trip");
         assertEq(tag1, "DERISK", "feedback tag round-trips");

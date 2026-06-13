@@ -56,8 +56,19 @@ export function fixtureSnapshot(): InsightsSnapshot {
   };
 }
 
+/** Abort a /snapshot fetch that hangs so the radar never blocks the page (the
+ *  agent can be briefly slow/unreachable on a cold cache). */
+const FETCH_TIMEOUT_MS = 8_000;
+
 export async function fetchSnapshot(): Promise<InsightsSnapshot> {
-  const res = await fetch(`${AGENT_API_URL}/snapshot`);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => { ctrl.abort(); }, FETCH_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${AGENT_API_URL}/snapshot`, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`/snapshot ${res.status}`);
   const ctx = (await res.json()) as SnapshotDto;
   return {
@@ -86,6 +97,10 @@ export interface UseInsightsDataResult {
 }
 
 const REFRESH_INTERVAL_MS = 15_000;
+// The agent returns 503 ("try again shortly") on a cold/stale snapshot cache; retry
+// a few times with a short backoff before falling back to stale/fixture data.
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2_000;
 
 export function useInsightsData(): UseInsightsDataResult {
   const [snapshot, setSnapshot] = useState<InsightsSnapshot>(fixtureSnapshot);
@@ -102,16 +117,22 @@ export function useInsightsData(): UseInsightsDataResult {
 
     let cancelled = false;
     const fetch = async () => {
-      try {
-        const snap = await fetchSnapshot();
-        if (!cancelled) {
-          setSnapshot(snap);
-          setLastUpdated(new Date());
-          setStale(false);
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          const snap = await fetchSnapshot();
+          if (!cancelled) {
+            setSnapshot(snap);
+            setLastUpdated(new Date());
+            setStale(false);
+            setLoading(false);
+          }
+          return;
+        } catch {
+          if (cancelled) return;
+          if (attempt < MAX_RETRIES - 1) {
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+            continue;
+          }
           setStale(true);
           setLoading(false);
         }

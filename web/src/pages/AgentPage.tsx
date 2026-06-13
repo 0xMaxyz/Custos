@@ -8,6 +8,7 @@ import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions } from "../li
 import { askAgent } from "../lib/askAgent";
 import { useIdentity, useDecisions } from "../lib/useGuardianData";
 import { useInsightsData, buildLiveWatchlist } from "../lib/useInsightsData";
+import { useGuardrails, useX402Offer } from "../lib/useAgentLive";
 
 function IdentityCard() {
   const { identity: id, cardUrl } = useIdentity();
@@ -87,6 +88,9 @@ function WatchlistPanel() {
 }
 
 function GuardrailsPanel() {
+  // Live `Guardrails.config()` (cached for the session); fixture only in demo/offline.
+  const { rows, isLive } = useGuardrails();
+  const items = isLive ? rows : guardrails;
   return (
     <Card>
       <div className="card-hl">
@@ -97,7 +101,7 @@ function GuardrailsPanel() {
         The agent proposes; these bounds dispose. The model can never cross them — it is never the last line of defense.
       </p>
       <div className="guardrail-grid">
-        {guardrails.map((g) => (
+        {items.map((g) => (
           <div key={g.key} className="guardrail">
             <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{g.label}</div>
             <div className="mono" style={{ fontWeight: 600, fontSize: "1rem", marginTop: 3 }}>{g.value}</div>
@@ -109,11 +113,20 @@ function GuardrailsPanel() {
   );
 }
 
+function endpointPath(resource: string): string {
+  try {
+    return new URL(resource).pathname;
+  } catch {
+    return resource || "/risk-score";
+  }
+}
+
 function AgentEconomicsPanel() {
-  const { card } = useIdentity();
-  const sells = card?.sells;
+  // Read the LIVE x402 offer straight from the agent's 402-gated /risk-score endpoint,
+  // so this reflects what the agent actually accepts right now.
+  const { offer, loading } = useX402Offer();
   // priceBaseUnits is in the asset's base units (USDC = 6-dec).
-  const priceUsdc = sells ? (Number(sells.priceBaseUnits) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 }) : undefined;
+  const priceUsdc = offer ? (Number(offer.priceBaseUnits) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 }) : undefined;
   return (
     <Card>
       <div className="card-hl">
@@ -125,16 +138,17 @@ function AgentEconomicsPanel() {
       </p>
 
       <div className="stat-label" style={{ marginBottom: 6 }}>Sells · x402 paid endpoint</div>
-      {sells ? (
+      {offer ? (
         <>
-          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Risk score</span><span className="v mono">GET {sells.endpoint}</span></div>
-          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Price</span><span className="v mono">{priceUsdc} USDC / call</span></div>
-          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Pay to</span><AddressChip address={sells.payTo} /></div>
-          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Asset</span><AddressChip address={sells.asset} /></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Risk score</span><span className="v mono">GET {endpointPath(offer.resource)}</span></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Price</span><span className="v mono">{priceUsdc} {offer.tokenName ?? "USDC"} / call</span></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Pay to</span><AddressChip address={offer.payTo} /></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Asset</span><AddressChip address={offer.asset} /></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Network</span><span className="v mono">{offer.network}</span></div>
         </>
       ) : (
         <p style={{ margin: "4px 0 0", fontSize: "0.8125rem", color: "var(--muted)" }}>
-          x402 paid endpoint not configured on this agent.
+          {loading ? "Checking the paid endpoint…" : "x402 paid endpoint not enabled on this agent."}
         </p>
       )}
     </Card>

@@ -35,3 +35,4 @@ coverage/
 
 # misc
 *.local
+e2e

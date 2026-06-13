@@ -4,6 +4,7 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import type { ReactNode } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { RainbowKitProvider, getDefaultConfig, lightTheme, darkTheme } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { mantleMainnet, mantleTestnet, supportedChains, DEFAULT_CHAIN } from "./lib/chains";
@@ -13,10 +14,13 @@ import { mantleMainnet, mantleTestnet, supportedChains, DEFAULT_CHAIN } from "./
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "custos-local-dev";
 
 export const wagmiConfig = projectId === "custos-local-dev"
-  // Without a real WC project id, RainbowKit's WC connector errors — fall back
-  // to a bare injected/transport config so the app still boots in dev/test.
+  // Without a real WC project id, RainbowKit's WalletConnect connector errors — fall
+  // back to a config with the `injected()` connector (MetaMask/Rabby/Brave + any
+  // EIP-6963 wallet) so connecting (and therefore depositing) still works. Only mobile
+  // WalletConnect sessions need VITE_WALLETCONNECT_PROJECT_ID.
   ? createConfig({
       chains: supportedChains,
+      connectors: [injected()],
       transports: {
         [mantleMainnet.id]: http(),
         [mantleTestnet.id]: http(),

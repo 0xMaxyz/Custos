@@ -12,12 +12,11 @@ import { DepositModal, WithdrawModal, type ToastPayload } from "./modals/TradeMo
 import { DashboardPage } from "./pages/DashboardPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { AgentPage } from "./pages/AgentPage";
-import { InsightsPage } from "./pages/InsightsPage";
 import { useVaultData } from "./lib/useVaultData";
 import { supportedChains } from "./lib/chains";
 import { resolveInitialTheme } from "./lib/theme";
 
-const ROUTES: Route[] = ["dashboard", "activity", "agent", "insights"];
+const ROUTES: Route[] = ["dashboard", "agent", "activity"];
 const SUPPORTED_IDS = supportedChains.map((c) => c.id) as number[];
 
 type ModalState = { type: "deposit" } | { type: "withdraw" } | null;
@@ -118,9 +117,8 @@ export default function App() {
       <Banners wrongNet={wrongNet} paused={flags.paused || vault.paused} killed={flags.killed || vault.killed} />
       <main>
         {route === "dashboard" && <DashboardPage {...pageProps} />}
-        {route === "activity" && <ActivityPage loading={loading} activityError={flags.activityError} />}
         {route === "agent" && <AgentPage loading={loading} />}
-        {route === "insights" && <InsightsPage loading={loading} />}
+        {route === "activity" && <ActivityPage loading={loading} activityError={flags.activityError} />}
       </main>
       <Footer />
       <MobileNav route={route} go={go} />

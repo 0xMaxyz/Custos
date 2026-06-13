@@ -80,7 +80,12 @@ export function WeightBars({ pre, post }: { pre: WeightsBps; post: WeightsBps })
 
 // ---------- Sparkline (two series overlay) ----------
 export function Sparkline({ a, b, width = 132, height = 40, colorA = "var(--primary)", colorB = "var(--faint)" }: { a: number[]; b: number[]; width?: number; height?: number; colorA?: string; colorB?: string }) {
-  const all = [...a, ...b], min = Math.min(...all), max = Math.max(...all), span = max - min || 1;
+  // Guard empty series (e.g. live mode with no benchmark history yet): Math.min(...[])
+  // is +Infinity, which makes span/zeroY NaN and React warns on the NaN attributes.
+  const all = [...a, ...b].filter((v) => Number.isFinite(v));
+  const min = all.length ? Math.min(...all) : 0;
+  const max = all.length ? Math.max(...all) : 1;
+  const span = max - min || 1;
   const pts = (arr: number[]) => arr.map((v, i) => {
     const x = arr.length > 1 ? (i / (arr.length - 1)) * width : 0;
     const y = height - 4 - ((v - min) / span) * (height - 8);

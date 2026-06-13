@@ -48,7 +48,7 @@ export const MAINNET_DEPLOYMENT: DeploymentAddresses = {
   aaveAdapter: "0x158FDE048f7ecEDE51580B1e990dcaCB3125C0b6",
   usdyAdapter: "0xFe58aaB3C14BB2Af5555c6753b2971d0ADfBfd9f",
   ausdAdapter: "0x0E695Cdb8010Ca7D75F90860eCc63a569888484e",
-  agentId: null,
+  agentId: 128,
 };
 
 /** Testnet (chainId 5003) deployed addresses. Populate after testnet deploy. */

@@ -13,7 +13,6 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { AgentPage } from "./pages/AgentPage";
 import { InsightsPage } from "./pages/InsightsPage";
-import { walletUsdcBalance } from "./lib/data";
 import { useVaultData } from "./lib/useVaultData";
 import { supportedChains } from "./lib/chains";
 import { resolveInitialTheme } from "./lib/theme";
@@ -75,7 +74,7 @@ export default function App() {
 
   const { address, isConnected, chainId } = useAccount();
   const { openConnectModal } = useConnectModal();
-  const { vault, position, usdcAddress, isLive: vaultLive } = useVaultData(address);
+  const { vault, position, usdcAddress, walletUsdc, isLive: vaultLive } = useVaultData(address);
   // Demo wrong-net flag OR a genuinely unsupported chain while connected.
   const wrongNet = (flags.wrongNet || (isConnected && chainId !== undefined && !SUPPORTED_IDS.includes(chainId)));
   // When vault is live, derive emptyPosition from actual shares; fall back to dev flag.
@@ -101,8 +100,8 @@ export default function App() {
   // Not connected → open RainbowKit's connect modal; otherwise run the action.
   const needWallet = (next: () => void) => { if (!isConnected) { openConnectModal?.(); } else { next(); } };
 
-  // Wallet balance is still a fixture until live ERC-20 reads land (see useVaultData seam).
-  const tradeWallet = { connected: isConnected, address, balance: walletUsdcBalance };
+  // Wallet USDC balance from the live ERC-20 read (fixture in demo/offline).
+  const tradeWallet = { connected: isConnected, address, balance: walletUsdc };
 
   const pageProps = {
     connected: isConnected, paused: flags.paused || vault.paused, killed: flags.killed || vault.killed,

@@ -7,6 +7,7 @@ import * as fmt from "../lib/fmt";
 import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions } from "../lib/data";
 import { askAgent } from "../lib/askAgent";
 import { useIdentity, useDecisions } from "../lib/useGuardianData";
+import { useInsightsData, buildLiveWatchlist } from "../lib/useInsightsData";
 
 function IdentityCard() {
   const { identity: id, cardUrl } = useIdentity();
@@ -55,11 +56,14 @@ function IdentityCard() {
 }
 
 function WatchlistPanel() {
+  // Live rows from the agent /snapshot; fall back to the fixture in demo/offline.
+  const { snapshot } = useInsightsData();
+  const rows = snapshot.live ? buildLiveWatchlist(snapshot) : watchlist;
   return (
     <Card>
       <span className="card-title"><Icon name="eye" size={14} />What I'm watching</span>
       <div style={{ display: "grid", gap: 2 }}>
-        {watchlist.map((w, i) => {
+        {rows.map((w, i) => {
           const r = RISK[w.status];
           const t = SIGNAL_TYPES[w.signal];
           return (

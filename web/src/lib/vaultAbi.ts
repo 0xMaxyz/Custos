@@ -27,6 +27,39 @@ export const ADAPTER_ABI = [
   },
 ] as const;
 
+// Guardrails.config() — the live on-chain guardrail parameters.
+export const GUARDRAILS_ABI = [
+  {
+    name: "config",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "maxWeightBps", type: "uint16[4]" },
+          { name: "minIdleBps", type: "uint16" },
+          { name: "minInstantLiquidityBps", type: "uint16" },
+          { name: "maxUsdyNotionalUsdc", type: "uint256" },
+          { name: "maxSlippageBps", type: "uint16" },
+          { name: "maxRebalanceMoveBps", type: "uint16" },
+          { name: "minRebalanceInterval", type: "uint32" },
+          { name: "tvlCap", type: "uint256" },
+          { name: "perTxDepositCap", type: "uint256" },
+          { name: "addStrategyTimelock", type: "uint32" },
+          { name: "pegWarnBps", type: "uint16" },
+          { name: "pegBlockBps", type: "uint16" },
+          { name: "pegDeRiskBps", type: "uint16" },
+          { name: "oracleMaxAge", type: "uint32" },
+          { name: "oracleRangeEndBuffer", type: "uint32" },
+        ],
+      },
+    ],
+  },
+] as const;
+
 export const BENCHMARK_ABI = [
   {
     name: "decisionCount",

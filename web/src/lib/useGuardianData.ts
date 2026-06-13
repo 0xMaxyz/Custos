@@ -54,7 +54,34 @@ const IDENTITY_ABI = [
     inputs: [{ name: "agentId", type: "uint256" }],
     outputs: [{ name: "", type: "string" }],
   },
+  {
+    name: "ownerOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
 ] as const;
+
+// IPFS gateway for resolving the agent card (ipfs:// → https). Override with
+// VITE_IPFS_GATEWAY_URL; defaults to a public Pinata gateway.
+const IPFS_GATEWAY = (import.meta.env.VITE_IPFS_GATEWAY_URL ?? "https://gateway.pinata.cloud").replace(/\/+$/, "");
+
+/** Resolve an ipfs:// (or ipfs/<cid>) URI to an HTTPS gateway URL; pass through http(s)/data. */
+export function ipfsToGateway(uri: string): string {
+  if (!uri) return "";
+  if (uri.startsWith("ipfs://")) {
+    const cid = uri.slice("ipfs://".length).replace(/^ipfs\//, "");
+    return `${IPFS_GATEWAY}/ipfs/${cid}`;
+  }
+  return uri;
+}
+
+/** The slice of the pinned ERC-8004 agent card the UI surfaces. */
+export interface AgentCardLite {
+  name?: string;
+  sells?: { endpoint: string; payTo: `0x${string}`; asset: `0x${string}`; priceBaseUnits: string };
+}
 
 // Minimal Decision shape built from on-chain data. Fields that require
 // off-chain resolution (signals, evidence, outcome, txHash) start as empty
@@ -189,30 +216,64 @@ export type IdentityRecord = typeof fixtureIdentity;
 export interface IdentityData {
   identity: IdentityRecord;
   baseline: BaselineSummary;
+  /** Pinned agent card resolved from tokenURI via the IPFS gateway (or undefined). */
+  card: AgentCardLite | undefined;
+  /** HTTPS gateway URL for the agent card (clickable), or "". */
+  cardUrl: string;
   isLive: boolean;
 }
 
 export function useIdentity(): IdentityData {
+  const enabled = agentIdBigInt !== undefined;
   const { data: rawURI } = useReadContract({
     address: IDENTITY_REGISTRY,
     abi: IDENTITY_ABI,
     functionName: "tokenURI",
     args: agentIdBigInt !== undefined ? [agentIdBigInt] : undefined,
-    query: { enabled: agentIdBigInt !== undefined },
+    query: { enabled },
+  });
+  const { data: rawOwner } = useReadContract({
+    address: IDENTITY_REGISTRY,
+    abi: IDENTITY_ABI,
+    functionName: "ownerOf",
+    args: agentIdBigInt !== undefined ? [agentIdBigInt] : undefined,
+    query: { enabled },
   });
   // isLive only when tokenURI has actually resolved from chain, not just when
-  // VITE_AGENT_ID is set. Track record / series remain fixture-backed until
-  // benchmark outcomes accumulate on-chain (Phase 5b).
+  // VITE_AGENT_ID is set.
   const tokenURI = rawURI as string | undefined;
+  const owner = rawOwner as `0x${string}` | undefined;
   const isLive = tokenURI !== undefined && tokenURI.length > 0;
-  const computedBaseline = computeBaseline(fixtureBaseline);
+  const cardUrl = tokenURI ? ipfsToGateway(tokenURI) : "";
+
+  // Resolve the pinned agent card JSON through the gateway (name + x402 sells offer).
+  const [card, setCard] = useState<AgentCardLite | undefined>(undefined);
+  useEffect(() => {
+    if (!cardUrl) {
+      setCard(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetch(cardUrl)
+      .then((r) => (r.ok ? (r.json() as Promise<AgentCardLite>) : undefined))
+      .then((j) => { if (!cancelled && j) setCard(j); })
+      .catch(() => { /* gateway miss — leave card undefined, UI falls back */ });
+    return () => { cancelled = true; };
+  }, [cardUrl]);
+
   const identity: IdentityRecord = {
     ...fixtureIdentity,
+    agentId: AGENT_ID_RAW ? Number(AGENT_ID_RAW) : fixtureIdentity.agentId,
+    name: card?.name ?? fixtureIdentity.name,
     agentURI: tokenURI ?? fixtureIdentity.agentURI,
+    owner: owner ?? fixtureIdentity.owner,
+    identityRegistry: IDENTITY_REGISTRY,
   };
   return {
     identity,
-    baseline: computedBaseline,
+    baseline: computeBaseline(fixtureBaseline),
+    card,
+    cardUrl,
     isLive,
   };
 }

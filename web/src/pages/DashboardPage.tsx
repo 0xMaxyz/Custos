@@ -164,8 +164,10 @@ function PositionCard({ connected, empty, paused, killed, vault, position, metri
 function AllocationCard({ vault }: { vault: VaultState }) {
   const instant = parseFloat(vault.instantWithdrawableUsdc);
   const tvl = parseFloat(vault.tvlUsdc);
-  const instantPct = Math.round((instant / tvl) * 100);
-  const ok = instantPct >= 15;
+  const hasTvl = tvl > 0;
+  // Avoid NaN when the vault is empty; an empty vault trivially meets the floor.
+  const instantPct = hasTvl ? Math.round((instant / tvl) * 100) : 0;
+  const ok = !hasTvl || instantPct >= 15;
   return (
     <Card>
       <span className="card-title"><Icon name="layout-dashboard" size={14} />Allocation</span>
@@ -186,8 +188,8 @@ function AllocationCard({ vault }: { vault: VaultState }) {
       </div>
       <div style={{ marginTop: 16, padding: "12px 14px", borderRadius: "var(--rounded-btn)", background: ok ? "var(--success-soft)" : "var(--error-soft)", display: "flex", alignItems: "center", gap: 10 }}>
         <Icon name={ok ? "check-circle" : "alert-triangle"} size={16} style={{ color: ok ? "var(--success)" : "var(--error)" }} />
-        <span style={{ fontSize: "0.875rem", flex: 1 }}>Instantly withdrawable <strong className="mono">{fmt.usd(instant)}</strong> ({instantPct}% of TVL)</span>
-        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>min 15% floor</span>
+        <span style={{ fontSize: "0.875rem", flex: 1 }}>Instantly withdrawable <strong className="mono">{fmt.usd(instant)}</strong>{hasTvl ? ` (${instantPct}% of TVL)` : ""}</span>
+        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{hasTvl ? "min 15% floor" : "no deposits yet"}</span>
       </div>
     </Card>
   );

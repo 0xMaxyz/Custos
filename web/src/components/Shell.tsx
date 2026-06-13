@@ -1,8 +1,13 @@
 // App shell: Topbar, MobileNav, Banners, Footer. Matches Design/src/shell.jsx.
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useChainId } from "wagmi";
 import { Icon } from "./Icons";
-import { explorer, tokens } from "../lib/data";
+import { explorer } from "../lib/data";
+import { resolveDeployment } from "../lib/deployment";
+
+const REPO_URL = "https://github.com/0xMaxyz/Custos";
+const DOCS_URL = "https://github.com/0xMaxyz/Custos/tree/main/docs#docs";
 
 const NAV = [
   { route: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
@@ -17,7 +22,7 @@ export type NetKey = "mainnet" | "testnet";
 function Brand({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
     <a className="brand" href="#dashboard" onClick={onClick}>
-      <span className="brand-mark"><Icon name="shield-check" size={18} /></span>
+      <img src="/custos.svg" alt="" width={26} height={26} style={{ display: "block" }} />
       Custos
     </a>
   );
@@ -104,14 +109,20 @@ export function Banners({ wrongNet, paused, killed }: { wrongNet: boolean; pause
 }
 
 export function Footer() {
+  const chainId = useChainId();
+  // Link the deployed Vault (not USDC) on the explorer; fall back to mainnet.
+  const vault = resolveDeployment(chainId).vault || resolveDeployment(5000).vault;
+  const vaultUrl = vault ? `${explorer}/address/${vault}` : explorer;
   return (
     <footer className="footer">
       <div className="footer-inner">
         <span>Custos — autonomous, on-chain risk-guardian vault on Mantle.</span>
         <span style={{ flex: 1 }} />
-        <a href="#" onClick={(e) => e.preventDefault()}><Icon name="external-link" size={13} />Repo</a>
-        <a href="#" onClick={(e) => e.preventDefault()}><Icon name="external-link" size={13} />Docs</a>
-        <a href={explorer + "/address/" + tokens.USDC.address} target="_blank" rel="noreferrer"><Icon name="external-link" size={13} />Contract on Mantlescan</a>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 16, flexWrap: "nowrap" }}>
+          <a href={REPO_URL} target="_blank" rel="noreferrer"><Icon name="external-link" size={13} />Repo</a>
+          <a href={DOCS_URL} target="_blank" rel="noreferrer"><Icon name="external-link" size={13} />Docs</a>
+          <a href={vaultUrl} target="_blank" rel="noreferrer"><Icon name="external-link" size={13} />Vault on Mantlescan</a>
+        </span>
       </div>
     </footer>
   );

@@ -21,6 +21,9 @@ pragma solidity 0.8.35;
  *
  * Environment variables read:
  *   DEPLOYER_PRIVATE_KEY   - deployer / initial admin
+ *   EXISTING_GUARDRAILS    - (optional) adopt an already-deployed, still-un-bootstrapped
+ *                            Guardrails instead of deploying a new one (resume a partial
+ *                            deploy). Deployer must still hold its admin roles.
  *   INITIAL_TIMELOCK_SECONDS - (mainnet, optional) bootstrap addStrategyTimelock for the
  *                            guarded-launch window (>= 1h MIN_TIMELOCK floor; 0/unset = 2d default)
  *   ADMIN_ADDRESS          - final admin (DEFAULT_ADMIN_ROLE + ADMIN) recipient. On mainnet
@@ -117,11 +120,24 @@ contract Deploy is Script {
         console2.log("USDC:", usdc);
         console2.log("USDY:", usdy);
 
+        // Optionally adopt an already-deployed Guardrails instead of deploying a fresh
+        // one — e.g. resuming a deploy that failed AFTER Guardrails was created but
+        // before its setConfig bootstrap landed. The adopted instance must still be
+        // un-bootstrapped (the setConfig below reverts AlreadyInitialized otherwise) and
+        // the deployer must still hold its admin roles (true until the H4 handoff at the
+        // end of this script). Leave unset to deploy a new Guardrails.
+        address existingGuardrails = vm.envOr("EXISTING_GUARDRAILS", address(0));
+
         vm.startBroadcast(deployerKey);
 
         // ── 1. Guardrails ─────────────────────────────────────────────────────
-        guardrails = new Guardrails(deployer);
-        console2.log("Guardrails:", address(guardrails));
+        if (existingGuardrails != address(0)) {
+            guardrails = Guardrails(existingGuardrails);
+            console2.log("Guardrails (adopted existing):", address(guardrails));
+        } else {
+            guardrails = new Guardrails(deployer);
+            console2.log("Guardrails:", address(guardrails));
+        }
 
         // One-shot config bootstrap (H3): setConfig applies instantly the first time and
         // then seals — every later change is timelocked via queueConfig/activateConfig.

@@ -40,8 +40,16 @@ const empty: DeploymentAddresses = {
   agentId: null,
 };
 
-/** Mainnet (chainId 5000) deployed addresses. Populate after deploy. */
-export const MAINNET_DEPLOYMENT: DeploymentAddresses = { ...empty };
+/** Mainnet (chainId 5000) deployed addresses. */
+export const MAINNET_DEPLOYMENT: DeploymentAddresses = {
+  guardrails:  "0x90C52C8Bd9df235b012e1920E5E8bb43B4B16e55",
+  vault:       "0xc4dc4Bc6e7bF61300747b017C08Ae86b63F08d3F",
+  benchmark:   "0xf1feCfc87fe4613AbCcd6B591884Ce12f272cb87",
+  aaveAdapter: "0x158FDE048f7ecEDE51580B1e990dcaCB3125C0b6",
+  usdyAdapter: "0xE328746c01bED1F5EBd1fbd5f532c58533f0D8cb",
+  ausdAdapter: "0xFA8d098B1D59D0A927EBa7E902BceB24a4cf3939",
+  agentId: null,
+};
 
 /** Testnet (chainId 5003) deployed addresses. Populate after testnet deploy. */
 export const TESTNET_DEPLOYMENT: DeploymentAddresses = {

@@ -39,8 +39,14 @@ describe("resolveDeployment", () => {
     expect(d.usdyAdapter).toMatch(/^0x[0-9a-fA-F]{40}$/);
   });
 
-  it("returns empty (fixtures) for the undeployed mainnet (5000)", () => {
-    expect(resolveDeployment(5000).vault).toBe("");
+  it("resolves the deployed mainnet (5000) vault", () => {
+    // Skip when the test run forces demo mode (VITE_DEMO_MODE=true).
+    if (DEMO_MODE) return;
+    const d = resolveDeployment(5000);
+    expect(d.vault).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(d.aaveAdapter).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(d.usdyAdapter).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(d.ausdAdapter).toMatch(/^0x[0-9a-fA-F]{40}$/);
   });
 
   it("returns empty for an unknown chain or undefined", () => {

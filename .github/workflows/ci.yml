@@ -58,15 +58,25 @@ jobs:
         with:
           version: v1.4.1
 
+      # forge v1.4.1 has a stale expected checksum for solc 0.8.35. Pre-install
+      # the binary from the official GitHub release and use --offline so forge
+      # skips the download/verify step that would otherwise fail the CI job.
+      - name: Install solc 0.8.35
+        run: |
+          mkdir -p "$HOME/.svm/0.8.35"
+          curl -sSL -o "$HOME/.svm/0.8.35/solc-0.8.35" \
+            https://github.com/ethereum/solidity/releases/download/v0.8.35/solc-static-linux
+          chmod +x "$HOME/.svm/0.8.35/solc-0.8.35"
+
       - name: Build
         working-directory: contracts
-        run: forge build
+        run: forge build --offline
 
       - name: Unit tests (offline — no fork)
         working-directory: contracts
         # Exclude every fork-only suite (ForkTest, ForkPhase1bTest, …) — their
         # setUp() needs a live Mantle fork. Pattern matches any contract named *Fork*.
-        run: forge test --no-match-contract 'Fork' -vv
+        run: forge test --no-match-contract 'Fork' -vv --offline
 
   # ── Fork tests (live Mantle RPC — post-merge on main only) ───────────────────
   # These hit live Mantle mainnet (DEX liquidity, oracle NAV, Aave) so their
@@ -95,12 +105,21 @@ jobs:
         with:
           version: v1.4.1
 
+      - name: Install solc 0.8.35
+        run: |
+          mkdir -p "$HOME/.svm/0.8.35"
+          curl -sSL -o "$HOME/.svm/0.8.35/solc-0.8.35" \
+            https://github.com/ethereum/solidity/releases/download/v0.8.35/solc-static-linux
+          chmod +x "$HOME/.svm/0.8.35/solc-0.8.35"
+
       - name: Fork tests
         working-directory: contracts
         env:
           MANTLE_RPC_URL: ${{ secrets.MANTLE_RPC_URL }}
         # Run every fork suite (ForkTest gate + ForkPhase1bTest Aave adapter + …).
+        # --offline: solc is pre-installed above; skip forge's download/verify step.
         run: |
           forge test --fork-url "$MANTLE_RPC_URL" \
             --match-contract 'Fork' \
+            --offline \
             -vv

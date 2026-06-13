@@ -68,12 +68,13 @@ export const PROTOCOLS: Record<string, Address | null> = {
   // a USDY->mUSD->USDY round-trip is value-neutral at oracle NAV.
   // TODO: stamp "verified @ block N" once the Phase-0 fork gate runs in CI.
   ondoTokenConverter: "0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3",
-  // Pinned Odos aggregator router used by UsdyAdapter for USDC<->USDY swaps.
-  // extcodesize = 14721 confirmed on Mantle mainnet by cursor[bot] review.
-  // TODO: record "verified @ block N" once Phase-0 fork gate runs in CI.
-  usdyAggregatorRouter: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745",
-  // AUSD swaps (AusdAdapter, task A1.1) reuse the same pinned Odos aggregator as
-  // USDY — there is no separate AUSD router. Kept as an explicit alias rather than
-  // null so callers don't read it as "AUSD routing not wired".
-  dexRouterAusd: "0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745",
+  // Pinned 1delta swap executor used by UsdyAdapter for USDC<->USDY swaps. 1delta's
+  // /actions/swap endpoint routes every swap through this single contract; the adapter
+  // pre-approves it and runs its returned calldata under an oracle-derived balance-delta
+  // minOut. Must equal the adapter's on-chain immutable AGGREGATOR.
+  usdyAggregatorRouter: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E",
+  // AUSD swaps (AusdAdapter) reuse the same pinned 1delta executor as USDY — there is no
+  // separate AUSD router. Kept as an explicit alias rather than null so callers don't
+  // read it as "AUSD routing not wired".
+  dexRouterAusd: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E",
 };

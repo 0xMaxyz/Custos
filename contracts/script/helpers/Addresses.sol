@@ -20,8 +20,8 @@ library Addresses {
 
     /// Ondo USDY Redemption Price Oracle — getPrice() returns 18-dec NAV.
     address internal constant MAINNET_USDY_ORACLE = 0xA96abbe61AfEdEB0D14a20440Ae7100D9aB4882f;
-    /// Pinned Odos aggregator router for USDC<->USDY swaps (UsdyAdapter).
-    address internal constant MAINNET_USDY_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
+    /// 1delta composer
+    address internal constant MAINNET_USDY_ROUTER = 0x5C019a146758287C614FE654CaEC1ba1CaF05F4E;
     /// Aave v3 PoolAddressesProvider; Pool + aUSDC resolved dynamically.
     address internal constant MAINNET_AAVE_PROVIDER = 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f;
 

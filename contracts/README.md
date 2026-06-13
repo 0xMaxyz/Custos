@@ -37,6 +37,7 @@ src/
   CustosReputationRegistry.sol ERC-8004 fallback reputation registry
   Roles.sol                   ADMIN / ALLOCATOR / GUARDIAN role constants
   AggregatorSwapLib.sol       Balance-delta minOut helper for 1delta swap calldata
+  Custos.sol                  Compile-time MANTLE_CHAIN_ID constant / scaffold marker
   interfaces/                 Canonical ABIs (ERC-8004, ERC-8183, IMusd, IStrategyAdapter…)
 
 script/
@@ -52,8 +53,9 @@ test/
 
 ## Deployed addresses
 
-See [`packages/shared/src/deployments.ts`](../packages/shared/src/deployments.ts) for the
-current testnet (5003) and mainnet (5000) addresses.
+Mainnet (5000) contracts are deployed — see [`deployments/5000.json`](../deployments/5000.json).
+The canonical address records live in [`packages/shared/src/deployments.ts`](../packages/shared/src/deployments.ts).
+The root [`README.md`](../README.md) has full tables with MantleScan links.
 
 ## In-depth docs
 

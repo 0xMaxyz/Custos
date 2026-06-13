@@ -147,7 +147,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 - Anthropic LLM client behind a thin, mockable `LLMClient` interface
 - ERC-8004 identity (canonical 0x8004 singletons on Mantle)
 - Frontend: account dashboard + risk-guardian feed (rationale + evidence) + deposit/withdraw + identity card + baseline counter
-- Deployed on Mantle Sepolia testnet (5003); mainnet deploy pending keys
+- Deployed on Mantle mainnet (5000) and Sepolia testnet (5003) — see [`deployments/`](../deployments/) and [`packages/shared/src/deployments.ts`](../packages/shared/src/deployments.ts)
 
 ### Additional features (shipped)
 

@@ -4,6 +4,11 @@ End-to-end runbook for deploying the full stack: contracts, ERC-8004 identity,
 backend agent, frontend, and the Caddy reverse proxy. Written for Mantle mainnet
 (chainId 5000); testnet (5003) differences are called out inline.
 
+> **Current state:** Mainnet (5000) contracts are already deployed — see
+> [`deployments/5000.json`](../deployments/5000.json). This guide serves for
+> **fresh testnet deployments, re-deploys, or local fork rehearsals**. Skip phases
+> already completed.
+
 > **Read first:** `docs/agents.md` §2 (non-negotiables), `docs/spec.md` §1 (guardrail
 > parameters & roles). Never commit secrets; everything sensitive lives in a
 > git-ignored `.env` (template: `.env.example`).

@@ -63,7 +63,7 @@ autonomous defense.**
  │  Agent (TS)   │  rebalance/deRisk   │  Guardrails        (immutable limits)         │
  │ Fastify       │───────────────────▶│  AgentBenchmark    (decisions + passive Δ)    │
  │  risk engine  │                    │  ERC-8004 identity + reputation (canonical)   │
- │  LLM (Claude) │◀── data (1delta    │  ERC-8183 job escrow + guardrail Evaluator    │
+ │  LLM (SDK)    │◀── data (1delta    │  ERC-8183 job escrow + guardrail Evaluator    │
  │  validator    │     + Mantle RPC)  └──────────────────────────────────────────────┘
  │  executor     │   evidence → IPFS (decisionURI) · premium feeds via x402 (EIP-3009)
  └───────────────┘

@@ -14,10 +14,10 @@ forge test --root contracts --match-contract Fork --fork-url $MANTLE_RPC_URL   #
 > **solc binary in restricted environments:** if `forge build` can't reach
 > `binaries.soliditylang.org`, install it from GitHub releases:
 > ```bash
-> mkdir -p ~/.svm/0.8.28
-> curl -sSL -o ~/.svm/0.8.28/solc-0.8.28 \
->   https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux
-> chmod +x ~/.svm/0.8.28/solc-0.8.28
+> mkdir -p ~/.svm/0.8.35
+> curl -sSL -o ~/.svm/0.8.35/solc-0.8.35 \
+>   https://github.com/ethereum/solidity/releases/download/v0.8.35/solc-static-linux
+> chmod +x ~/.svm/0.8.35/solc-0.8.35
 > forge build --root contracts --offline
 > ```
 

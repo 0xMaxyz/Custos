@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title IERC8004Canonical — the REAL deployed erc-8004 registry ABIs on Mantle

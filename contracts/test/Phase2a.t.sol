@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.35;
 
 /**
  * @title Phase2a.t.sol — Unit tests for tasks 2.1–2.3 (offline, no fork)

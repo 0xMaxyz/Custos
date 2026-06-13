@@ -1,28 +1,9 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════════════════════════
-# COPY THIS ENTIRE FILE into claude.ai/code → Environment settings → Setup script
-#
-# Cloud environments are NOT repo-based — they are shared across projects and
-# this script runs before any repository is cloned. Do NOT reference project
-# paths here. Project setup is in scripts/claude-cloud-session-setup.sh
-# (SessionStart hook committed to each repo).
-#
-# Pre-installed on the cloud VM (no action needed):
-#   Node 20/21/22 (nvm), pnpm/npm/yarn, Docker + docker compose, git/jq/ripgrep
-#   https://code.claude.com/docs/en/claude-code-on-the-web#installed-tools
-#
-# Docker daemon is NOT running during this setup script — do not pull images here.
-# Image pulls and `docker compose up` run in the repo SessionStart hook instead.
-#
-# Trusted network mode blocks binaries.soliditylang.org — solc is fetched from
-# GitHub releases instead. Add rpc.mantle.xyz + api.1delta.io to Allowed domains
-# in the environment for Mantle fork tests / live RPC (per-repo concern).
-# ═══════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
 readonly FOUNDRY_VERSION="v1.4.1"
-readonly SOLC_VERSION="0.8.28"
+readonly SOLC_VERSION="0.8.35"
 readonly NODE_VERSION="22"
 readonly PNPM_VERSION="10.33.0"
 readonly FOUNDRY_BIN_DIR="$HOME/.foundry/bin"

@@ -1,5 +1,6 @@
-# Custos reverse proxy. Replace :80 with your domain for automatic TLS.
-:80 {
+# Custos reverse proxy. Serves the SPA and proxies /api/* to the agent.
+# Caddy auto-provisions Let's Encrypt TLS for the domain below.
+trycustos.xyz {
 	# Agent API
 	handle_path /api/* {
 		reverse_proxy agent:8080

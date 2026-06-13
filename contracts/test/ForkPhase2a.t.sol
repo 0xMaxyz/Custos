@@ -13,8 +13,8 @@ pragma solidity 0.8.35;
  *         values an empty position at 0, and is not on the USDY blocklist.
  *
  * NOTE — why there is no live USDC→USDY swap here:
- *   USDY execution now routes through a single pinned DEX **aggregator** (Odos on
- *   Mantle): the adapter runs aggregator calldata and enforces a balance-delta
+ *   USDY execution now routes through a single pinned router (the 1delta swap
+ *   executor on Mantle): the adapter runs aggregator calldata and enforces a balance-delta
  *   minOut. Reproducing that on a fork requires the aggregator's signed route
  *   calldata for the exact fork block, which can't be fetched deterministically in
  *   Foundry. The swap execution path (deposit/withdraw/emergency, minOut enforcement,
@@ -46,10 +46,9 @@ contract ForkPhase2aTest is Test {
     // on-chain in ForkPhase2d.t.sol (usdy()==USDY, oracle()==RWADynamicOracle).
     address internal constant MUSD = 0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3;
 
-    // Odos V2 router on Mantle — the single pinned aggregator the adapter executes
-    // against. MUST be re-verified on-chain (Phase 0.3 gate) before any deployment;
-    // only used for construction here (no live swap is performed in this suite).
-    address internal constant ODOS_ROUTER = 0xD9F4e85489aDCD0bAF0Cd63b4231c6af58c26745;
+    // 1delta swap executor on Mantle — the single pinned router the adapter executes
+    // against. Only used for construction here (no live swap is performed in this suite).
+    address internal constant ONEDELTA_EXECUTOR = 0x5C019a146758287C614FE654CaEC1ba1CaF05F4E;
 
     // USDY oracle: Ondo Redemption Price Oracle on Mantle. USDY.oracle() reverts,
     // so we use the documented constant (Ondo docs / Phase 0.3 gate). Exposes
@@ -82,7 +81,7 @@ contract ForkPhase2aTest is Test {
         vault = new YieldVault(USDC, admin, address(gr));
 
         adapter = new UsdyAdapter(
-            ODOS_ROUTER,
+            ONEDELTA_EXECUTOR,
             USDC,
             USDY,
             MUSD,

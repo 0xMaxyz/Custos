@@ -213,7 +213,7 @@ contract Deploy is Script {
         }
 
         // ── 5b. AusdAdapter (safety bucket; skip if no AUSD / router) ─────────
-        // AUSD swaps run through the same pinned Odos aggregator as USDY.
+        // AUSD swaps run through the same pinned 1delta swap executor as USDY.
         if (ausd != address(0) && usdyRouter != address(0)) {
             ausdAdapter = new AusdAdapter(
                 usdyRouter,

@@ -2,15 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Icon } from "../components/Icons";
-import { Card, AddressChip, StatusDot, Skeleton, PaidEvidenceBadge, JobStatusChip } from "../components/Components";
+import { Card, AddressChip, StatusDot, Skeleton } from "../components/Components";
 import * as fmt from "../lib/fmt";
-import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions, agentEconomics } from "../lib/data";
+import { RISK, SIGNAL_TYPES, watchlist, guardrails, askSuggestions } from "../lib/data";
 import { askAgent } from "../lib/askAgent";
-import { useIdentity } from "../lib/useGuardianData";
+import { useIdentity, useDecisions } from "../lib/useGuardianData";
 
 function IdentityCard() {
-  const { identity: id } = useIdentity();
-  const tr = id.trackRecord;
+  const { identity: id, cardUrl } = useIdentity();
+  const { decisions } = useDecisions();
+  // Track record derived from on-chain DecisionRecorded events. vs-passive /
+  // drawdown-avoided come from AgentBenchmark outcomes which aren't populated yet,
+  // so they read "—" rather than a fabricated number.
+  const decisionCount = decisions.length;
+  const deRiskCount = decisions.filter((d) => d.kind === 1).length;
   return (
     <Card>
       <span className="card-title"><Icon name="fingerprint" size={14} />Agent identity · ERC-8004</span>
@@ -25,20 +30,22 @@ function IdentityCard() {
           <div style={{ marginTop: 12, display: "grid", gap: 2 }}>
             <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Owner</span><AddressChip address={id.owner} /></div>
             <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Registry</span><AddressChip address={id.identityRegistry} /></div>
-            <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Agent card</span><a className="linklike mono" style={{ fontSize: "0.8125rem" }} href="#" onClick={(e) => e.preventDefault()}>{fmt.shortHash(id.agentURI, 12, 6)} <Icon name="external-link" size={13} /></a></div>
+            <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Agent card</span>{cardUrl
+              ? <a className="linklike mono" style={{ fontSize: "0.8125rem" }} href={cardUrl} target="_blank" rel="noreferrer">{fmt.shortHash(id.agentURI, 12, 6)} <Icon name="external-link" size={13} /></a>
+              : <span className="mono" style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{fmt.shortHash(id.agentURI, 12, 6)}</span>}</div>
           </div>
         </div>
       </div>
       <hr className="divider" />
       <div className="grid track" style={{ gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
         {[
-          { l: "Decisions", v: tr.decisions },
-          { l: "De-risk events", v: tr.deRiskEvents },
-          { l: "vs passive", v: "+" + tr.realizedVsPassivePct + "%", role: "success" },
-          { l: "Drawdown avoided", v: "−" + fmt.usd(tr.drawdownAvoidedUsdc, { cents: false }), role: "success" },
+          { l: "Decisions", v: String(decisionCount) },
+          { l: "De-risk events", v: String(deRiskCount) },
+          { l: "vs passive", v: "—" },
+          { l: "Drawdown avoided", v: "—" },
         ].map((s, i) => (
           <div key={i}>
-            <div className="mono" style={{ fontWeight: 700, fontSize: "1.25rem", color: s.role ? `var(--${s.role})` : undefined }}>{s.v}</div>
+            <div className="mono" style={{ fontWeight: 700, fontSize: "1.25rem" }}>{s.v}</div>
             <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: 2 }}>{s.l}</div>
           </div>
         ))}
@@ -99,49 +106,33 @@ function GuardrailsPanel() {
 }
 
 function AgentEconomicsPanel() {
-  const { sells, paidEvidence, jobs } = agentEconomics;
+  const { card } = useIdentity();
+  const sells = card?.sells;
+  // priceBaseUnits is in the asset's base units (USDC = 6-dec).
+  const priceUsdc = sells ? (Number(sells.priceBaseUnits) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 }) : undefined;
   return (
     <Card>
       <div className="card-hl">
-        <span className="card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Agent economics · A4</span>
-        <span className="chip role-neutral" style={{ height: 22 }} title="x402 payments and ERC-8183 job escrow never move vault deposits.">outside custody</span>
+        <span className="card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Agent economics · x402</span>
+        <span className="chip role-neutral" style={{ height: 22 }} title="x402 payments never move vault deposits.">outside custody</span>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: "0.875rem", color: "var(--muted)", lineHeight: 1.5 }}>
-        Buys its evidence, sells its judgment — and settles each de-risk as a verifiable job. None of this touches vault deposits.
+        Sells its risk judgment per call via x402, paid in USDC — settled entirely outside the vault custody path.
       </p>
 
       <div className="stat-label" style={{ marginBottom: 6 }}>Sells · x402 paid endpoint</div>
-      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Risk score</span><span className="v mono">GET {sells.endpoint}</span></div>
-      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Price</span><span className="v mono">{sells.priceUsdc} {sells.asset} / call</span></div>
-      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Pay to</span><AddressChip address={sells.payTo} /></div>
-      <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Calls served</span><span className="v mono">{sells.callsServed}</span></div>
-
-      <hr className="divider" />
-
-      <div className="stat-label" style={{ marginBottom: 8 }}>Buys · paid evidence (x402)</div>
-      <div style={{ display: "grid", gap: 8 }}>
-        {paidEvidence.map((p, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <PaidEvidenceBadge receipt={{ evidenceId: "", amountUsdc: p.amountUsdc, asset: p.asset, transaction: p.transaction, network: "mantle", payer: sells.payTo, resource: "" }} />
-            <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{p.source} → decision <span className="mono">#{p.forDecision}</span></span>
-          </div>
-        ))}
-      </div>
-
-      <hr className="divider" />
-
-      <div className="stat-label" style={{ marginBottom: 8 }}>Verifiable jobs · ERC-8183 → ERC-8004 reputation</div>
-      <div style={{ display: "grid", gap: 8 }}>
-        {jobs.map((j) => (
-          <div key={j.jobId} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <JobStatusChip status={j.status} />
-            <span className="mono" style={{ fontSize: "0.8125rem" }}>#{j.jobId}</span>
-            <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{fmt.usd(j.budgetUsdc)} bounty</span>
-            {j.forDecision != null && <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>→ decision <span className="mono">#{j.forDecision}</span></span>}
-            {j.reputationScore != null && <span className="chip role-success" style={{ height: 22 }}>+{j.reputationScore} rep</span>}
-          </div>
-        ))}
-      </div>
+      {sells ? (
+        <>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Risk score</span><span className="v mono">GET {sells.endpoint}</span></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Price</span><span className="v mono">{priceUsdc} USDC / call</span></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Pay to</span><AddressChip address={sells.payTo} /></div>
+          <div className="kvrow" style={{ padding: "5px 0" }}><span className="k">Asset</span><AddressChip address={sells.asset} /></div>
+        </>
+      ) : (
+        <p style={{ margin: "4px 0 0", fontSize: "0.8125rem", color: "var(--muted)" }}>
+          x402 paid endpoint not configured on this agent.
+        </p>
+      )}
     </Card>
   );
 }

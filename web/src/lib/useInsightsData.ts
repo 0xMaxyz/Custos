@@ -94,6 +94,18 @@ export interface UseInsightsDataResult {
   /** True when live mode is configured but the latest /snapshot fetch failed —
    *  the radar is showing stale/fixture data and operators should know. */
   stale: boolean;
+  /** Live snapshots accumulated this session (for the time-series charts). Module-
+   *  scoped so it survives route changes; empty until the first live read lands. */
+  history: InsightsSnapshot[];
+}
+
+// Session-scoped ring buffer of live samples — the charts plot real data only.
+const MAX_HISTORY = 240; // ~1h at the 15s refresh
+const liveHistory: InsightsSnapshot[] = [];
+function pushHistory(s: InsightsSnapshot): void {
+  if (liveHistory.length > 0 && liveHistory[liveHistory.length - 1]?.asOf === s.asOf) return;
+  liveHistory.push(s);
+  if (liveHistory.length > MAX_HISTORY) liveHistory.shift();
 }
 
 const REFRESH_INTERVAL_MS = 15_000;
@@ -107,6 +119,7 @@ export function useInsightsData(): UseInsightsDataResult {
   const [loading, setLoading] = useState(AGENT_API_URL.length > 0);
   const [lastUpdated, setLastUpdated] = useState<Date | undefined>(undefined);
   const [stale, setStale] = useState(false);
+  const [history, setHistory] = useState<InsightsSnapshot[]>(() => [...liveHistory]);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -125,6 +138,10 @@ export function useInsightsData(): UseInsightsDataResult {
             setLastUpdated(new Date());
             setStale(false);
             setLoading(false);
+            if (snap.live) {
+              pushHistory(snap);
+              setHistory([...liveHistory]);
+            }
           }
           return;
         } catch {
@@ -147,7 +164,7 @@ export function useInsightsData(): UseInsightsDataResult {
     };
   }, []);
 
-  return { snapshot, loading, lastUpdated, stale };
+  return { snapshot, loading, lastUpdated, stale, history };
 }
 
 export interface WatchRow {

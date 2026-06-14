@@ -19,9 +19,6 @@ import { VAULT_ABI, BENCHMARK_ABI, ADAPTER_ABI } from "./vaultAbi";
 import { resolveDeployment, computeWeightsBps } from "./deployment";
 import { getLogsPaged } from "./useGuardianData";
 
-// Deployment block hint: scope getLogs (deposited cost-basis) to avoid a full-chain
-// scan on mainnet. Shared with useGuardianData via the same env var.
-const DEPLOY_BLOCK = BigInt(import.meta.env.VITE_VAULT_DEPLOY_BLOCK ?? "0");
 
 const ERC20_ABI = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
@@ -140,7 +137,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
         ] },
         args: { owner: account },
         fromBlock, toBlock,
-      }), DEPLOY_BLOCK),
+      }), dep.vaultDeployBlock),
       getLogsPaged(head, ({ fromBlock, toBlock }) => client.getLogs({
         address: VAULT_ADDRESS,
         event: { type: "event", name: "Withdraw", inputs: [
@@ -152,7 +149,7 @@ export function useVaultData(account?: `0x${string}`): VaultData {
         ] },
         args: { owner: account },
         fromBlock, toBlock,
-      }), DEPLOY_BLOCK),
+      }), dep.vaultDeployBlock),
     ]).then(([deposits, withdraws]) => {
       if (cancelled) return;
       const net = sumAssets(deposits) - sumAssets(withdraws);

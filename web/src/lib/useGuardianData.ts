@@ -11,15 +11,11 @@
 // not the demo fixture data).
 
 import { useReadContract, useWatchContractEvent, usePublicClient, useChainId } from "wagmi";
-import { useRef, useState, useEffect }                              from "react";
+import { useState, useEffect }                              from "react";
 import { decisions as fixtureDecisions, identity as fixtureIdentity, baseline as fixtureBaseline, type Decision } from "./data";
 import { computeBaseline, type BaselineSummary } from "./baseline";
 import { VAULT_ABI }      from "./vaultAbi";
 import { resolveDeployment } from "./deployment";
-
-// Deployment block hint: scope getLogs to avoid full-chain scan on mainnet.
-// Set VITE_VAULT_DEPLOY_BLOCK after deploy (defaults to 0 = from genesis).
-const DEPLOY_BLOCK = BigInt(import.meta.env.VITE_VAULT_DEPLOY_BLOCK ?? "0");
 
 // Mantle RPC providers cap the block span of a single getLogs call, so a lone
 // fromBlock→latest query can exceed the per-call limit and fail (N5). Page the range.
@@ -83,37 +79,93 @@ export interface AgentCardLite {
   sells?: { endpoint: string; payTo: `0x${string}`; asset: `0x${string}`; priceBaseUnits: string };
 }
 
-// Minimal Decision shape built from on-chain data. Fields that require
-// off-chain resolution (signals, evidence, outcome, txHash) start as empty
-// defaults and can be enriched later when the decisionURI bundle is fetched.
-// blockTimestamp: pass log.blockNumber * 1 as a stable ordering key; the
-// accurate wall-clock time comes from the decisionURI bundle (future work).
+type W = { IDLE: number; AAVE: number; USDY: number; AUSD: number };
+
+// On-chain event ABIs used to enrich the decision feed (signatures verified against
+// contracts/src/YieldVault.sol). Rebalanced carries the resulting weights; DeRisked
+// carries the destination bucket.
+const REBALANCED_EVENT = {
+  type: "event", name: "Rebalanced",
+  inputs: [
+    { name: "id", type: "uint256", indexed: true },
+    { name: "postWeightsBps", type: "uint16[4]", indexed: false },
+  ],
+} as const;
+const DERISKED_EVENT = {
+  type: "event", name: "DeRisked",
+  inputs: [
+    { name: "id", type: "uint256", indexed: true },
+    { name: "toBucket", type: "uint8", indexed: false },
+    { name: "evidenceHash", type: "bytes32", indexed: false },
+  ],
+} as const;
+const DECISION_RECORDED_EVENT = {
+  type: "event", name: "DecisionRecorded",
+  inputs: [
+    { name: "id", type: "uint256", indexed: true },
+    { name: "kind", type: "uint8", indexed: false },
+    { name: "rationaleHash", type: "bytes32", indexed: false },
+    { name: "decisionURI", type: "string", indexed: false },
+  ],
+} as const;
+
+/** A short "30% Idle / 70% Aave" description of the largest target buckets. */
+function describeWeights(w: W): string {
+  const parts = ([["Idle", w.IDLE], ["Aave", w.AAVE], ["USDY", w.USDY], ["AUSD", w.AUSD]] as [string, number][])
+    .filter(([, b]) => b > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, b]) => `${Math.round(b / 100)}% ${k}`);
+  return parts.join(" / ") || "—";
+}
+
+/** Best-effort post-weights for a de-risk (USDY → 0 into the destination bucket). */
+function deriveDeRiskPost(pre: W, toBucket: number | undefined): W {
+  const moved = pre.USDY;
+  if (moved === 0) return pre;
+  return toBucket === 3
+    ? { ...pre, USDY: 0, AUSD: pre.AUSD + moved }
+    : { ...pre, USDY: 0, IDLE: pre.IDLE + moved };
+}
+
+// Build a Decision from on-chain data. Manual ALLOCATOR actions (decisionURI prefixed
+// "manual:") have no LLM bundle, so confidence/benchmark-outcome are flagged off and a
+// plain-language summary is derived from the resulting weights.
 function buildLiveDecision(args: {
-  id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
-  blockNumber?: bigint;
+  id: number; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
+  txHash: string; timestamp: string; pre: W; post: W; toBucket?: number;
 }): Decision {
-  // Use a stable placeholder — actual timestamp from bundle fetch (Phase 5b).
-  const timestamp = new Date().toISOString();
+  const isManual = args.decisionURI.startsWith("manual:");
+  const kindLabel = args.kind === 1 ? "de-risk" : "rebalance";
+  const summary = isManual
+    ? `Manual ${kindLabel} → ${describeWeights(args.post)}`
+    : `Agent ${kindLabel} → ${describeWeights(args.post)}`;
   return {
-    id:              Number(args.id),
+    id:              args.id,
     kind:            args.kind as 0 | 1,
-    timestamp,
-    riskLevel:       "NORMAL",
+    timestamp:       args.timestamp,
+    riskLevel:       args.kind === 1 ? "DERISK" : "NORMAL",
     confidence:      0,
-    preWeightsBps:   { IDLE: 0, AAVE: 0, USDY: 0, AUSD: 0 },
-    postWeightsBps:  { IDLE: 0, AAVE: 0, USDY: 0, AUSD: 0 },
+    ...(args.toBucket !== undefined ? { toBucket: args.toBucket } : {}),
+    preWeightsBps:   args.pre,
+    postWeightsBps:  args.post,
     flags:           [],
     maxUsdyWeightBpsAllowed: 6000,
-    summary:         `Decision #${Number(args.id)} — bundle resolving…`,
-    rationale:       "",
+    summary,
+    rationale:       isManual
+      ? "Manual ALLOCATOR action, submitted on-chain within the guardrails. No model rationale — this was an operator decision."
+      : "Recorded on-chain; the full model rationale lives in the decision bundle.",
     signals:         [],
     evidence:        [],
     rationaleHash:   args.rationaleHash as string,
     decisionURI:     args.decisionURI,
     outcome:         { realizedYieldBps: 0, passiveDeltaBps: 0, drawdownAvoidedUsdc: "0", measuredAt: "" },
-    txHash:          "",
+    txHash:          args.txHash,
+    isManual,
   };
 }
+
+const IDLE_ONLY: W = { IDLE: 10_000, AAVE: 0, USDY: 0, AUSD: 0 };
+const toW = (a: readonly number[]): W => ({ IDLE: a[0] ?? 0, AAVE: a[1] ?? 0, USDY: a[2] ?? 0, AUSD: a[3] ?? 0 });
 
 export interface GuardianFeed {
   decisions: Decision[];
@@ -123,73 +175,92 @@ export interface GuardianFeed {
 
 export function useDecisions(): GuardianFeed {
   const chainId = useChainId();
-  const VAULT_ADDRESS = resolveDeployment(chainId).vault as `0x${string}`;
+  const dep = resolveDeployment(chainId);
+  const VAULT_ADDRESS = dep.vault as `0x${string}`;
   const isDeployed = VAULT_ADDRESS.length > 2;
+  const deployBlock = dep.vaultDeployBlock;
   // null = loading (deployed, fetch in progress); [] = loaded but empty
   const [liveDecisions, setLiveDecisions] = useState<Decision[] | null>(isDeployed ? null : []);
-  const seenIds = useRef(new Set<number>());
+  // Bump to re-run the loader (used by the live watch when a new event arrives).
+  const [reloadKey, setReloadKey] = useState(0);
   const client = usePublicClient();
 
-  // Backfill historical DecisionRecorded events on mount.
+  // Load the full feed: DecisionRecorded (the spine) joined with Rebalanced (post
+  // weights) + DeRisked (destination) + block timestamps. Scoped to the vault deploy
+  // block so we never scan from genesis (a full-chain Mantle scan is thousands of paged
+  // getLogs calls — the public-RPC 429 storm). Rebuilds the whole feed (not append-only)
+  // so derived pre-weights stay consistent.
   useEffect(() => {
     if (!isDeployed || !client) {
       setLiveDecisions([]);
       return;
     }
-    getLogsPaged(
-      () => client.getBlockNumber(),
-      ({ fromBlock, toBlock }) => client.getLogs({
-        address: VAULT_ADDRESS,
-        event: {
-          type: "event",
-          name: "DecisionRecorded",
-          inputs: [
-            { name: "id",            type: "uint256", indexed: true  },
-            { name: "kind",          type: "uint8",   indexed: false },
-            { name: "rationaleHash", type: "bytes32", indexed: false },
-            { name: "decisionURI",   type: "string",  indexed: false },
-          ],
-        },
-        fromBlock,
-        toBlock,
-      }),
-      DEPLOY_BLOCK,
-    ).then((logs) => {
-      const next: Decision[] = [];
-      for (const log of [...logs].reverse()) {
-        const args = log.args as { id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string };
-        const nId = Number(args.id);
-        if (seenIds.current.has(nId)) continue;
-        seenIds.current.add(nId);
-        next.push(buildLiveDecision({ ...args, blockNumber: log.blockNumber ?? undefined }));
-      }
-      setLiveDecisions(next);
-    }).catch(() => {
-      // getLogs unavailable — fall back to empty live feed, watch-only.
-      setLiveDecisions([]);
-    });
-  }, [client, VAULT_ADDRESS, isDeployed]);
+    let cancelled = false;
+    const head = () => client.getBlockNumber();
+    const range = (event: typeof DECISION_RECORDED_EVENT | typeof REBALANCED_EVENT | typeof DERISKED_EVENT) =>
+      getLogsPaged(head, ({ fromBlock, toBlock }) => client.getLogs({ address: VAULT_ADDRESS, event, fromBlock, toBlock }), deployBlock);
 
-  // Watch for new events after mount.
+    Promise.all([range(DECISION_RECORDED_EVENT), range(REBALANCED_EVENT), range(DERISKED_EVENT)])
+      .then(async ([decLogs, rebLogs, derLogs]) => {
+        // id → resulting weights / destination bucket.
+        const postById = new Map<number, W>();
+        for (const l of rebLogs) {
+          const a = l.args as { id: bigint; postWeightsBps: readonly number[] };
+          postById.set(Number(a.id), toW(a.postWeightsBps));
+        }
+        const toBucketById = new Map<number, number>();
+        for (const l of derLogs) {
+          const a = l.args as { id: bigint; toBucket: number };
+          toBucketById.set(Number(a.id), Number(a.toBucket));
+        }
+
+        // Fetch a timestamp per unique block the decisions landed in (deduped).
+        const blocks = [...new Set(decLogs.map((l) => l.blockNumber).filter((b): b is bigint => b != null))];
+        const tsByBlock = new Map<bigint, number>();
+        await Promise.all(
+          blocks.map((b) => client.getBlock({ blockNumber: b }).then((blk) => tsByBlock.set(b, Number(blk.timestamp))).catch(() => {})),
+        );
+        if (cancelled) return;
+
+        // Build ascending by id so pre-weights chain from the previous decision's post.
+        const ascending = [...decLogs].sort((x, y) => {
+          const xi = Number((x.args as { id: bigint }).id), yi = Number((y.args as { id: bigint }).id);
+          return xi - yi;
+        });
+        let prev: W = IDLE_ONLY;
+        const built: Decision[] = [];
+        for (const log of ascending) {
+          const a = log.args as { id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string };
+          const id = Number(a.id);
+          const kind = Number(a.kind);
+          const toBucket = toBucketById.get(id);
+          const post = kind === 1 ? deriveDeRiskPost(prev, toBucket) : postById.get(id) ?? prev;
+          const ts = log.blockNumber != null ? tsByBlock.get(log.blockNumber) : undefined;
+          built.push(buildLiveDecision({
+            id, kind, rationaleHash: a.rationaleHash, decisionURI: a.decisionURI,
+            txHash: log.transactionHash ?? "",
+            timestamp: ts ? new Date(ts * 1000).toISOString() : new Date().toISOString(),
+            pre: prev, post,
+            ...(toBucket !== undefined ? { toBucket } : {}),
+          }));
+          prev = post;
+        }
+        built.reverse(); // most-recent first
+        setLiveDecisions(built);
+      })
+      .catch(() => { if (!cancelled) setLiveDecisions([]); });
+
+    return () => { cancelled = true; };
+  }, [client, VAULT_ADDRESS, isDeployed, deployBlock, reloadKey]);
+
+  // A new on-chain decision → trigger a full reload (keeps pre/post chaining correct).
   useWatchContractEvent({
     address: VAULT_ADDRESS,
     abi: VAULT_ABI,
     eventName: "DecisionRecorded",
     enabled: isDeployed,
-    onLogs(logs) {
-      setLiveDecisions((prev) => {
-        const next = [...(prev ?? [])];
-        for (const log of logs) {
-          const { id, kind, rationaleHash, decisionURI } = log.args as {
-            id: bigint; kind: number; rationaleHash: `0x${string}`; decisionURI: string;
-          };
-          const nId = Number(id);
-          if (seenIds.current.has(nId)) continue;
-          seenIds.current.add(nId);
-          next.unshift(buildLiveDecision({ id, kind, rationaleHash, decisionURI, blockNumber: log.blockNumber ?? undefined }));
-        }
-        return next;
-      });
+    onLogs() {
+      setReloadKey((k) => k + 1);
     },
   });
 

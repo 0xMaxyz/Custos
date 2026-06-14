@@ -5,19 +5,37 @@ import { defineChain } from "viem";
 import { mantle, mantleSepoliaTestnet } from "viem/chains";
 import { MANTLE_MAINNET_CHAIN_ID, MANTLE_TESTNET_CHAIN_ID, getDeployment } from "@custos/shared";
 
-const MAINNET_RPC = import.meta.env.VITE_MANTLE_RPC_URL || "https://rpc.mantle.xyz";
-const TESTNET_RPC = import.meta.env.VITE_MANTLE_TESTNET_RPC_URL || "https://rpc.sepolia.mantle.xyz";
+// A pool of public Mantle RPCs. The app fans these out through a viem `fallback`
+// transport (see providers.tsx) so a single rate-limited endpoint (429) fails over to
+// the next instead of stalling reads — the browser-side analogue of the agent's RPC
+// rotation, minus the premium endpoint. Override/extend with a comma-separated
+// VITE_MANTLE_RPC_URL (its entries are tried first).
+const DEFAULT_MAINNET_RPCS = [
+  "https://rpc.mantle.xyz",
+  "https://mantle-rpc.publicnode.com",
+  "https://mantle.drpc.org",
+  "https://1rpc.io/mantle",
+];
+
+function parseRpcList(env: string | undefined, fallbacks: string[]): string[] {
+  const fromEnv = (env ?? "").split(",").map((u) => u.trim()).filter(Boolean);
+  // Env entries first (operator preference), then the public pool, de-duplicated.
+  return [...new Set([...fromEnv, ...fallbacks])];
+}
+
+export const MAINNET_RPCS = parseRpcList(import.meta.env.VITE_MANTLE_RPC_URL, DEFAULT_MAINNET_RPCS);
+export const TESTNET_RPCS = parseRpcList(import.meta.env.VITE_MANTLE_TESTNET_RPC_URL, ["https://rpc.sepolia.mantle.xyz"]);
 
 export const mantleMainnet = defineChain({
   ...mantle,
   id: MANTLE_MAINNET_CHAIN_ID,
-  rpcUrls: { default: { http: [MAINNET_RPC] } },
+  rpcUrls: { default: { http: MAINNET_RPCS } },
 });
 
 export const mantleTestnet = defineChain({
   ...mantleSepoliaTestnet,
   id: MANTLE_TESTNET_CHAIN_ID,
-  rpcUrls: { default: { http: [TESTNET_RPC] } },
+  rpcUrls: { default: { http: TESTNET_RPCS } },
 });
 
 const hasDeploy = (id: number) => (getDeployment(id).vault?.length ?? 0) > 2;

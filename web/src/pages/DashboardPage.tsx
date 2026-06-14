@@ -50,7 +50,7 @@ function AgentStatusCard({ go }: { go: (r: Route) => void }) {
           <p style={{ margin: "0 0 12px", fontSize: "0.9375rem", fontWeight: 500, lineHeight: 1.45 }}>{decision.summary}</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             {decision.signals.slice(0, 2).map((s, i) => <SignalBadge key={i} type={s.type} severity={s.severity} />)}
-            <ConfidenceMeter value={decision.confidence} compact />
+            {decision.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual</span> : <ConfidenceMeter value={decision.confidence} compact />}
           </div>
         </div>
       </div>
@@ -180,7 +180,10 @@ function AllocationCard({ vault }: { vault: VaultState }) {
   const ok = !hasTvl || instantPct >= 15;
   return (
     <Card>
-      <span className="cs-card-title"><Icon name="layout-dashboard" size={14} />Allocation</span>
+      <div className="cs-card-hl">
+        <span className="cs-card-title" style={{ margin: 0 }}><Icon name="layout-dashboard" size={14} />Vault allocation</span>
+        <InfoTip text="The entire vault's allocation across buckets — shared by all depositors, not just your funds." />
+      </div>
       <div style={{ display: "flex", gap: 22, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <AllocationChart weightsBps={vault.weightsBps} />

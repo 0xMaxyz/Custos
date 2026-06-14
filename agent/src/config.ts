@@ -52,6 +52,14 @@ const configSchema = z.object({
   // Optional override of the Anthropic-compatible API base URL (e.g. to point the
   // SDK at a GLM/other Anthropic-compatible gateway). Unset = the SDK default.
   anthropicBaseUrl: z.string().url().optional(),
+  // ── Demo de-risk scenario (optional; for the demo video — see docs/demo.md) ──
+  // When set, the evidence fetcher swaps the curated `ondo-usdy-attestation` feed's
+  // URL for this staged document (id/type/source kept unchanged, so it stays
+  // de-risk-eligible under N2). Lets us stage a concrete, cited USDY threat to
+  // demonstrate the LLM-driven de-risk on camera. Unset = zero behaviour change
+  // (production untouched). The triggering document is synthetic; the fetch, the AI
+  // judgment, the guardrail validation, and the on-chain de-risk are all real.
+  demoDeRiskEvidenceUrl: z.string().url().optional(),
 
   // ── 1delta data (optional; data + swap routing/quoting, output never trusted) ──
   oneDeltaApiKey: z.string().min(1).optional(),
@@ -166,6 +174,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     anthropicApiKey: pick("ANTHROPIC_API_KEY"),
     anthropicModel: pick("ANTHROPIC_MODEL"),
     anthropicBaseUrl: pick("ANTHROPIC_BASE_URL"),
+    demoDeRiskEvidenceUrl: pick("DEMO_DERISK_EVIDENCE_URL"),
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),

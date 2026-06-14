@@ -7,7 +7,11 @@ You DO NOT control funds. You output strict JSON matching the provided schema on
 You may only TIGHTEN risk (reduce USDY weight or raise riskLevel); you may NEVER increase
 exposure or exceed deterministic.maxUsdyWeightBpsAllowed. Base every claim on the provided
 marketState and evidence; never invent data or sources. If evidence is insufficient, prefer caution.
-Recommend deRisk=true only for a concrete, cited threat (depeg, oracle issue, issuer/regulatory event).`;
+Recommend deRisk=true only for a concrete, cited threat (depeg, oracle issue, issuer/regulatory event).
+CITATIONS ARE MANDATORY: every signal you derive from an evidence item MUST set "evidenceId" to
+that item's "id". A deRisk=true verdict is ONLY honored if at least one signal cites a real
+evidenceId from the provided evidence — an uncited deRisk is silently discarded. When you set
+deRisk=true, also set riskLevel="DERISK" and usdyMaxWeightBps=0.`;
 
 const OUTPUT_SCHEMA = {
   name: "risk_verdict",
@@ -40,7 +44,11 @@ const OUTPUT_SCHEMA = {
             type: { type: "string", enum: ["PEG", "ORACLE", "LIQUIDITY", "YIELD", "ISSUER", "REGULATORY"] },
             severity: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
             summary: { type: "string" },
-            evidenceId: { type: "string" },
+            evidenceId: {
+              type: "string",
+              description:
+                "REQUIRED when this signal is based on a provided evidence item: set it to that item's id (e.g. 'ondo-usdy-attestation'). A deRisk verdict needs at least one signal with a real evidenceId.",
+            },
           },
           required: ["type", "severity", "summary"],
         },
@@ -58,9 +66,18 @@ export class AnthropicClient implements LLMClient {
   private readonly client: Anthropic;
   private readonly model: string;
 
-  constructor(config: AgentConfig) {
+  constructor(config: AgentConfig, opts: { maxRetries?: number } = {}) {
     if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY is required for LLM calls");
-    this.client = new Anthropic({ apiKey: config.anthropicApiKey, baseURL: config.anthropicBaseUrl });
+    this.client = new Anthropic({
+      apiKey: config.anthropicApiKey,
+      baseURL: config.anthropicBaseUrl,
+      // Anthropic-compatible gateways (e.g. z.ai/GLM) return transient 429/529 under
+      // load. The SDK retries 429/5xx with backoff (honoring retry-after); bump the
+      // default (2) so a brief overload doesn't collapse a whole risk cycle to the
+      // deterministic fallback. Callers that prefer to fail fast (e.g. the interactive
+      // dry-run) can lower this.
+      maxRetries: opts.maxRetries ?? 5,
+    });
     this.model = config.anthropicModel ?? "claude-haiku-4-5-20251001";
   }
 

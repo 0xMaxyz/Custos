@@ -119,7 +119,9 @@ export class Executor {
     let evidence: EvidenceItem[] = [];
     if (this.config.anthropicApiKey) {
       const llm = new AnthropicClient(this.config);
-      const fetcher = buildEvidenceFetcher();
+      const fetcher = buildEvidenceFetcher(undefined, {
+        demoEvidenceUrl: this.config.demoDeRiskEvidenceUrl,
+      });
       try { evidence = await fetcher(); } catch { evidence = []; }
       verdict = await runSignalLayer(snapshot, assessment, {
         llm,

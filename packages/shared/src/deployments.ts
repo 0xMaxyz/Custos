@@ -28,6 +28,12 @@ export interface DeploymentAddresses {
   ausdAdapter: string;
   /** ERC-8004 agent token id, or null before registration. */
   agentId: number | null;
+  /**
+   * Block the vault was deployed at. Used to scope `getLogs` (decisions, cost-basis)
+   * so the web app never scans from genesis — a full-chain scan on Mantle is thousands
+   * of paged RPC calls and triggers public-RPC 429s. 0 = unknown (falls back to genesis).
+   */
+  vaultDeployBlock: number;
 }
 
 const empty: DeploymentAddresses = {
@@ -38,6 +44,7 @@ const empty: DeploymentAddresses = {
   usdyAdapter: "",
   ausdAdapter: "",
   agentId: null,
+  vaultDeployBlock: 0,
 };
 
 /** Mainnet (chainId 5000) deployed addresses. */
@@ -49,6 +56,7 @@ export const MAINNET_DEPLOYMENT: DeploymentAddresses = {
   usdyAdapter: "0xFe58aaB3C14BB2Af5555c6753b2971d0ADfBfd9f",
   ausdAdapter: "0x0E695Cdb8010Ca7D75F90860eCc63a569888484e",
   agentId: 128,
+  vaultDeployBlock: 96604858,
 };
 
 /** Testnet (chainId 5003) deployed addresses. Populate after testnet deploy. */
@@ -60,6 +68,7 @@ export const TESTNET_DEPLOYMENT: DeploymentAddresses = {
   usdyAdapter: "0xd420Bdf2a7eab8F86DE12f06728342b7243101C9",
   ausdAdapter: "",
   agentId: null,
+  vaultDeployBlock: 0,
 };
 
 /** Return the deployment record for a given chainId, or the empty record. */

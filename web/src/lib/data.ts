@@ -193,6 +193,9 @@ export interface Decision {
   decisionURI: string;
   outcome: Outcome;
   txHash: string;
+  /** True when submitted by an ALLOCATOR via the manual rebalance UI/script (no LLM
+   *  bundle): confidence + benchmark outcome don't apply, so the UI suppresses them. */
+  isManual?: boolean;
   /** x402 receipts for premium evidence the agent paid for (A4.1). */
   payments?: PaidReceipt[];
   /** The ERC-8183 verifiable Job this de-risk settled as (A4.2). */

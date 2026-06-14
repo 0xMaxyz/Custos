@@ -12,11 +12,13 @@ import { DepositModal, WithdrawModal, type ToastPayload } from "./modals/TradeMo
 import { DashboardPage } from "./pages/DashboardPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { AgentPage } from "./pages/AgentPage";
+import { AllocatorPage } from "./pages/AllocatorPage";
 import { useVaultData } from "./lib/useVaultData";
+import { useAllocator } from "./lib/useAllocator";
 import { supportedChains } from "./lib/chains";
 import { resolveInitialTheme } from "./lib/theme";
 
-const ROUTES: Route[] = ["dashboard", "agent", "activity"];
+const ROUTES: Route[] = ["dashboard", "agent", "activity", "allocator"];
 const SUPPORTED_IDS = supportedChains.map((c) => c.id) as number[];
 
 type ModalState = { type: "deposit" } | { type: "withdraw" } | null;
@@ -74,6 +76,7 @@ export default function App() {
   const { address, isConnected, chainId } = useAccount();
   const { openConnectModal } = useConnectModal();
   const { vault, position, usdcAddress, walletUsdc, isLive: vaultLive } = useVaultData(address);
+  const { isAllocator } = useAllocator(address);
   // Demo wrong-net flag OR a genuinely unsupported chain while connected.
   const wrongNet = (flags.wrongNet || (isConnected && chainId !== undefined && !SUPPORTED_IDS.includes(chainId)));
   // When vault is live, derive emptyPosition from actual shares; fall back to dev flag.
@@ -88,6 +91,12 @@ export default function App() {
     const id = setTimeout(() => setLoading(false), 650);
     return () => clearTimeout(id);
   }, []);
+
+  // Guard the allocator route: if the connected wallet isn't the ALLOCATOR (or
+  // disconnects), bounce back to the dashboard so the page can't be reached by hash.
+  useEffect(() => {
+    if (route === "allocator" && !isAllocator) go("dashboard");
+  }, [route, isAllocator, go]);
 
   const pushToast = useCallback((t: ToastPayload) => {
     const id = Date.now() + Math.random();
@@ -113,15 +122,16 @@ export default function App() {
 
   return (
     <div className="app-root" data-theme={theme}>
-      <Topbar route={route} go={go} theme={theme} setTheme={setThemeState} />
+      <Topbar route={route} go={go} theme={theme} setTheme={setThemeState} showAllocator={isAllocator} />
       <Banners wrongNet={wrongNet} paused={flags.paused || vault.paused} killed={flags.killed || vault.killed} />
       <main>
         {route === "dashboard" && <DashboardPage {...pageProps} />}
         {route === "agent" && <AgentPage loading={loading} />}
         {route === "activity" && <ActivityPage loading={loading} activityError={flags.activityError} />}
+        {route === "allocator" && <AllocatorPage loading={loading} onToast={pushToast} />}
       </main>
       <Footer />
-      <MobileNav route={route} go={go} />
+      <MobileNav route={route} go={go} showAllocator={isAllocator} />
 
       {modal?.type === "deposit" && isConnected && <DepositModal wallet={tradeWallet} vault={vault} usdcAddress={usdcAddress} onClose={() => setModal(null)} onToast={pushToast} />}
       {modal?.type === "withdraw" && <WithdrawModal position={position} vault={vault} onClose={() => setModal(null)} onToast={pushToast} />}

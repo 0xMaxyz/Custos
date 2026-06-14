@@ -139,7 +139,12 @@ export function GuardrailsMark({ small = false }: { small?: boolean }) {
 }
 
 // ---------- OutcomeStrip ----------
-export function OutcomeStrip({ outcome, compact = false }: { outcome: Outcome | null | undefined; compact?: boolean }) {
+export function OutcomeStrip({ outcome, compact = false, manual = false }: { outcome: Outcome | null | undefined; compact?: boolean; manual?: boolean }) {
+  // Manual ALLOCATOR actions aren't scored against the passive baseline, so don't
+  // leave them spinning on "measuring…" forever — say so plainly.
+  if (manual) {
+    return <span className="chip role-neutral" title="Manual allocator action — not scored against the passive baseline">manual · not benchmarked</span>;
+  }
   if (!outcome?.measuredAt) {
     return (
       <span className="chip role-info">

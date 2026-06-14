@@ -39,15 +39,17 @@ function DecisionItem({ d, onOpen }: { d: Decision; onOpen: (d: Decision) => voi
           {d.signals.map((s, i) => <SignalBadge key={i} type={s.type} severity={s.severity} />)}
           {d.payments?.map((p) => <PaidEvidenceBadge key={p.evidenceId} receipt={p} />)}
           {d.job && <JobStatusChip status={d.job.status} />}
-          <ConfidenceMeter value={d.confidence} compact />
+          {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual</span> : <ConfidenceMeter value={d.confidence} compact />}
           <GuardrailsMark small />
         </div>
         <div className="decision-foot">
-          <div style={{ flex: 1, minWidth: 200 }}><OutcomeStrip outcome={d.outcome} compact /></div>
+          <div style={{ flex: 1, minWidth: 200 }}><OutcomeStrip outcome={d.outcome} compact manual={!!d.isManual} /></div>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-            <a className="chip role-neutral" style={{ textDecoration: "none" }} href={`${explorer}/tx/${d.txHash}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-              <Icon name="external-link" size={12} />tx
-            </a>
+            {d.txHash && (
+              <a className="chip role-neutral" style={{ textDecoration: "none" }} href={`${explorer}/tx/${d.txHash}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                <Icon name="external-link" size={12} />tx
+              </a>
+            )}
             <span className="mono" style={{ fontSize: "0.6875rem", color: "var(--faint)" }} title={d.rationaleHash}>{fmt.shortHash(d.rationaleHash, 6, 4)}</span>
             <span className="linklike" style={{ fontSize: "0.8125rem" }}>Details <Icon name="chevron-right" size={14} /></span>
           </div>
@@ -75,7 +77,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
         <KindBadge kind={d.kind} />
         <RiskLevelChip level={d.riskLevel} />
-        <ConfidenceMeter value={d.confidence} />
+        {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual allocator action</span> : <ConfidenceMeter value={d.confidence} />}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{fmt.dateTime(d.timestamp)}</span>
       </div>
@@ -90,7 +92,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
                 <span className="dot" style={{ background: `var(--${r.role})` }} />
                 <strong style={{ color: `var(--${r.role})` }}>{r.status}</strong>
               </div>
-              <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 6 }}>{r.means}. Confidence {d.confidence.toFixed(2)}.</div>
+              <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 6 }}>{r.means}.{d.isManual ? "" : ` Confidence ${d.confidence.toFixed(2)}.`}</div>
             </div>
           </Section>
         </div>
@@ -133,8 +135,10 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
       </Section>
       <Section title="Outcome">
         <div style={{ padding: "14px 16px", borderRadius: "var(--rounded-btn)", background: "var(--base-200)" }}>
-          <OutcomeStrip outcome={d.outcome} />
-          {d.outcome?.measuredAt && <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 10 }}>Measured {fmt.dateTime(d.outcome.measuredAt)}</div>}
+          <OutcomeStrip outcome={d.outcome} manual={!!d.isManual} />
+          {d.isManual
+            ? <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 10 }}>Operator action — not scored against the passive-USDY baseline.</div>
+            : d.outcome?.measuredAt && <div style={{ fontSize: "0.75rem", color: "var(--faint)", marginTop: 10 }}>Measured {fmt.dateTime(d.outcome.measuredAt)}</div>}
         </div>
       </Section>
       {d.job && (
@@ -164,7 +168,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
         </Section>
       )}
       <Section title="Verifiability">
-        <div className="kvrow"><span className="k">Transaction</span><AddressChip address={d.txHash} kind="tx" /></div>
+        <div className="kvrow"><span className="k">Transaction</span>{d.txHash ? <AddressChip address={d.txHash} kind="tx" /> : <span className="v mono" style={{ fontSize: "0.8125rem", color: "var(--faint)" }}>—</span>}</div>
         <div className="kvrow"><span className="k">Rationale hash</span><span className="mono v" style={{ fontSize: "0.8125rem" }}>{fmt.shortHash(d.rationaleHash, 10, 6)}</span></div>
         {d.evidenceHash && <div className="kvrow"><span className="k">Evidence hash</span><span className="mono v" style={{ fontSize: "0.8125rem" }}>{fmt.shortHash(d.evidenceHash, 6, 4)}</span></div>}
         <div className="kvrow"><span className="k">Decision bundle</span>{(() => {

@@ -177,6 +177,43 @@ export const VAULT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    // AccessControl role check — used to gate the allocator rebalance panel.
+    name: "hasRole",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "role", type: "bytes32" },
+      { name: "account", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    // Last rebalance timestamp — for the 1-hour interval guardrail (display + gating).
+    name: "lastRebalanceAt",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
+    // ALLOCATOR-only manual rebalance (Allocator page). Idle/Aave moves carry empty
+    // swapData; USDY (slot 2) / AUSD (slot 3) legs carry 1delta calldata the UI fetches
+    // from the agent's /swap/quote (the 1delta key stays server-side). The calldata is
+    // inert until it runs here, where the adapter's pinned-router + balance-delta minOut
+    // bind on-chain — so the swap-routing boundary still holds.
+    name: "rebalance",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "targetWeightsBps", type: "uint16[4]" },
+      { name: "swapData", type: "bytes[]" },
+      { name: "decisionURI", type: "string" },
+      { name: "rationaleHash", type: "bytes32" },
+      { name: "usdyDexSpotUsdc", type: "uint256" },
+    ],
+    outputs: [{ name: "decisionId", type: "uint256" }],
+  },
+  {
     name: "DecisionRecorded",
     type: "event",
     inputs: [

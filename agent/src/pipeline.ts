@@ -1,11 +1,12 @@
 import { getAddress, type PublicClient } from "viem";
-import { Bucket, PROTOCOLS, TOKENS } from "@custos/shared";
+import { Bucket, PEG_WARN_BPS, PROTOCOLS, TOKENS } from "@custos/shared";
 
 import type { AgentConfig } from "./config.js";
 import { makeClients, type ChainClients } from "./chain/clients.js";
 import { erc20Abi, strategyAdapterAbi, yieldVaultAbi } from "./chain/abis.js";
 import { OneDeltaClient } from "./data/oneDelta.js";
 import { readUsdyOracle } from "./data/readers.js";
+import { pegDeviationBps } from "./risk/engine.js";
 import { ApySampler } from "./data/apySampler.js";
 import { Snapshotter, type SnapshotSources } from "./data/snapshot.js";
 import type { WeightsBps } from "./types.js";
@@ -23,6 +24,22 @@ export interface Pipeline {
   readonly clients: ChainClients;
   readonly oneDelta: OneDeltaClient;
   readonly snapshotter: Snapshotter;
+}
+
+/**
+ * Two-tier USDY DEX-spot resolution (#1, 1delta credit saver). Routine monitoring
+ * uses the cheap, RPC-free token-prices feed; the agent only pays for the precise,
+ * RPC-on-1delta `swap/spot` quote once the cheap price shows the peg reaching the
+ * warn band — so every peg FLAG / de-risk decision is still made on the authoritative
+ * executable quote, while calm markets cost zero `swap/spot` calls. (Below the warn
+ * band no peg flag can fire, so the cheap price is sufficient there.) Falls back to
+ * the precise quote whenever the cheap price is unavailable.
+ */
+export async function resolveDexSpot(oneDelta: OneDeltaClient, oracleNavUsdc: bigint): Promise<bigint> {
+  const cheap = await oneDelta.getUsdyMarketPriceUsdc();
+  if (cheap <= 0n) return oneDelta.getUsdyDexSpotUsdc();
+  if (pegDeviationBps(oracleNavUsdc, cheap) >= PEG_WARN_BPS) return oneDelta.getUsdyDexSpotUsdc();
+  return cheap;
 }
 
 function requireAddress(value: string | null | undefined, name: string): `0x${string}` {
@@ -49,7 +66,7 @@ export function buildPipeline(config: AgentConfig): Pipeline {
       return { navUsdc, rangeEnd, updatedAt: 0, impliedApyBps: apySampler.sample(navUsdc) };
     },
     aaveMarket: () => oneDelta.getAaveUsdcMarket(),
-    usdyDexSpotUsdc: () => oneDelta.getUsdyDexSpotUsdc(),
+    usdyDexSpotUsdc: (oracleNavUsdc) => resolveDexSpot(oneDelta, oracleNavUsdc),
     ausdBackingRatioBps: () => oneDelta.getAusdBackingRatioBps(),
     vaultState: () => readVaultState(clients.publicClient, vaultAddr),
   };

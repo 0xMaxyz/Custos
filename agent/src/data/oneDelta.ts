@@ -36,6 +36,12 @@ export interface AaveUsdcMarket {
   readonly utilizationBps: number;
 }
 
+/** GET /v1/data/token/prices → { success, data: { items: { <addr>: usdPrice } } }. */
+const tokenPricesSchema = z.object({
+  success: z.boolean(),
+  data: z.object({ items: z.record(z.string(), z.coerce.number()) }),
+});
+
 /** GET /v1/data/lending/pools → { data: { items: [pool] } }. */
 const lendingPoolsSchema = z.object({
   success: z.boolean(),
@@ -157,6 +163,34 @@ export class OneDeltaClient {
     // value in tokenOut base units, then scale tokenOut decimals → 18.
     const out = floatToBaseUnits(quote.tradeOutput, decimals);
     return out * 10n ** BigInt(18 - decimals);
+  }
+
+  /**
+   * Cheap USDY DEX-market price proxy (USDC per 1 USDY, 18-dec fixed point) from the
+   * indexed, **RPC-free** token-prices feed (1delta aggregates oracle + DEX +
+   * CoinGecko + DefiLlama). Used for routine peg monitoring so the agent only pays
+   * for the precise, RPC-on-1delta `swap/spot` quote when the peg approaches the warn
+   * band. Returns 0n when unavailable so callers fall back to the precise quote.
+   *
+   * MVP-grade: a production integration would screen the DEX pools / oracles directly
+   * rather than lean on an aggregated price.
+   */
+  async getUsdyMarketPriceUsdc(): Promise<bigint> {
+    const qs = `?chainId=${CHAIN_ID}&assets=${TOKENS.USDY.address},${TOKENS.USDC.address}`;
+    let raw: unknown;
+    try {
+      raw = await this.getJson(`/v1/data/token/prices${qs}`);
+    } catch {
+      return 0n;
+    }
+    const parsed = tokenPricesSchema.safeParse(raw);
+    if (!parsed.success || !parsed.data.success) return 0n;
+    const items = parsed.data.data.items;
+    const usdy = items[TOKENS.USDY.address.toLowerCase()] ?? 0;
+    const usdc = items[TOKENS.USDC.address.toLowerCase()] ?? 0;
+    if (!(usdy > 0) || !(usdc > 0)) return 0n;
+    // USDC per USDY = USDY_usd / USDC_usd, expressed as 18-dec fixed point.
+    return floatToBaseUnits(usdy / usdc, 18);
   }
 
   /**

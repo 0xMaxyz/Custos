@@ -21,7 +21,11 @@ export interface SwapQuoteResult {
 /** Whether the swap-quote endpoint is reachable (agent API configured). */
 export const swapQuoteAvailable = AGENT_API_URL.length > 0;
 
-const FETCH_TIMEOUT_MS = 12_000;
+// Must exceed the agent's 1delta swap-build budget (ONEDELTA_SWAP_TIMEOUT_MS, default
+// 30s) plus network overhead — otherwise the browser aborts before the agent can
+// return the route (or its own clean error). Building a route through Mantle's thin
+// USDY/AUSD pools can take tens of seconds.
+const FETCH_TIMEOUT_MS = 35_000;
 
 /**
  * Fetch swap calldata for a single USDY/AUSD leg. `usdcAmount` is the 6-decimal
@@ -44,6 +48,13 @@ export async function fetchSwapQuote(req: {
       body: JSON.stringify(req),
       signal: ctrl.signal,
     });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(
+        `Swap-quote timed out after ${FETCH_TIMEOUT_MS / 1000}s — the route is slow; try a smaller amount or retry.`,
+      );
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }

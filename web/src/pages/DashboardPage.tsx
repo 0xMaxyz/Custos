@@ -123,11 +123,19 @@ function PositionCard({ connected, empty, paused, killed, vault, position, metri
         <span className="card-title"><Icon name="coins" size={14} />Your position</span>
         <EmptyState icon="plus" title="Make your first deposit"
           body="You haven't deposited yet. Deposit USDC to start earning the agent-managed blended yield."
-          action={<button className="btn btn-primary" disabled={paused || killed} onClick={onDeposit}><Icon name="plus" size={16} />Deposit USDC</button>} />
+          action={
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button className="btn btn-primary" disabled={paused || killed} onClick={onDeposit}><Icon name="plus" size={16} />Deposit USDC</button>
+              <button className="btn btn-ghost" disabled title="No shares to withdraw"><Icon name="minus" size={16} />Withdraw</button>
+            </div>
+          } />
       </Card>
     );
   }
   const yld = parseFloat(position.allTimeYieldUsdc);
+  // Withdraw is always shown for a funded position, disabled only when there are no
+  // shares — larger withdrawals beyond instant liquidity unwind USDY on request.
+  const canWithdraw = parseFloat(position.shares) > 0;
   return (
     <Card>
       <div className="card-hl">
@@ -155,7 +163,7 @@ function PositionCard({ connected, empty, paused, killed, vault, position, metri
           title={killed ? "Disabled — emergency withdraw-only" : paused ? "Disabled — deposits paused" : undefined}>
           <Icon name="plus" size={16} />Deposit
         </button>
-        <button className="btn btn-ghost btn-block" onClick={onWithdraw}><Icon name="minus" size={16} />Withdraw</button>
+        <button className="btn btn-ghost btn-block" disabled={!canWithdraw} onClick={onWithdraw} title={canWithdraw ? undefined : "No shares to withdraw"}><Icon name="minus" size={16} />Withdraw</button>
       </div>
     </Card>
   );
@@ -292,12 +300,27 @@ export function DashboardPage({ connected, paused, killed, emptyPosition, go, on
         </div>
       </div>
       <div className="grid" style={{ gap: 16 }}>
-        <AgentStatusCard go={go} />
-        <BaselineCounter baseline={baseline} />
-        <div className="grid dash-cols">
-          <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} vault={vault} position={position} metricsUnavailable={metricsUnavailable} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
-          <AllocationCard vault={vault} />
-        </div>
+        {/* When connected, the user's position is the priority — surface it above the
+            agent status. When disconnected, lead with the agent's stance instead. */}
+        {connected ? (
+          <>
+            <div className="grid dash-cols">
+              <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} vault={vault} position={position} metricsUnavailable={metricsUnavailable} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
+              <AllocationCard vault={vault} />
+            </div>
+            <AgentStatusCard go={go} />
+            <BaselineCounter baseline={baseline} />
+          </>
+        ) : (
+          <>
+            <AgentStatusCard go={go} />
+            <BaselineCounter baseline={baseline} />
+            <div className="grid dash-cols">
+              <PositionCard connected={connected} empty={emptyPosition} paused={paused} killed={killed} vault={vault} position={position} metricsUnavailable={metricsUnavailable} onDeposit={onDeposit} onWithdraw={onWithdraw} onConnect={onConnect} />
+              <AllocationCard vault={vault} />
+            </div>
+          </>
+        )}
         <VaultStatsCard vault={vault} metricsUnavailable={metricsUnavailable} />
       </div>
     </div>

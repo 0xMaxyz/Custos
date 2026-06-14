@@ -98,7 +98,7 @@ export const VAULT_ABI = [
   },
   {
     // Vault share token decimals. NOTE: with the ERC-4626 `_decimalsOffset()` of 6
-    // (inflation-grief defense, contract I1) this is 18 (asset 6 + offset 6), NOT 6.
+    // (inflation-grief defense, contract I1) this is 12 (asset 6 + offset 6), NOT 6.
     // Read it on-chain rather than hardcoding so share<->raw conversions stay correct.
     name: "decimals",
     type: "function",

@@ -130,7 +130,7 @@ contract YieldVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
      *      attacker would have to donate ~1e6x the victim's deposit to steal a single
      *      rounding unit, and even then captures only dust. Combined with the per-tx
      *      deposit cap and TVL cap (see {_checkDepositCaps}), the griefing surface is
-     *      closed. Side effects: share decimals become 18 (asset 6 + offset 6) and the
+     *      closed. Side effects: share decimals become 12 (asset 6 + offset 6) and the
      *      initial share:asset rate is 1e6:1 (1 USDC -> 1e6 vault shares at genesis).
      */
     function _decimalsOffset() internal pure override returns (uint8) {

@@ -10,8 +10,8 @@ function makeSources(overrides: Partial<SnapshotSources> = {}): SnapshotSources 
       navUsdc: 1_080_000_000_000_000_000n,
       rangeEnd: 1_900_000_000,
       updatedAt: 1_700_000_000,
+      impliedApyBps: 452,
     }),
-    usdyImpliedApyBps: async () => 452,
     aaveMarket: async () => ({ supplyApyBps: 380, utilizationBps: 7_400 }),
     usdyDexSpotUsdc: async () => 1_079_000_000_000_000_000n,
     ausdBackingRatioBps: async () => 10_000,
@@ -44,7 +44,7 @@ describe("Snapshotter", () => {
   });
 
   it("caches source reads within the ttl window", async () => {
-    const oracle = vi.fn(async () => ({ navUsdc: 1n, rangeEnd: 0, updatedAt: 0 }));
+    const oracle = vi.fn(async () => ({ navUsdc: 1n, rangeEnd: 0, updatedAt: 0, impliedApyBps: 450 }));
     const snapshotter = new Snapshotter(makeSources({ oracle }), {
       ttlMs: 10_000,
       now: () => 1_000,
@@ -55,7 +55,7 @@ describe("Snapshotter", () => {
   });
 
   it("re-fetches after invalidate()", async () => {
-    const oracle = vi.fn(async () => ({ navUsdc: 1n, rangeEnd: 0, updatedAt: 0 }));
+    const oracle = vi.fn(async () => ({ navUsdc: 1n, rangeEnd: 0, updatedAt: 0, impliedApyBps: 450 }));
     const snapshotter = new Snapshotter(makeSources({ oracle }), { now: () => 1_000 });
     await snapshotter.snapshot();
     snapshotter.invalidate();

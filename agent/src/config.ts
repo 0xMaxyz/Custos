@@ -19,7 +19,19 @@ const privateKey = z
 
 const configSchema = z.object({
   // ── Chain / RPC ──
-  mantleRpcUrl: z.string().url(),
+  // One URL, or several comma-separated provider URLs. With more than one, the agent
+  // builds a viem `fallback` transport that fails over (and spreads overflow) across
+  // them when a provider returns 429 / errors — so a single rate-limited public RPC
+  // can't stall the agent. See chain/clients.ts.
+  mantleRpcUrl: z
+    .string()
+    .refine(
+      (s) => {
+        const urls = s.split(",").map((u) => u.trim()).filter(Boolean);
+        return urls.length > 0 && urls.every((u) => z.string().url().safeParse(u).success);
+      },
+      { message: "must be one or more comma-separated http(s) RPC URLs" },
+    ),
   // How long to wait for a submitted tx's receipt before treating the cycle as a
   // loud failure (O2). Bounded waiting only — no fee-bump/replacement machinery.
   txReceiptTimeoutMs: z.coerce.number().int().positive().default(120_000),

@@ -24,10 +24,12 @@ export interface SchedulerOptions {
  * 1. **Periodic loop** — runs a full `Executor.runCycle()` on `intervalMs`
  *    (default 60 min). Covers normal yield-optimisation rebalances.
  *
- * 2. **Breach-poll loop** — runs `Executor.runCycle()` every `pollMs` (default
- *    30 s). The executor's deterministic `assess()` will fire `forceDeRisk` on
- *    peg/oracle breach and call `deRisk()` immediately, regardless of the rebalance
- *    interval (de-risk is exempt from the frequency cap on-chain).
+ * 2. **Breach-poll loop** — every `pollMs` (default 30 s) runs a CHEAP breach check
+ *    (`runCycle({ full: false })`): it reads only the peg/oracle inputs and returns
+ *    early unless they already force a de-risk, in which case it escalates to a full
+ *    cycle and calls `deRisk()` immediately (de-risk is exempt from the on-chain
+ *    frequency cap). This keeps the 30 s poll to a single oracle read instead of the
+ *    full vault-state snapshot, so the RPC isn't hammered (avoids 429 rate-limits).
  *
  * A **demo-trigger harness** (`injectBreachCondition`) allows fork tests to signal
  * a forced breach poll without waiting for the real interval. This is the hook the
@@ -102,6 +104,7 @@ export class Scheduler {
    */
   private async _runGuarded(
     label: "periodic" | "poll",
+    full: boolean,
     handle: (result: CycleResult) => void,
   ): Promise<boolean> {
     if (this._inFlight) {
@@ -110,7 +113,9 @@ export class Scheduler {
     }
     this._inFlight = true;
     try {
-      const result = await this.executor.runCycle();
+      // Periodic + injected breaches run the FULL pipeline; routine polls run the
+      // cheap breach check (full=false), escalating to a full cycle only on breach.
+      const result = await this.executor.runCycle({ full });
       handle(result);
     } catch (e) {
       this.onError(e);
@@ -142,14 +147,16 @@ export class Scheduler {
   }
 
   private async _runPeriodic(): Promise<void> {
-    await this._runGuarded("periodic", (result) => this.onCycle(result));
+    await this._runGuarded("periodic", true, (result) => this.onCycle(result));
     this._schedulePeriodic();
   }
 
   private async _runPoll(): Promise<void> {
     const wasBreachPending = this._breachPending;
     this._breachPending = false;
-    const ran = await this._runGuarded("poll", (result) => {
+    // An explicitly injected breach (demo/test) forces a full cycle; a routine poll
+    // runs the cheap breach check and only escalates to a full cycle on breach.
+    const ran = await this._runGuarded("poll", wasBreachPending, (result) => {
       // Notify on a submitted decision, or whenever a breach was explicitly injected.
       if (result.submitted || wasBreachPending) {
         this.onCycle(result);

@@ -27,6 +27,14 @@ export type FetchLike = (
 /** Mantle mainnet — the only chain Custos serves (CLAUDE.md #4). */
 const CHAIN_ID = "5000";
 
+/**
+ * 1delta matches token/account addresses case-sensitively and expects them
+ * lowercase; a checksummed (mixed-case) address can miss a route or be rejected.
+ * Normalize EVERY address before it goes into a 1delta request URL. (The token-prices
+ * response is also keyed by lowercase address — see {@link OneDeltaClient.getUsdyMarketPriceUsdc}.)
+ */
+const lc = (address: string): string => address.toLowerCase();
+
 // ── Response schemas (validate only the fields we depend on) ─────────────────
 
 export interface AaveUsdcMarket {
@@ -127,7 +135,7 @@ export class OneDeltaClient {
    */
   async getAaveUsdcMarket(): Promise<AaveUsdcMarket> {
     const qs =
-      `?chainId=${CHAIN_ID}&lender=AAVE_V3&underlyings=${TOKENS.USDC.address}` +
+      `?chainId=${CHAIN_ID}&lender=AAVE_V3&underlyings=${lc(TOKENS.USDC.address)}` +
       // Widen the default util/TVL filters so the USDC pool is never filtered out.
       `&minUtil=0&maxUtil=1&minTvlUsd=0`;
     const raw = await this.getJson(`/v1/data/lending/pools${qs}`);
@@ -146,7 +154,7 @@ export class OneDeltaClient {
   async getUsdyDexSpotUsdc(): Promise<bigint> {
     const oneUsdy = (10n ** BigInt(TOKENS.USDY.decimals)).toString();
     const qs =
-      `?chainId=${CHAIN_ID}&tokenIn=${TOKENS.USDY.address}&tokenOut=${TOKENS.USDC.address}` +
+      `?chainId=${CHAIN_ID}&tokenIn=${lc(TOKENS.USDY.address)}&tokenOut=${lc(TOKENS.USDC.address)}` +
       `&amount=${oneUsdy}&slippage=50&tradeType=0`;
     let raw: unknown;
     try {
@@ -176,7 +184,7 @@ export class OneDeltaClient {
    * rather than lean on an aggregated price.
    */
   async getUsdyMarketPriceUsdc(): Promise<bigint> {
-    const qs = `?chainId=${CHAIN_ID}&assets=${TOKENS.USDY.address},${TOKENS.USDC.address}`;
+    const qs = `?chainId=${CHAIN_ID}&assets=${lc(TOKENS.USDY.address)},${lc(TOKENS.USDC.address)}`;
     let raw: unknown;
     try {
       raw = await this.getJson(`/v1/data/token/prices${qs}`);
@@ -226,10 +234,10 @@ export class OneDeltaClient {
     slippageBps: number,
   ): Promise<SwapQuote> {
     const qs =
-      `?chainId=${CHAIN_ID}&tokenIn=${tokenIn}&tokenOut=${tokenOut}` +
+      `?chainId=${CHAIN_ID}&tokenIn=${lc(tokenIn)}&tokenOut=${lc(tokenOut)}` +
       `&amount=${amountIn.toString()}&slippage=${slippageBps}&tradeType=0` +
       // account builds the tx (pulls tokenIn from `to`); receiver lands tokenOut on `to`.
-      `&account=${to}&receiver=${to}`;
+      `&account=${lc(to)}&receiver=${lc(to)}`;
     const parsed = spotSwapSchema.parse(await this.getJson(`/v1/actions/swap/spot${qs}`));
 
     if (!parsed.success || parsed.actions === null) {

@@ -153,17 +153,26 @@ describe("OneDeltaClient", () => {
     expect(q.amountOut).toBe(12_210_000n); // 12.21 × 10^6
   });
 
-  it("sends account+receiver=to and tradeType=0 for the swap build", async () => {
+  it("sends account+receiver=to and tradeType=0, lowercasing all addresses (1delta is case-sensitive)", async () => {
     const fetchImpl = vi.fn<FetchLike>(async () =>
       jsonResponse(spotBuild({ to: "0x5c019a146758287c614fe654caec1ba1caf05f4e" })),
     );
     const client = new OneDeltaClient(config, { fetchImpl });
-    await client.getSwapQuote("0xIN", "0xOUT", 11n, "0xADAPTER", 50);
+    // Checksummed (mixed-case) inputs must be normalized to lowercase in the request.
+    const tokenIn = "0x5Be26527e817998A7206475496fDE1E68957c5A6"; // USDY (checksummed)
+    const tokenOut = "0x09Bc4E0D864854c6aFB6eb9A9cdF58aC190D0dF9"; // USDC (checksummed)
+    const adapter = "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01";
+    await client.getSwapQuote(tokenIn, tokenOut, 11n, adapter, 50);
     const [url] = fetchImpl.mock.calls[0]!;
     expect(url).toContain("/v1/actions/swap/spot");
-    expect(url).toContain("account=0xADAPTER");
-    expect(url).toContain("receiver=0xADAPTER");
+    expect(url).toContain(`tokenIn=${tokenIn.toLowerCase()}`);
+    expect(url).toContain(`tokenOut=${tokenOut.toLowerCase()}`);
+    expect(url).toContain(`account=${adapter.toLowerCase()}`);
+    expect(url).toContain(`receiver=${adapter.toLowerCase()}`);
     expect(url).toContain("tradeType=0");
+    // No mixed-case address leaks through.
+    expect(url).not.toContain(adapter);
+    expect(url).not.toContain(tokenIn);
   });
 
   it("throws when the swap returns pre-trade setup transactions", async () => {

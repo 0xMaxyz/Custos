@@ -13,6 +13,7 @@ import { pinRationale, type RationaleBundle, type PaidEvidenceReceipt } from "./
 import { CycleFailureError } from "./errors.js";
 import { writeJournal, clearJournal } from "./txjournal.js";
 import type { PaidEvidenceFetcher } from "../payments/evidence.js";
+import type { AttestationFacts } from "../data/attestations.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
 import type { WeightsBps, RiskSignal, Decision } from "../types.js";
@@ -28,6 +29,12 @@ export interface ExecutorOptions {
    * premium feed and pins the settlement receipt into the decision bundle.
    */
   readonly paidEvidence?: PaidEvidenceFetcher | undefined;
+  /**
+   * Optional provider for the latest parsed Ondo USDY reserve attestation (Dropbox).
+   * When set, the LLM's `ondo-usdy-attestation` evidence is built from the report's
+   * structured facts instead of a homepage scrape.
+   */
+  readonly attestationProvider?: (() => Promise<AttestationFacts | null>) | undefined;
   /** Injectable IPFS pin (defaults to {@link pinRationale}); used by tests. */
   readonly pin?: typeof pinRationale | undefined;
 }
@@ -67,6 +74,7 @@ export class Executor {
   private readonly vault: `0x${string}`;
   private readonly snapshotter: Snapshotter;
   private readonly paidEvidence: PaidEvidenceFetcher | undefined;
+  private readonly attestationProvider: (() => Promise<AttestationFacts | null>) | undefined;
   private readonly pin: typeof pinRationale;
 
   constructor(opts: ExecutorOptions) {
@@ -81,6 +89,7 @@ export class Executor {
     this.vault = getAddress(opts.config.vaultAddress);
     this.snapshotter = opts.snapshotter;
     this.paidEvidence = opts.paidEvidence;
+    this.attestationProvider = opts.attestationProvider;
     this.pin = opts.pin ?? pinRationale;
   }
 
@@ -121,6 +130,7 @@ export class Executor {
       const llm = new AnthropicClient(this.config);
       const fetcher = buildEvidenceFetcher(undefined, {
         demoEvidenceUrl: this.config.demoDeRiskEvidenceUrl,
+        attestation: this.attestationProvider,
       });
       try { evidence = await fetcher(); } catch { evidence = []; }
       verdict = await runSignalLayer(snapshot, assessment, {

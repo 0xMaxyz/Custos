@@ -15,6 +15,8 @@ import { reconcileJournal } from "./executor/txjournal.js";
 import type { Eip3009Signer, PaymentRequirements } from "./payments/x402.js";
 import { onChainSettlingVerifier, replayGuardedVerifier, signatureVerifyingVerifier } from "./payments/verifier.js";
 import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/evidence.js";
+import { DropboxClient } from "./data/dropbox.js";
+import { fetchLatestAttestation, type AttestationFacts } from "./data/attestations.js";
 import { makeIdentityOwnerReader, resolveX402PayTo, PayeeConfigError, type ResolvedPayee } from "./identity/payee.js";
 import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
 import type { Decision } from "./types.js";
@@ -229,11 +231,31 @@ if (config.allocatorPrivateKey && config.vaultAddress && pipeline) {
     });
   }
 
+  // Attestation evidence (Dropbox): when all three OAuth creds are set, the LLM's
+  // ondo-usdy-attestation evidence is built from the daily ATC report's structured
+  // facts. Memoized ~1h so the agent doesn't re-download/parse the report every cycle.
+  let attestationProvider: (() => Promise<AttestationFacts | null>) | undefined;
+  if (config.dropboxAppKey && config.dropboxAppSecret && config.dropboxRefreshToken) {
+    const dbx = new DropboxClient({
+      appKey: config.dropboxAppKey,
+      appSecret: config.dropboxAppSecret,
+      refreshToken: config.dropboxRefreshToken,
+    });
+    let cache: { at: number; val: Promise<AttestationFacts | null> } | undefined;
+    attestationProvider = () => {
+      const now = Date.now();
+      if (!cache || now - cache.at > 3_600_000) cache = { at: now, val: fetchLatestAttestation(dbx) };
+      return cache.val;
+    };
+    app.log.info("attestation evidence enabled (Dropbox)");
+  }
+
   const executor = new Executor({
     config,
     clients: pipeline.clients,
     snapshotter: pipeline.snapshotter,
     paidEvidence,
+    attestationProvider,
   });
   const scheduler = new Scheduler(executor, {
     onDebug: (msg) => app.log.debug(msg),

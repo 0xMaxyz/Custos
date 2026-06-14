@@ -70,6 +70,14 @@ const configSchema = z.object({
   // legitimate builds (502 on rebalance-to-USDY). Bump if routes are still slow.
   oneDeltaSwapTimeoutMs: z.coerce.number().int().positive().default(30_000),
 
+  // ── Dropbox (optional; daily Ondo USDY attestation PDFs for the LLM evidence path) ──
+  // OAuth refresh-token credentials (Scoped app, files.metadata.read + sharing.read).
+  // All three are required together to enable attestation evidence; absent = the agent
+  // simply runs without it. See docs/agents.md §2.1.
+  dropboxAppKey: z.string().min(1).optional(),
+  dropboxAppSecret: z.string().min(1).optional(),
+  dropboxRefreshToken: z.string().min(1).optional(),
+
   // ── Signer (optional until execution path; guardrail-bounded hot key) ──
   allocatorPrivateKey: privateKey.optional(),
   // ALLOCATOR address without the key — lets keyless runs (read-only mode,
@@ -183,6 +191,9 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
     oneDeltaSwapTimeoutMs: pick("ONEDELTA_SWAP_TIMEOUT_MS"),
+    dropboxAppKey: pick("DROPBOX_APP_KEY"),
+    dropboxAppSecret: pick("DROPBOX_APP_SECRET"),
+    dropboxRefreshToken: pick("DROPBOX_REFRESH_TOKEN"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),
     allocatorAddress: pick("ALLOCATOR_ADDRESS"),
     ipfsApiUrl: pick("IPFS_API_URL"),

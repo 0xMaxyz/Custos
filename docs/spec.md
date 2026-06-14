@@ -52,6 +52,13 @@ Concrete specifications for Custos. Three parts, in order:
 | `pegDeRiskBps` | `100` (1.0%) | ≥ → **force de-risk** (rotate USDY → USDC) |
 | `oracleMaxAge` | `100800s` (~28h)* | Beyond → treat NAV as stale → block + de-risk |
 | `oracleRangeEndBuffer` | `86400s` (24h) | If within 24h of `RWADynamicOracle` configured range end → CAUTION |
+| `usdyMinCollateralBps` | `9900` (99%) | Daily Ondo/Ankura attestation backing ratio (reserves ÷ token principal) below → **force de-risk** (off-chain ISSUER backstop; routes USDY→0 via rebalance) |
+
+The `usdyMinCollateralBps` guard is an **off-chain** deterministic backstop in the
+agent (not an on-chain `Guardrails` param): the agent parses the latest USDY reserve
+attestation PDF (Dropbox) into structured facts and, if the backing ratio is under the
+floor, forces USDY→0 regardless of the LLM (tighten-only). It complements the on-chain
+peg/oracle guards, which remain the authoritative custody backstop.
 
 \* USDY's `RWADynamicOracle` accrues by configured daily-rate ranges (it interpolates
 rather than going "stale" like a Chainlink feed). "Stale" here means: now is **past

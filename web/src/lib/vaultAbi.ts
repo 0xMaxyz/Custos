@@ -223,4 +223,14 @@ export const VAULT_ABI = [
       { name: "decisionURI", type: "string", indexed: false },
     ],
   },
+  // Custom errors the rebalance path can revert with. Declared here so viem can
+  // DECODE a revert instead of printing the raw 4-byte selector. The guardrail
+  // rejection wraps the failing check's own selector in `reason` — map it to a
+  // human-readable string with `describeGuardrailReason` (allocatorRebalance.ts).
+  { name: "GuardrailsRejected", type: "error", inputs: [{ name: "reason", type: "bytes4" }] },
+  { name: "Killed", type: "error", inputs: [] },
+  { name: "GuardrailsNotSet", type: "error", inputs: [] },
+  { name: "InsufficientLiquidity", type: "error", inputs: [] },
+  { name: "InvalidBucket", type: "error", inputs: [] },
+  { name: "RwaAdapterNotSet", type: "error", inputs: [] },
 ] as const;

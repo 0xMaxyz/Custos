@@ -64,6 +64,11 @@ const configSchema = z.object({
   // ── 1delta data (optional; data + swap routing/quoting, output never trusted) ──
   oneDeltaApiKey: z.string().min(1).optional(),
   oneDeltaBaseUrl: z.string().url().default("https://portal.1delta.io"),
+  // Timeout (ms) for the 1delta swap-BUILD call (/actions/swap/spot with account set).
+  // Building a route through Mantle's thin, split USDY/AUSD pools is far heavier than
+  // the cheap data reads, so it gets its own, longer budget; the default 10s aborted
+  // legitimate builds (502 on rebalance-to-USDY). Bump if routes are still slow.
+  oneDeltaSwapTimeoutMs: z.coerce.number().int().positive().default(30_000),
 
   // ── Signer (optional until execution path; guardrail-bounded hot key) ──
   allocatorPrivateKey: privateKey.optional(),
@@ -177,6 +182,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
     demoDeRiskEvidenceUrl: pick("DEMO_DERISK_EVIDENCE_URL"),
     oneDeltaApiKey: pick("ONEDELTA_API_KEY"),
     oneDeltaBaseUrl: pick("ONEDELTA_BASE_URL"),
+    oneDeltaSwapTimeoutMs: pick("ONEDELTA_SWAP_TIMEOUT_MS"),
     allocatorPrivateKey: pick("ALLOCATOR_PRIVATE_KEY"),
     allocatorAddress: pick("ALLOCATOR_ADDRESS"),
     ipfsApiUrl: pick("IPFS_API_URL"),

@@ -1,5 +1,15 @@
 import { extractText, getDocumentProxy } from "unpdf";
 
+import type { DropboxReader } from "./dropbox.js";
+
+/**
+ * The public Dropbox shared folder of daily Ondo USDY attestation PDFs, structured
+ * `<year>/<MM Month>/Ondo USDY LLC_ATCAttest_YYMMDD.pdf`. Stable; override only if
+ * Ondo re-publishes the link.
+ */
+export const ONDO_USDY_ATTESTATION_FOLDER_URL =
+  "https://www.dropbox.com/scl/fo/375wdvar3rbc7o23nxsgp/AOFY8jhpENaNx9WAw-WPnbY?rlkey=4icqn1z9bez725wywr30fx52a";
+
 /**
  * Deterministic parser for the daily Ondo USDY reserve attestation (the "ATC"
  * report verified by Ankura Trust Company). The agent turns this unstructured PDF
@@ -112,4 +122,51 @@ export async function readAttestation(bytes: Uint8Array): Promise<AttestationFac
     return null;
   }
   return parseAttestationFacts(text);
+}
+
+/** Highest-sorting folder name matching `re` (entries are folders only). */
+function latestFolder(entries: { tag: "file" | "folder"; name: string }[], re: RegExp): string | undefined {
+  return entries
+    .filter((e) => e.tag === "folder" && re.test(e.name))
+    .map((e) => e.name)
+    .sort()
+    .at(-1);
+}
+
+/**
+ * Find, download, and parse the LATEST Ondo USDY attestation from the Dropbox shared
+ * folder. Walks `<year>/<MM Month>/…_ATCAttest_YYMMDD.pdf`, picking the newest at each
+ * level (folder names are zero-padded so a lexical sort is chronological; files are
+ * picked by their YYMMDD stamp). Fail-soft: returns null on any listing/download/parse
+ * error so a bad cycle degrades to "no attestation evidence", never throws.
+ *
+ * (The monthly folders hold ≤31 files, well under Dropbox's list page size, so no
+ * pagination is needed.)
+ */
+export async function fetchLatestAttestation(
+  reader: DropboxReader,
+  folderUrl: string = ONDO_USDY_ATTESTATION_FOLDER_URL,
+): Promise<AttestationFacts | null> {
+  try {
+    const root = await reader.listSharedFolder(folderUrl, "");
+    const year = latestFolder(root, /^\d{4}$/);
+    if (year === undefined) return null;
+
+    const months = await reader.listSharedFolder(folderUrl, `/${year}`);
+    const month = latestFolder(months, /^\d{2}\b/); // "06 June", "12 December", …
+    if (month === undefined) return null;
+
+    const files = await reader.listSharedFolder(folderUrl, `/${year}/${month}`);
+    const latest = files
+      .filter((e) => e.tag === "file" && /ATCAttest_\d{6}\.pdf$/i.test(e.name))
+      .map((e) => ({ name: e.name, stamp: /ATCAttest_(\d{6})\.pdf$/i.exec(e.name)![1]! }))
+      .sort((a, b) => a.stamp.localeCompare(b.stamp))
+      .at(-1);
+    if (latest === undefined) return null;
+
+    const bytes = await reader.downloadSharedFile(folderUrl, `/${year}/${month}/${latest.name}`);
+    return await readAttestation(bytes);
+  } catch {
+    return null;
+  }
 }

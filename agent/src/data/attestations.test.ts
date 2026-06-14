@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { readAttestation, parseAttestationFacts } from "./attestations.js";
+import { readAttestation, parseAttestationFacts, fetchLatestAttestation } from "./attestations.js";
+import type { DropboxReader, DropboxEntry } from "./dropbox.js";
 
 const FIXTURE = fileURLToPath(
   new URL("./__fixtures__/ondo-usdy-attestation-260609.pdf", import.meta.url),
@@ -39,5 +40,54 @@ describe("attestation parser", () => {
     const facts = parseAttestationFacts(text);
     expect(facts?.date).toBe("2026-06-09");
     expect(facts?.collateralRatioBps).toBe(10_050);
+  });
+});
+
+// ── Dropbox traversal (fetchLatestAttestation) ───────────────────────────────
+
+const folder = (name: string): DropboxEntry => ({ tag: "folder", name });
+const file = (name: string): DropboxEntry => ({ tag: "file", name });
+
+describe("fetchLatestAttestation", () => {
+  it("walks to the newest year/month/file, downloads it, and parses", async () => {
+    const bytes = new Uint8Array(readFileSync(FIXTURE));
+    const download = vi.fn(async () => bytes);
+    const reader: DropboxReader = {
+      listSharedFolder: vi.fn(async (_url: string, path: string) => {
+        if (path === "") return [folder("2024"), folder("2026"), folder("2025")];
+        if (path === "/2026") return [folder("05 May"), folder("06 June"), folder("04 April")];
+        if (path === "/2026/06 June") {
+          return [
+            file("Ondo USDY LLC_ATCAttest_260605.pdf"),
+            file("Ondo USDY LLC_ATCAttest_260609.pdf"),
+            file("Ondo USDY LLC_ATCAttest_260608.pdf"),
+            file("README.txt"),
+          ];
+        }
+        return [];
+      }),
+      downloadSharedFile: download,
+    };
+
+    const facts = await fetchLatestAttestation(reader, "https://dropbox/folder");
+    expect(facts?.date).toBe("2026-06-09");
+    // Picked the newest at every level.
+    expect(download).toHaveBeenCalledWith("https://dropbox/folder", "/2026/06 June/Ondo USDY LLC_ATCAttest_260609.pdf");
+  });
+
+  it("returns null (degrades) when the folder has no year folders", async () => {
+    const reader: DropboxReader = {
+      listSharedFolder: vi.fn(async () => []),
+      downloadSharedFile: vi.fn(async () => new Uint8Array()),
+    };
+    expect(await fetchLatestAttestation(reader, "url")).toBeNull();
+  });
+
+  it("returns null when listing throws (no leak)", async () => {
+    const reader: DropboxReader = {
+      listSharedFolder: vi.fn(async () => { throw new Error("network"); }),
+      downloadSharedFile: vi.fn(async () => new Uint8Array()),
+    };
+    expect(await fetchLatestAttestation(reader, "url")).toBeNull();
   });
 });

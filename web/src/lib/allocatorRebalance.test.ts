@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planRebalance, type PlanInput } from "./allocatorRebalance";
+import { planRebalance, describeGuardrailReason, checkUsdySpot, type PlanInput } from "./allocatorRebalance";
 import type { WeightsBps } from "./data";
 
 const TVL = 100_000_000n; // $100 (6-dec)
@@ -83,5 +83,39 @@ describe("planRebalance", () => {
     const plan = planRebalance(base({ lastRebalanceAt: 1_000_000 - 600, nowSec: 1_000_000 }));
     expect(plan.valid).toBe(false);
     expect(plan.error).toMatch(/next rebalance in/i);
+  });
+});
+
+describe("describeGuardrailReason", () => {
+  it("maps the UsdyAllocationBlocked selector to a peg message", () => {
+    expect(describeGuardrailReason("0x96b5021b")).toMatch(/off-peg/i);
+  });
+
+  it("maps the UsdyNotionalCapExceeded selector", () => {
+    expect(describeGuardrailReason("0x0781eae1")).toMatch(/notional capped/i);
+  });
+
+  it("is case-insensitive on the selector", () => {
+    expect(describeGuardrailReason("0x96B5021B")).toMatch(/off-peg/i);
+  });
+
+  it("falls back to the raw selector when unknown", () => {
+    expect(describeGuardrailReason("0xdeadbeef")).toContain("0xdeadbeef");
+  });
+});
+
+describe("checkUsdySpot", () => {
+  const w0 = (USDY: number): WeightsBps => w(10_000 - USDY, 0, USDY, 0);
+
+  it("requires a non-zero spot when USDY increases", () => {
+    expect(checkUsdySpot(w0(0), w0(2_500), 0n)).toMatch(/spot price/i);
+  });
+
+  it("passes when a spot is supplied", () => {
+    expect(checkUsdySpot(w0(0), w0(2_500), 1_000_000_000_000_000_000n)).toBe("");
+  });
+
+  it("does not require a spot when USDY is not increasing", () => {
+    expect(checkUsdySpot(w0(2_500), w0(0), 0n)).toBe("");
   });
 });

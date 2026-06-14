@@ -10,7 +10,7 @@
 import { useState, useEffect } from "react";
 import { useAccount, useChainId, usePublicClient, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseUnits, keccak256, toBytes } from "viem";
+import { parseUnits, keccak256, toBytes, BaseError, ContractFunctionRevertedError } from "viem";
 import { MAX_SLIPPAGE_BPS, MAX_USDY_NOTIONAL_USDC, MIN_IDLE_BPS, MIN_INSTANT_LIQUIDITY_BPS, MAX_REBALANCE_MOVE_BPS, MAX_WEIGHT_BPS, Bucket } from "@custos/shared";
 import { Icon } from "../components/Icons";
 import { Card, Skeleton, Spinner } from "../components/Components";
@@ -20,7 +20,7 @@ import { useAllocator } from "../lib/useAllocator";
 import { useInsightsData } from "../lib/useInsightsData";
 import { resolveDeployment } from "../lib/deployment";
 import { VAULT_ABI } from "../lib/vaultAbi";
-import { planRebalance } from "../lib/allocatorRebalance";
+import { planRebalance, checkUsdySpot, describeGuardrailReason } from "../lib/allocatorRebalance";
 import { fetchSwapQuote, swapQuoteAvailable } from "../lib/swapQuote";
 import type { ToastPayload } from "../modals/TradeModals";
 
@@ -29,6 +29,23 @@ const EDITABLE: BucketKey[] = ["AAVE", "USDY", "AUSD"];
 
 function pctStr(bps: number): string { return (bps / 100).toFixed(1); }
 function bpsFromPct(s: string): number { return Math.round((parseFloat(s || "0") || 0) * 100); }
+
+/**
+ * Turn a rebalance failure into a user-readable message. When the revert is
+ * `GuardrailsRejected(bytes4 reason)` (now decodable via vaultAbi.ts), surface the
+ * specific guardrail that tripped instead of a raw 4-byte selector.
+ */
+function rebalanceErrorMessage(err: unknown): string {
+  if (err instanceof BaseError) {
+    const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
+    if (revert instanceof ContractFunctionRevertedError && revert.data?.errorName === "GuardrailsRejected") {
+      const reason = revert.data.args?.[0];
+      if (typeof reason === "string") return describeGuardrailReason(reason);
+    }
+    return err.shortMessage;
+  }
+  return err instanceof Error ? err.message : "Check your wallet and the guardrails, then try again.";
+}
 
 function WeightBar({ label, fromBps, toBps }: { label: string; fromBps: number; toBps: number }) {
   const changed = fromBps !== toBps;
@@ -151,6 +168,11 @@ function RebalanceForm({ onToast }: { onToast: (t: ToastPayload) => void }) {
         }
       }
 
+      // Mirror the on-chain UsdySpotRequired guard: the pure planRebalance check runs
+      // before the quote resolves, so re-check here now that usdyDexSpot is known.
+      const spotErr = checkUsdySpot(cur, target, usdyDexSpot);
+      if (spotErr) throw new Error(spotErr);
+
       const args = [
         [target.IDLE, target.AAVE, target.USDY, target.AUSD] as const,
         swapData,
@@ -170,8 +192,7 @@ function RebalanceForm({ onToast }: { onToast: (t: ToastPayload) => void }) {
       setTxHash(hash);
     } catch (err) {
       setBusy(false);
-      const msg = (err as { shortMessage?: string })?.shortMessage ?? (err instanceof Error ? err.message : "Check your wallet and the guardrails, then try again.");
-      onToast({ kind: "error", title: "Rebalance failed", body: msg });
+      onToast({ kind: "error", title: "Rebalance failed", body: rebalanceErrorMessage(err) });
     }
   };
 

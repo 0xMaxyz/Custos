@@ -15,8 +15,16 @@ const NAV = [
   { route: "activity", label: "Activity", icon: "scroll-text" },
 ] as const;
 
-export type Route = "dashboard" | "activity" | "agent";
+// Shown only to the connected ALLOCATOR (gated in App via useAllocator).
+const ALLOCATOR_NAV = { route: "allocator", label: "Allocator", icon: "gauge" } as const;
+
+export type Route = "dashboard" | "activity" | "agent" | "allocator";
 export type NetKey = "mainnet" | "testnet";
+
+/** Primary nav items, appending the Allocator tab only for the allocator wallet. */
+function navItems(showAllocator: boolean): readonly { route: Route; label: string; icon: string }[] {
+  return showAllocator ? [...NAV, ALLOCATOR_NAV] : NAV;
+}
 
 function Brand({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
@@ -37,15 +45,15 @@ function ThemeToggle({ theme, setTheme }: { theme: string; setTheme: (t: string)
   );
 }
 
-export function Topbar({ route, go, theme, setTheme }: {
-  route: Route; go: (r: Route) => void; theme: string; setTheme: (t: string) => void;
+export function Topbar({ route, go, theme, setTheme, showAllocator = false }: {
+  route: Route; go: (r: Route) => void; theme: string; setTheme: (t: string) => void; showAllocator?: boolean;
 }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
         <Brand onClick={(e) => { e.preventDefault(); go("dashboard"); }} />
         <nav className="nav" aria-label="Primary">
-          {NAV.map((n) => (
+          {navItems(showAllocator).map((n) => (
             <a key={n.route} href={"#" + n.route} className={"nav-tab" + (route === n.route ? " active" : "")}
               aria-current={route === n.route ? "page" : undefined}
               onClick={(e) => { e.preventDefault(); go(n.route); }}>
@@ -63,10 +71,10 @@ export function Topbar({ route, go, theme, setTheme }: {
   );
 }
 
-export function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
+export function MobileNav({ route, go, showAllocator = false }: { route: Route; go: (r: Route) => void; showAllocator?: boolean }) {
   return (
     <nav className="mobile-nav" aria-label="Primary mobile">
-      {NAV.map((n) => (
+      {navItems(showAllocator).map((n) => (
         <button key={n.route} className={"mobile-tab" + (route === n.route ? " active" : "")}
           aria-current={route === n.route ? "page" : undefined} onClick={() => go(n.route)}>
           <Icon name={n.icon} size={20} />{n.label}

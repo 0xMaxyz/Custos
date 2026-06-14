@@ -27,9 +27,16 @@ export interface ResolvedDeployment {
   aaveAdapter: `0x${string}` | "";
   usdyAdapter: `0x${string}` | "";
   ausdAdapter: `0x${string}` | "";
+  /** Block the vault was deployed at — scopes getLogs so we never scan from genesis. */
+  vaultDeployBlock: bigint;
 }
 
-const EMPTY: ResolvedDeployment = { vault: "", guardrails: "", benchmark: "", aaveAdapter: "", usdyAdapter: "", ausdAdapter: "" };
+const EMPTY: ResolvedDeployment = { vault: "", guardrails: "", benchmark: "", aaveAdapter: "", usdyAdapter: "", ausdAdapter: "", vaultDeployBlock: 0n };
+
+// Optional override for the vault deploy block (after a redeploy, before the
+// committed record is updated). Applies on any chain — keep it consistent with
+// VITE_VAULT_ADDRESS.
+const ENV_DEPLOY_BLOCK = (import.meta.env.VITE_VAULT_DEPLOY_BLOCK ?? "").trim();
 
 /** Resolve Custos contract addresses for a chain (see precedence above). */
 export function resolveDeployment(chainId: number | undefined): ResolvedDeployment {
@@ -40,6 +47,7 @@ export function resolveDeployment(chainId: number | undefined): ResolvedDeployme
   // override belongs to, or reads/writes will target a vault that isn't there.
   const vault = isAddr(ENV_VAULT) ? ENV_VAULT : isAddr(d.vault) ? d.vault : "";
   if (!vault) return EMPTY; // no vault for this chain -> fixtures
+  const deployBlock = /^[0-9]+$/.test(ENV_DEPLOY_BLOCK) ? BigInt(ENV_DEPLOY_BLOCK) : BigInt(d.vaultDeployBlock ?? 0);
   return {
     vault,
     guardrails:  isAddr(d.guardrails)  ? d.guardrails  : "",
@@ -47,6 +55,7 @@ export function resolveDeployment(chainId: number | undefined): ResolvedDeployme
     aaveAdapter: isAddr(d.aaveAdapter) ? d.aaveAdapter : "",
     usdyAdapter: isAddr(d.usdyAdapter) ? d.usdyAdapter : "",
     ausdAdapter: isAddr(d.ausdAdapter) ? d.ausdAdapter : "",
+    vaultDeployBlock: deployBlock,
   };
 }
 

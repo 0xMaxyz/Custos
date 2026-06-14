@@ -48,6 +48,16 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
    adapter's standing approval covers the quote's `permissions` step). Aave adapters
    still call the pool directly with on-chain `minOut`. The pinned router address is
    verified on-chain; changing it requires a redeploy.
+   **Swap-quote surface (allocator UI):** the agent API exposes `POST /swap/quote`
+   (`agent/src/data/swapQuote.ts`) so the web allocator panel can build `swapData` for a
+   manual USDY/AUSD rebalance **without holding the 1delta key** — the agent fetches the
+   route with its own key server-side. It is a thin wrapper, not a new boundary: it only
+   sizes a USDC↔USDY/AUSD leg for a known adapter, re-asserts the **pinned router** before
+   returning, and returns calldata that is still inert until an ALLOCATOR runs it through
+   the vault (where the adapter's balance-delta `minOut` and pinned-router checks bind on
+   chain). It is rate-limited like `/ask`, origin-locked when `CORS_ALLOWED_ORIGINS` is
+   set (a disallowed cross-origin browser is 403'd before any 1delta call, to protect the
+   key's quota), and never moves funds.
    **mUSD converter leg (USDY↔mUSD):** the RWA core (bucket 2) may be held as USDY or
    its rebasing $1 form mUSD. `UsdyAdapter` converts between them via the **Ondo mUSD
    contract's `wrap`/`unwrap`** — which IS the "Ondo Token Converter" (verified

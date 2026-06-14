@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { buildServer } from "./server.js";
 import type { ExplainClient, ExplainContext } from "./llm/explain.js";
 import { encodePaymentHeader, type PaymentPayload } from "./payments/x402.js";
+import type { SwapQuoteResult } from "./data/swapQuote.js";
 
 const sampleContext: ExplainContext = {
   asOf: "2026-06-01T00:00:00.000Z",
@@ -319,6 +320,103 @@ describe("agent server — x402-paid /risk-score (A4.1)", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ riskScore: 41 });
     expect(res.headers["x-payment-response"]).toBeTruthy();
+    await app.close();
+  });
+});
+
+describe("agent server — /swap/quote (allocator UI)", () => {
+  const goodResult: SwapQuoteResult = {
+    router: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E",
+    calldata: "0xdeadbeef",
+    amountOut: "1000000",
+    bucketIndex: 2,
+    usdyDexSpotUsdc: "1081000000000000000",
+  };
+
+  it("is not registered when no handler is wired", async () => {
+    const app = buildServer();
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload: { bucket: "USDY", side: "deposit", usdcAmount: "1000000" } });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("returns the handler's quote on a valid request", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload: { bucket: "USDY", side: "deposit", usdcAmount: "5000000" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ router: goodResult.router, calldata: "0xdeadbeef", bucketIndex: 2 });
+    await app.close();
+  });
+
+  it("rejects an invalid bucket / side / amount with 400", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult });
+    await app.ready();
+    const bad = [
+      { bucket: "AAVE", side: "deposit", usdcAmount: "1000000" },
+      { bucket: "USDY", side: "swap", usdcAmount: "1000000" },
+      { bucket: "USDY", side: "deposit", usdcAmount: "0" },
+      { bucket: "USDY", side: "deposit", usdcAmount: "-5" },
+      { bucket: "USDY", side: "deposit", usdcAmount: 5 },
+    ];
+    for (const payload of bad) {
+      const res = await app.inject({ method: "POST", url: "/swap/quote", payload });
+      expect(res.statusCode).toBe(400);
+    }
+    await app.close();
+  });
+
+  it("maps a handler failure to 502", async () => {
+    const app = buildServer({ swapQuote: async () => { throw new Error("router mismatch"); } });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload: { bucket: "AUSD", side: "withdraw", usdcAmount: "1000000" } });
+    expect(res.statusCode).toBe(502);
+    await app.close();
+  });
+
+  it("throttles past the rate limit with 429", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, swapRateLimit: 1, swapRateWindowMs: 60_000 });
+    await app.ready();
+    const ok = await app.inject({ method: "POST", url: "/swap/quote", payload: { bucket: "USDY", side: "deposit", usdcAmount: "1000000" } });
+    expect(ok.statusCode).toBe(200);
+    const limited = await app.inject({ method: "POST", url: "/swap/quote", payload: { bucket: "USDY", side: "deposit", usdcAmount: "1000000" } });
+    expect(limited.statusCode).toBe(429);
+    await app.close();
+  });
+});
+
+describe("agent server — /swap/quote origin lock", () => {
+  const goodResult: SwapQuoteResult = {
+    router: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E",
+    calldata: "0xabcd",
+    amountOut: "1",
+    bucketIndex: 2,
+    usdyDexSpotUsdc: "0",
+  };
+  const payload = { bucket: "USDY", side: "deposit", usdcAmount: "1000000" };
+
+  it("rejects a cross-origin browser not on the allowlist with 403", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload, headers: { origin: "https://evil.example" } });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("allows an allow-listed origin", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload, headers: { origin: "https://app.custos.xyz" } });
+    expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it("allows a same-origin call with no Origin header", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload });
+    expect(res.statusCode).toBe(200);
     await app.close();
   });
 });

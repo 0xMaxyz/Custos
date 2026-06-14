@@ -49,6 +49,31 @@ export function computeBaseline(input: BaselineInput): BaselineSummary {
 }
 
 /**
+ * Whether the benchmark has any real data to show yet. A fresh/live vault with no
+ * measured AgentBenchmark outcome is fully zeroed (empty series, zero headline
+ * metrics) — in that state the "Custos vs passive" widget has nothing meaningful to
+ * say, so the dashboard hides it and only shows it once a real (non-zero) on-chain
+ * outcome exists (e.g. after a de-risk is measured). NOTE: `measuredAt` is NOT a
+ * reliable signal — the live zeroed baseline inherits the fixture's timestamp — so
+ * gate on actual content (series + headline numbers).
+ */
+export function hasBaselineData(b: {
+  custosSeries: number[];
+  passiveSeries: number[];
+  realizedYieldBps: number;
+  passiveDeltaBps: number;
+  drawdownAvoidedUsdc: string;
+}): boolean {
+  return (
+    b.custosSeries.length > 0 ||
+    b.passiveSeries.length > 0 ||
+    b.realizedYieldBps !== 0 ||
+    b.passiveDeltaBps !== 0 ||
+    Number(b.drawdownAvoidedUsdc) > 0
+  );
+}
+
+/**
  * Format a signed bps delta for display, e.g. 180 → "+1.80%", -52 → "-0.52%".
  * `bps` is basis points (1% = 100 bps).
  */

@@ -142,3 +142,41 @@ export function planRebalance(input: PlanInput): RebalancePlan {
 
 /** The unchanged keys helper, exported for the page's input wiring. */
 export const WEIGHT_KEYS = KEYS;
+
+// ── On-chain guardrail reason decoding ──────────────────────────────────────
+//
+// YieldVault.rebalance reverts `GuardrailsRejected(bytes4 reason)` where `reason`
+// is the 4-byte selector of the failing Guardrails check. viem decodes the outer
+// error (vaultAbi.ts) to the raw selector; this map turns that selector into the
+// same human-readable text the pre-flight mirror uses. Selectors are the first 4
+// bytes of keccak256(errorSignature) — keep in sync with contracts/src/Guardrails.sol.
+export const GUARDRAIL_REASON_TEXT: Record<string, string> = {
+  "0xa3d27378": "Weights must total 100%",
+  "0xcaaf06dc": "A bucket exceeds its weight cap",
+  "0x513f07ad": `Idle must stay at least ${(MIN_IDLE_BPS / 100).toFixed(0)}%`,
+  "0xe448d791": `Instant liquidity must stay above ${(MIN_INSTANT_LIQUIDITY_BPS / 100).toFixed(0)}%`,
+  "0xfe1af477": "Rebalance interval not elapsed (1-hour guardrail)",
+  "0x8b257661": `Move too large — at most ${(MAX_REBALANCE_MOVE_BPS / 100).toFixed(0)}% of TVL per rebalance`,
+  "0x96b5021b": `USDY is off-peg by ≥ ${(PEG_BLOCK_BPS / 100).toFixed(2)}% — adding USDY is blocked. Mantle's thin USDY pools mean a buy of this size moves the price past the peg guard; try a smaller USDY increase or wait for deeper liquidity.`,
+  "0x33b95123": "A live USDY DEX spot is required to add USDY (none was supplied)",
+  "0x0781eae1": `USDY notional capped at $${(MAX_USDY_NOTIONAL_USDC / 1e6).toLocaleString()}`,
+};
+
+/** Map a `GuardrailsRejected` inner reason selector to friendly text (or the raw selector). */
+export function describeGuardrailReason(reason: string): string {
+  return GUARDRAIL_REASON_TEXT[reason.toLowerCase()] ?? `Guardrails rejected the rebalance (${reason})`;
+}
+
+/**
+ * Mirror of the on-chain `UsdySpotRequired` check (Guardrails.sol §7): when USDY
+ * weight increases, the vault fails closed unless a non-zero DEX spot is supplied.
+ * The pure `planRebalance` mirror runs BEFORE the swap quote is fetched, so it cannot
+ * see the spot; the page calls this once the leg quote has resolved `usdyDexSpot`.
+ * Returns an error string when the on-chain guard would revert, else "".
+ */
+export function checkUsdySpot(current: WeightsBps, target: WeightsBps, usdyDexSpot: bigint): string {
+  if (target.USDY > current.USDY && usdyDexSpot <= 0n) {
+    return "Could not fetch a USDY DEX spot price — required to add USDY. Retry, or check the agent's /swap/quote.";
+  }
+  return "";
+}

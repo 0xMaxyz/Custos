@@ -84,5 +84,15 @@ export const PEG_DE_RISK_BPS = 100; // 1.0%
  */
 export const ORACLE_MAX_AGE = 100_800; // ~28 hours
 
+/**
+ * USDY reserve backing ratio (permitted assets / token principal, from the daily
+ * Ondo/Ankura attestation), in bps, below which the issuer is treated as
+ * under-collateralized => force de-risk (USDY -> 0). Normal is ~10_055 (100.55%);
+ * this 9_900 (99%) floor leaves a 1% buffer against measurement/timing noise so only
+ * a genuine reserve shortfall trips it. Deterministic backstop — independent of, and
+ * un-loosenable by, the LLM.
+ */
+export const USDY_MIN_COLLATERAL_BPS = 9_900; // 99%
+
 /** Warn when within this many seconds of the oracle's configured range end. */
 export const ORACLE_RANGE_END_BUFFER = 86_400; // 24 hours

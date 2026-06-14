@@ -4,6 +4,7 @@ import { buildEvidenceFetcher, CURATED_EVIDENCE_SOURCES } from "./evidence.js";
 import { runSignalLayer } from "./signals.js";
 import type { LLMClient, RiskVerdict } from "./types.js";
 import type { MarketSnapshot, RiskAssessment, WeightsBps } from "../types.js";
+import type { AttestationFacts } from "../data/attestations.js";
 
 /** Minimal fetch stub returning a page with the given title + meta description. */
 function pageFetch(byUrl: Record<string, { title: string; desc: string }>) {
@@ -88,6 +89,49 @@ const DERISK_VERDICT: RiskVerdict = {
   ],
   confidence: 0.8,
 };
+
+// ── Attestation-backed evidence item ─────────────────────────────────────────
+
+const FACTS: AttestationFacts = {
+  date: "2026-06-09",
+  tokenPrincipalOutstanding: 2_127_768_031.64,
+  permittedAssetsMarketValue: 2_139_527_002.7,
+  collateralRatioBps: 10_055,
+  tbillPct: 99.86,
+  wamDays: 164.02,
+  estYieldPct: 3.61,
+};
+
+describe("buildEvidenceFetcher — attestation provider", () => {
+  it("builds the ondo item from parsed facts (no scrape) when a provider is given", async () => {
+    const fetchImpl = pageFetch({});
+    const items = await buildEvidenceFetcher(fetchImpl, { attestation: async () => FACTS })();
+    const ondo = items.find((i) => i.id === "ondo-usdy-attestation");
+    expect(ondo).toBeDefined();
+    expect(ondo!.source).toBe("ondo.finance"); // trusted → de-risk-eligible
+    expect(ondo!.publishedAt).toBe("2026-06-09");
+    expect(ondo!.summary).toContain("100.55% backed");
+    expect(ondo!.summary).toContain("99.86% US Treasury Bills");
+    expect(fetchImpl).not.toHaveBeenCalledWith(ONDO_URL); // facts used, not scrape
+  });
+
+  it("demo override takes precedence over the attestation provider", async () => {
+    const fetchImpl = pageFetch({ [DEMO_URL]: STAGED });
+    const attestation = vi.fn(async () => FACTS);
+    const items = await buildEvidenceFetcher(fetchImpl, { demoEvidenceUrl: DEMO_URL, attestation })();
+    const ondo = items.find((i) => i.id === "ondo-usdy-attestation");
+    expect(ondo!.summary).toContain("halts USDY redemptions"); // staged page, not attestation
+    expect(attestation).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the scrape when the attestation provider returns null", async () => {
+    const fetchImpl = pageFetch({ [ONDO_URL]: STAGED });
+    const items = await buildEvidenceFetcher(fetchImpl, { attestation: async () => null })();
+    const ondo = items.find((i) => i.id === "ondo-usdy-attestation");
+    expect(ondo!.summary).toContain("halts USDY redemptions"); // scraped fallback
+    expect(fetchImpl).toHaveBeenCalledWith(ONDO_URL);
+  });
+});
 
 describe("staged evidence → LLM de-risk (citation gate)", () => {
   it("keeps deRisk=true when the cited staged item resolves to a trusted source", async () => {

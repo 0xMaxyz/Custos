@@ -38,6 +38,9 @@ importers:
       fastify:
         specifier: ^5.2.0
         version: 5.8.5
+      unpdf:
+        specifier: ^1.6.2
+        version: 1.6.2
       viem:
         specifier: ^2.21.55
         version: 2.51.3(typescript@5.9.3)(zod@3.25.76)
@@ -2347,6 +2350,14 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
+  unpdf@1.6.2:
+    resolution: {integrity: sha512-zQ80ySoPuPHOsvIoRp/nJyQt8TOUoTh1+WBCGcBvlddQNgKDLRwm0AY3x8Q35I7+kIiRSgqMx+Ma2pl9McIp7A==}
+    peerDependencies:
+      '@napi-rs/canvas': ^0.1.69
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
+
   update-browserslist-db@1.2.3:
     resolution: {integrity: sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==}
     hasBin: true
@@ -4569,6 +4580,8 @@ snapshots:
       ua-is-frozen: 0.1.2
 
   undici-types@6.21.0: {}
+
+  unpdf@1.6.2: {}
 
   update-browserslist-db@1.2.3(browserslist@4.28.2):
     dependencies:

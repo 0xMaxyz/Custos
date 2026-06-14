@@ -1,5 +1,6 @@
 import type { EvidenceItem } from "./types.js";
 import type { EvidenceFetcher } from "./signals.js";
+import { ONDO_USDY_ATTESTATION_FOLDER_URL, type AttestationFacts } from "../data/attestations.js";
 
 /**
  * Curated evidence sources for the hero path (ROADMAP task 3.5).
@@ -85,6 +86,24 @@ export interface EvidenceFetcherOptions {
    * stays de-risk-eligible under N2. Unset = production behaviour, untouched.
    */
   readonly demoEvidenceUrl?: string | undefined;
+  /**
+   * Provider for the latest parsed Ondo USDY reserve attestation (Dropbox-backed).
+   * When set and NOT in demo mode, the `ondo-usdy-attestation` item is built from the
+   * report's STRUCTURED facts (backing ratio, T-bill %, WAM, yield) rather than the
+   * homepage scrape — the substantive evidence the LLM reasons over. Returns null on
+   * any fetch/parse failure → falls back to the scrape.
+   */
+  readonly attestation?: (() => Promise<AttestationFacts | null>) | undefined;
+}
+
+/** A one-line evidence summary from the attestation's structured facts. */
+function attestationSummary(facts: AttestationFacts): string {
+  return (
+    `Ondo USDY reserve attestation (Ankura Trust Co., ${facts.date}): ` +
+    `${(facts.collateralRatioBps / 100).toFixed(2)}% backed (permitted assets vs token principal); ` +
+    `${facts.tbillPct}% US Treasury Bills; weighted-avg maturity ${facts.wamDays}d; ` +
+    `est. yield ${facts.estYieldPct}%.`
+  );
 }
 
 /**
@@ -114,6 +133,23 @@ export function buildEvidenceFetcher(
 
     const results = await Promise.allSettled(
       feeds.map(async (feed): Promise<EvidenceItem | null> => {
+        // Real Ondo attestation report (when configured and not overridden for the
+        // demo): build from the parsed structured facts instead of scraping.
+        if (feed.id === "ondo-usdy-attestation" && options.demoEvidenceUrl === undefined && options.attestation) {
+          const facts = await options.attestation().catch(() => null);
+          if (facts) {
+            return {
+              id: feed.id,
+              type: feed.type,
+              source: feed.source,
+              url: ONDO_USDY_ATTESTATION_FOLDER_URL,
+              publishedAt: facts.date,
+              summary: attestationSummary(facts),
+            };
+          }
+          // facts === null → fall through to the homepage scrape below.
+        }
+
         const summary = await fetchSummary(feed.url, fetchImpl);
         if (!summary) return null;
         return {

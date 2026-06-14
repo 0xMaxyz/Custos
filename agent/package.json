@@ -9,7 +9,9 @@
     "pin:smoke": "tsx src/scripts/pinSmokeTest.ts",
     "card:pin": "tsx src/scripts/pinAgentCard.ts",
     "rebalance": "tsx src/scripts/rebalance.ts",
+    "guardrail:peg": "tsx src/scripts/guardrailPeg.ts",
     "demo:derisk-dryrun": "tsx src/scripts/demoDeRiskDryRun.ts",
+    "demo:derisk": "tsx src/scripts/demoDeRisk.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "build": "tsc",
@@ -19,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.100.1",
     "@custos/shared": "workspace:*",
     "fastify": "^5.2.0",
+    "unpdf": "^1.6.2",
     "viem": "^2.21.55",
     "zod": "^3.24.1"
   },

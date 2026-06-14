@@ -177,6 +177,41 @@ export const VAULT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    // AccessControl role check — used to gate the allocator rebalance panel.
+    name: "hasRole",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "role", type: "bytes32" },
+      { name: "account", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    // Last rebalance timestamp — for the 1-hour interval guardrail (display + gating).
+    name: "lastRebalanceAt",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
+    // ALLOCATOR-only manual rebalance. The web UI only ever moves funds between IDLE
+    // and AAVE (swapData all-empty, USDY/AUSD held at current) — buckets that need a
+    // 1delta swap stay with the off-chain agent, which owns the swap-routing boundary.
+    name: "rebalance",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "targetWeightsBps", type: "uint16[4]" },
+      { name: "swapData", type: "bytes[]" },
+      { name: "decisionURI", type: "string" },
+      { name: "rationaleHash", type: "bytes32" },
+      { name: "usdyDexSpotUsdc", type: "uint256" },
+    ],
+    outputs: [{ name: "decisionId", type: "uint256" }],
+  },
+  {
     name: "DecisionRecorded",
     type: "event",
     inputs: [

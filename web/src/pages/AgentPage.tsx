@@ -1,6 +1,7 @@
 // Agent (§5.3). Matches Design/src/agent.jsx.
 
 import { useState, useRef, useEffect } from "react";
+import { useAccount } from "wagmi";
 import { Icon } from "../components/Icons";
 import { Card, AddressChip, StatusDot, Skeleton } from "../components/Components";
 import * as fmt from "../lib/fmt";
@@ -9,6 +10,68 @@ import { askAgent } from "../lib/askAgent";
 import { useIdentity, useDecisions } from "../lib/useGuardianData";
 import { useInsightsData, buildLiveWatchlist } from "../lib/useInsightsData";
 import { useGuardrails, useX402Offer } from "../lib/useAgentLive";
+import { useVaultData } from "../lib/useVaultData";
+import { useAllocator } from "../lib/useAllocator";
+import { AllocatorRebalanceModal } from "../modals/AllocatorModal";
+import type { ToastPayload } from "../modals/TradeModals";
+
+// Donut-free allocation readout for the allocator panel.
+function AllocBar({ label, bps }: { label: string; bps: number }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--muted)" }}>
+        <span>{label}</span><span className="mono">{(bps / 100).toFixed(1)}%</span>
+      </div>
+      <div style={{ height: 6, background: "var(--base-200)", borderRadius: 3, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.min(100, bps / 100)}%`, background: "var(--primary)" }} />
+      </div>
+    </div>
+  );
+}
+
+// ALLOCATOR-only manual rebalance. Hidden entirely unless the connected wallet holds
+// the on-chain ALLOCATOR role on the live vault. Lets the allocator deploy idle USDC
+// into Aave (and back) without waiting on the agent — the autonomous engine never
+// grows a position from idle on its own.
+function AllocatorPanel({ onToast }: { onToast?: ((t: ToastPayload) => void) | undefined }) {
+  const { address } = useAccount();
+  const { isAllocator, lastRebalanceAt } = useAllocator(address);
+  const { vault, isLive } = useVaultData(address);
+  const [open, setOpen] = useState(false);
+
+  if (!isAllocator || !isLive) return null;
+  const w = vault.weightsBps;
+
+  return (
+    <Card>
+      <div className="cs-card-hl">
+        <span className="cs-card-title" style={{ margin: 0 }}><Icon name="gauge" size={14} />Allocator controls</span>
+        <span className="chip role-warning" style={{ height: 22 }}><Icon name="shield" size={12} />ALLOCATOR</span>
+      </div>
+      <p style={{ margin: "0 0 14px", fontSize: "0.875rem", color: "var(--muted)", lineHeight: 1.5 }}>
+        Manually deploy idle USDC into Aave, USDY, or AUSD (or pull it back). The agent only
+        maintains or de-risks the RWA position — it never grows an allocation from idle on its own.
+      </p>
+      <div style={{ display: "grid", gap: 10 }}>
+        <AllocBar label="Idle" bps={w.IDLE} />
+        <AllocBar label="Aave" bps={w.AAVE} />
+        <AllocBar label="USDY" bps={w.USDY} />
+        <AllocBar label="AUSD" bps={w.AUSD} />
+      </div>
+      <button className="cs-btn cs-btn-primary cs-btn-block" style={{ marginTop: 16 }} onClick={() => setOpen(true)}>
+        <Icon name="refresh-cw" size={15} />Rebalance allocation
+      </button>
+      {open && (
+        <AllocatorRebalanceModal
+          vault={vault}
+          lastRebalanceAt={lastRebalanceAt}
+          onClose={() => setOpen(false)}
+          onToast={onToast ?? (() => {})}
+        />
+      )}
+    </Card>
+  );
+}
 
 function IdentityCard() {
   const { identity: id, cardUrl } = useIdentity();
@@ -228,7 +291,7 @@ function AskPanel() {
   );
 }
 
-export function AgentPage({ loading }: { loading: boolean }) {
+export function AgentPage({ loading, onToast }: { loading: boolean; onToast?: ((t: ToastPayload) => void) | undefined }) {
   if (loading) {
     return <div className="page"><div className="grid agent-cols"><div className="grid" style={{ gap: 16 }}><Skeleton h={220} r={14} /><Skeleton h={260} r={14} /></div><Skeleton h={420} r={14} /></div></div>;
   }
@@ -243,6 +306,7 @@ export function AgentPage({ loading }: { loading: boolean }) {
       <div className="grid agent-cols">
         <div className="grid" style={{ gap: 16, alignContent: "start" }}>
           <IdentityCard />
+          <AllocatorPanel onToast={onToast} />
           <WatchlistPanel />
           <AgentEconomicsPanel />
           <GuardrailsPanel />

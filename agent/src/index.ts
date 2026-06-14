@@ -5,6 +5,7 @@ import { Executor } from "./executor/index.js";
 import { Scheduler } from "./scheduler.js";
 import { AnthropicExplainer, type ExplainContext } from "./llm/explain.js";
 import { computeFreshContext } from "./context.js";
+import { makeSwapQuoteHandler } from "./data/swapQuote.js";
 import { AlertNotifier } from "./alerts.js";
 import { assertChainId, makeClients } from "./chain/clients.js";
 import { resolveMantleRpcUrls } from "./chain/rpcList.js";
@@ -186,8 +187,15 @@ const buildGovernanceWatcher = (): GovernanceWatcher | undefined => {
   });
 };
 
+// Swap-quote handler (allocator UI): hides the 1delta key from the browser. Wired
+// whenever the data pipeline exists (it carries the 1delta client + a read client);
+// it resolves the vault's USDY/AUSD adapters and asserts the pinned router itself.
+const swapQuote = pipeline
+  ? makeSwapQuoteHandler({ config, oneDelta: pipeline.oneDelta, publicClient: pipeline.clients.publicClient })
+  : undefined;
+
 const allowedOrigins = config.corsAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean);
-const app = buildServer({ explainClient, getContext, x402, allowedOrigins });
+const app = buildServer({ explainClient, getContext, x402, swapQuote, allowedOrigins });
 
 if (x402) {
   app.log.info(

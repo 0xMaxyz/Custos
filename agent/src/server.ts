@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { ExplainClient, ExplainContext } from "./llm/explain.js";
+import type { SwapBucket, SwapSide, SwapQuoteHandler } from "./data/swapQuote.js";
 import {
   PAYMENT_HEADER,
   PAYMENT_RESPONSE_HEADER,
@@ -52,6 +53,17 @@ export interface ServerOptions {
    */
   readonly x402?: X402Options | undefined;
   /**
+   * When set, exposes `POST /swap/quote` — a thin, key-hiding wrapper around 1delta's
+   * swap routing so the web allocator UI can build `swapData` for a USDY/AUSD rebalance
+   * without ever holding the agent's 1delta key. The handler resolves the adapter,
+   * sizes the leg, fetches the calldata, and asserts the pinned router (see
+   * data/swapQuote.ts). Rate-limited like `/ask` to cap key abuse.
+   */
+  readonly swapQuote?: SwapQuoteHandler | undefined;
+  /** Max `/swap/quote` requests per `swapRateWindowMs` (default 30 / minute; 0 = off). */
+  readonly swapRateLimit?: number | undefined;
+  readonly swapRateWindowMs?: number | undefined;
+  /**
    * CORS allowlist for the public endpoints. `["*"]` (default) allows any origin —
    * fine for the read-only/x402 surface today. Provide explicit origins to lock it
    * down before adding any authenticated/mutating endpoint (L5).
@@ -79,6 +91,12 @@ function makeRateLimiter(limit: number, windowMs: number): () => boolean {
 
 interface AskBody {
   question?: unknown;
+}
+
+interface SwapQuoteBody {
+  bucket?: unknown;
+  side?: unknown;
+  usdcAmount?: unknown;
 }
 
 /**
@@ -177,6 +195,43 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       } catch (err) {
         req.log.error({ err }, "explain failed");
         return reply.code(502).send({ error: "The assistant could not answer right now." });
+      }
+    });
+  }
+
+  // ── Swap-quote endpoint (allocator UI) ─────────────────────────────────────
+  // Hides the agent's 1delta key from the browser: the web allocator panel posts the
+  // bucket/side/notional, the agent fetches the best-route calldata with its own key
+  // and returns it (pinned-router asserted in the handler). Read-only w.r.t. funds —
+  // the calldata only executes inside the vault's ALLOCATOR-gated rebalance.
+  const { swapQuote } = options;
+  if (swapQuote) {
+    const allowSwap = makeRateLimiter(options.swapRateLimit ?? 30, options.swapRateWindowMs ?? 60_000);
+
+    app.post<{ Body: SwapQuoteBody }>("/swap/quote", async (req, reply) => {
+      if (!allowSwap()) {
+        return reply.code(429).send({ error: "Too many quote requests — slow down and try again shortly." });
+      }
+
+      const bucket = req.body?.bucket;
+      const side = req.body?.side;
+      const amountRaw = req.body?.usdcAmount;
+      if (bucket !== "USDY" && bucket !== "AUSD") {
+        return reply.code(400).send({ error: "Invalid 'bucket' (want 'USDY' or 'AUSD')." });
+      }
+      if (side !== "deposit" && side !== "withdraw") {
+        return reply.code(400).send({ error: "Invalid 'side' (want 'deposit' or 'withdraw')." });
+      }
+      if (typeof amountRaw !== "string" || !/^[1-9][0-9]{0,18}$/.test(amountRaw)) {
+        return reply.code(400).send({ error: "Invalid 'usdcAmount' (want a positive 6-decimal base-unit integer string)." });
+      }
+
+      try {
+        const result = await swapQuote({ bucket: bucket as SwapBucket, side: side as SwapSide, usdcAmount: BigInt(amountRaw) });
+        return result;
+      } catch (err) {
+        req.log.error({ err }, "swap-quote failed");
+        return reply.code(502).send({ error: "Could not fetch a swap route right now — try again shortly." });
       }
     });
   }

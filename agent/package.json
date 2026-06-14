@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "pin:smoke": "tsx src/scripts/pinSmokeTest.ts",
     "card:pin": "tsx src/scripts/pinAgentCard.ts",
+    "rebalance": "tsx src/scripts/rebalance.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "build": "tsc",

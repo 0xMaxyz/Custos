@@ -117,7 +117,7 @@ export default function App() {
       <Banners wrongNet={wrongNet} paused={flags.paused || vault.paused} killed={flags.killed || vault.killed} />
       <main>
         {route === "dashboard" && <DashboardPage {...pageProps} />}
-        {route === "agent" && <AgentPage loading={loading} />}
+        {route === "agent" && <AgentPage loading={loading} onToast={pushToast} />}
         {route === "activity" && <ActivityPage loading={loading} activityError={flags.activityError} />}
       </main>
       <Footer />

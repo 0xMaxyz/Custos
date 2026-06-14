@@ -11,7 +11,7 @@ import { useVaultData } from "../lib/useVaultData";
 import { useDecisions } from "../lib/useGuardianData";
 import { useInsightsData } from "../lib/useInsightsData";
 import { mergeSnapshotIntoVault } from "../lib/vaultMetrics";
-import { computeBaseline, formatDeltaPct } from "../lib/baseline";
+import { computeBaseline, formatDeltaPct, hasBaselineData } from "../lib/baseline";
 import type { PositionState, VaultState } from "../lib/data";
 import type { VaultData } from "../lib/useVaultData";
 import type { Route } from "../components/Shell";
@@ -59,6 +59,11 @@ function AgentStatusCard({ go }: { go: (r: Route) => void }) {
 }
 
 function BaselineCounter({ baseline: b }: { baseline: VaultData["baseline"] }) {
+  // Hide entirely until there's a real (non-zero) on-chain benchmark outcome. A
+  // fresh/live vault with no measured outcome is fully zeroed; showing "+0.00% vs
+  // passive" with a flat sparkline reads as broken. It reappears automatically once
+  // an outcome is measured (e.g. after a de-risk).
+  if (!hasBaselineData(b)) return null;
   // Derive the headline delta from the benchmark series via the shared, tested
   // helper (ROADMAP 4.7) so the widget, useIdentity().baseline, and the unit tests
   // all read one source — not the raw, potentially-stale passiveDeltaBps field.

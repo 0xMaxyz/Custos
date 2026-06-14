@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { computeBaseline, formatDeltaPct } from "./baseline";
+import { computeBaseline, formatDeltaPct, hasBaselineData } from "./baseline";
+
+const ZEROED = {
+  custosSeries: [] as number[],
+  passiveSeries: [] as number[],
+  realizedYieldBps: 0,
+  passiveDeltaBps: 0,
+  drawdownAvoidedUsdc: "0.00",
+};
 
 describe("computeBaseline", () => {
   it("derives the delta from the last aligned point and the per-point spread", () => {
@@ -61,6 +69,26 @@ describe("computeBaseline", () => {
     });
     expect(r.deltaBps).toBe(48);
     expect(r.custosAhead).toBe(true);
+  });
+});
+
+describe("hasBaselineData", () => {
+  it("is false for a fresh/live zeroed baseline (no measured outcome)", () => {
+    expect(hasBaselineData(ZEROED)).toBe(false);
+  });
+
+  it("is true when the demo series are present", () => {
+    expect(hasBaselineData({ ...ZEROED, custosSeries: [0, 10], passiveSeries: [0, 5] })).toBe(true);
+  });
+
+  it("is true once any headline metric is non-zero", () => {
+    expect(hasBaselineData({ ...ZEROED, passiveDeltaBps: 180 })).toBe(true);
+    expect(hasBaselineData({ ...ZEROED, realizedYieldBps: 45 })).toBe(true);
+    expect(hasBaselineData({ ...ZEROED, drawdownAvoidedUsdc: "610.00" })).toBe(true);
+  });
+
+  it("treats a zero drawdown string as no data", () => {
+    expect(hasBaselineData({ ...ZEROED, drawdownAvoidedUsdc: "0" })).toBe(false);
   });
 });
 

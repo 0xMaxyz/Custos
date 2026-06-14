@@ -75,6 +75,7 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 ### 3.4 Backend AI agent (Node.js + TypeScript + Fastify)
 
 - **Data ingestion (read):** 1delta API (Aave/market data on Mantle — rates, utilization, TVL, IRM curves) + **direct RPC** for held-asset ground-truth (Aave position, USDY `RWADynamicOracle` NAV, USDY DEX price, AUSD proof-of-reserves).
+- **RPC efficiency (avoids public-RPC 429s):** the per-cycle vault reads are aggregated through **Multicall3** (one `eth_call`, not ~13); the oracle NAV is read once per snapshot (feeds both peg and APY); the always-reverting `currentRange()` is probed once per process; and the 30s loop runs a **cheap breach check** (peg/oracle only) that escalates to a full vault snapshot only on a real breach (the 60m periodic loop does the full yield rebalance). `MANTLE_RPC_URL` accepts several comma-separated providers → a viem `fallback` transport that fails over on 429.
 - **Deterministic risk engine:** yield-spread calc, peg/NAV deviation, oracle-staleness check, liquidity-buffer math.
 - **LLM layer (Anthropic Claude):** ingest unstructured RWA signals (attestations, reserve/regulatory/issuer news) → structured risk flags + written rationale + de-risk verdict. See [spec.md §3](./spec.md) for the prompt schema.
 - **Guardrail validator:** TS mirror of on-chain guardrails; rejects/repairs any proposal that violates limits **before** signing.

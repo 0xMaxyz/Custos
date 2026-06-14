@@ -41,14 +41,12 @@ export function buildPipeline(config: AgentConfig): Pipeline {
   const vaultAddr = config.vaultAddress === undefined ? undefined : getAddress(config.vaultAddress);
 
   const sources: SnapshotSources = {
+    // The oracle is read ONCE per snapshot and feeds both the NAV/range fields and
+    // the USDY-implied APY (previously two independent oracle reads — see #2). The
+    // Ondo oracle has no updatedAt; rely on rangeEnd for staleness.
     oracle: async () => {
       const { navUsdc, rangeEnd } = await readUsdyOracle(clients.publicClient, oracleAddr);
-      // The Ondo oracle has no updatedAt; rely on rangeEnd for staleness.
-      return { navUsdc, rangeEnd, updatedAt: 0 };
-    },
-    usdyImpliedApyBps: async () => {
-      const { navUsdc } = await readUsdyOracle(clients.publicClient, oracleAddr);
-      return apySampler.sample(navUsdc);
+      return { navUsdc, rangeEnd, updatedAt: 0, impliedApyBps: apySampler.sample(navUsdc) };
     },
     aaveMarket: () => oneDelta.getAaveUsdcMarket(),
     usdyDexSpotUsdc: () => oneDelta.getUsdyDexSpotUsdc(),
@@ -85,17 +83,19 @@ async function readVaultState(
     };
   }
 
-  const totalAssets = await client.readContract({
-    address: vault,
-    abi: yieldVaultAbi,
-    functionName: "totalAssets",
-  });
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-  const idle = await client.readContract({
-    address: getAddress(TOKENS.USDC.address),
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [vault],
+  // Round 1 — vault-level reads with no inter-dependencies, aggregated into one
+  // Multicall3 `eth_call`: TVL, idle USDC, and the three bucket adapter addresses.
+  const [totalAssets, idle, aaveAdapter, usdyAdapter, ausdAdapter] = await client.multicall({
+    allowFailure: false,
+    contracts: [
+      { address: vault, abi: yieldVaultAbi, functionName: "totalAssets" },
+      { address: getAddress(TOKENS.USDC.address), abi: erc20Abi, functionName: "balanceOf", args: [vault] },
+      { address: vault, abi: yieldVaultAbi, functionName: "adapters", args: [BigInt(Bucket.AAVE)] },
+      { address: vault, abi: yieldVaultAbi, functionName: "adapters", args: [BigInt(Bucket.USDY)] },
+      { address: vault, abi: yieldVaultAbi, functionName: "adapters", args: [BigInt(Bucket.AUSD)] },
+    ] as const,
   });
 
   // Per-bucket adapter values (bucket 0 = idle has no adapter).
@@ -107,27 +107,32 @@ async function readVaultState(
   };
   let aaveWithdrawable = 0n;
 
-  for (const bucket of [Bucket.AAVE, Bucket.USDY, Bucket.AUSD] as const) {
-    const adapter = await client.readContract({
-      address: vault,
-      abi: yieldVaultAbi,
-      functionName: "adapters",
-      args: [BigInt(bucket)],
-    });
-    if (adapter === "0x0000000000000000000000000000000000000000") continue;
+  // Round 2 — per-adapter reads (depend on the round-1 adapter addresses), again
+  // batched into a single Multicall3 call. Skip buckets with no adapter set.
+  const round2: { tag: "aaveTotal" | "aaveWithdraw" | "usdyTotal" | "ausdTotal"; address: `0x${string}` }[] = [];
+  if (aaveAdapter !== ZERO_ADDRESS) {
+    round2.push({ tag: "aaveTotal", address: aaveAdapter });
+    round2.push({ tag: "aaveWithdraw", address: aaveAdapter });
+  }
+  if (usdyAdapter !== ZERO_ADDRESS) round2.push({ tag: "usdyTotal", address: usdyAdapter });
+  if (ausdAdapter !== ZERO_ADDRESS) round2.push({ tag: "ausdTotal", address: ausdAdapter });
 
-    bucketValues[bucket] = await client.readContract({
-      address: adapter,
-      abi: strategyAdapterAbi,
-      functionName: "totalAssets",
-    });
-    if (bucket === Bucket.AAVE) {
-      aaveWithdrawable = await client.readContract({
-        address: adapter,
+  if (round2.length > 0) {
+    const results = await client.multicall({
+      allowFailure: false,
+      contracts: round2.map((r) => ({
+        address: r.address,
         abi: strategyAdapterAbi,
-        functionName: "maxWithdrawable",
-      });
-    }
+        functionName: r.tag === "aaveWithdraw" ? "maxWithdrawable" : "totalAssets",
+      })),
+    });
+    round2.forEach((r, i) => {
+      const value = results[i] as bigint;
+      if (r.tag === "aaveTotal") bucketValues[Bucket.AAVE] = value;
+      else if (r.tag === "aaveWithdraw") aaveWithdrawable = value;
+      else if (r.tag === "usdyTotal") bucketValues[Bucket.USDY] = value;
+      else if (r.tag === "ausdTotal") bucketValues[Bucket.AUSD] = value;
+    });
   }
 
   return {

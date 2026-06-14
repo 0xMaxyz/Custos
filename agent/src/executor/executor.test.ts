@@ -1045,3 +1045,58 @@ describe("Executor tx-journal (O4)", () => {
     clearSpy.mockRestore();
   });
 });
+
+// ── Breach poll (#3): runCycle({ full: false }) ───────────────────────────────
+// The cheap 30s poll reads only peg/oracle inputs and short-circuits unless they
+// already force a de-risk; on a real breach it escalates to the full pipeline.
+describe("Executor.runCycle({ full: false }) breach poll", () => {
+  function pegOf(snap: MarketSnapshot) {
+    return {
+      usdyOracleNavUsdc: snap.usdyOracleNavUsdc,
+      usdyDexSpotUsdc: snap.usdyDexSpotUsdc,
+      oracleRangeEnd: snap.oracleRangeEnd,
+      oracleUpdatedAt: snap.oracleUpdatedAt,
+    };
+  }
+
+  async function makeExecutor(snap: MarketSnapshot) {
+    const { Executor } = await import("./index.js");
+    const { loadConfig } = await import("../config.js");
+    const writeContract = vi.fn(async () => "0xabc123" as `0x${string}`);
+    const readContract = vi.fn(async () => 0n);
+    const publicClient = { readContract, waitForTransactionReceipt: vi.fn(async () => ({ logs: [] })) } as never;
+    const walletClient = { writeContract, chain: { id: 5000 }, account: { address: "0x1234" as `0x${string}` } } as never;
+    const config = loadConfig({
+      MANTLE_RPC_URL: "https://rpc.mantle.xyz",
+      VAULT_ADDRESS: "0x1111111111111111111111111111111111111111",
+      ALLOCATOR_PRIVATE_KEY: "0x" + "a".repeat(64),
+    });
+    const snapshot = vi.fn(async () => snap);
+    const pegInputs = vi.fn(async () => pegOf(snap));
+    const snapshotter = { snapshot, pegInputs, invalidate: vi.fn() } as never;
+    const executor = new Executor({ config, clients: { publicClient, walletClient } as never, snapshotter });
+    return { executor, snapshot, pegInputs, writeContract };
+  }
+
+  it("healthy peg: returns early without the full snapshot", async () => {
+    const { executor, snapshot, pegInputs, writeContract } = await makeExecutor(baseSnapshot());
+    const result = await executor.runCycle({ full: false });
+
+    expect(result.submitted).toBe(false);
+    expect(pegInputs).toHaveBeenCalledOnce();
+    expect(snapshot).not.toHaveBeenCalled(); // no vault-state read on a quiet poll
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it("depeg: escalates to the full cycle and de-risks", async () => {
+    const snap = baseSnapshot({ usdyDexSpotUsdc: 1_069_200_000_000_000_000n }); // ~100bps below NAV
+    const { executor, snapshot, writeContract } = await makeExecutor(snap);
+    const result = await executor.runCycle({ full: false });
+
+    expect(result.submitted).toBe(true);
+    expect(result.kind).toBe("derisk");
+    expect(snapshot).toHaveBeenCalledOnce(); // breach → full snapshot for fresh vault state
+    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string }])[0];
+    expect(call.functionName).toBe("deRisk");
+  });
+});

@@ -100,6 +100,36 @@ describe("OneDeltaClient", () => {
     expect(await client.getUsdyDexSpotUsdc()).toBe(0n);
   });
 
+  // ── Cheap USDY market price (RPC-free token/prices) ───────────────────────
+
+  it("derives an 18-dec USDY/USDC market price from token/prices", async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () =>
+      jsonResponse({
+        success: true,
+        data: {
+          items: {
+            "0x5be26527e817998a7206475496fde1e68957c5a6": 1.1360251, // USDY
+            "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9": 0.99977, // USDC
+          },
+        },
+      }),
+    );
+    const client = new OneDeltaClient(config, { fetchImpl });
+    // USDC per USDY = 1.1360251 / 0.99977 ≈ 1.13628 → 18-dec.
+    const price = await client.getUsdyMarketPriceUsdc();
+    expect(price).toBeGreaterThan(1_135_000_000_000_000_000n);
+    expect(price).toBeLessThan(1_137_000_000_000_000_000n);
+    expect(fetchImpl.mock.calls[0]![0]).toContain("/v1/data/token/prices");
+  });
+
+  it("returns 0n when token/prices is missing an asset", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ success: true, data: { items: {} } }),
+    ) as unknown as FetchLike;
+    const client = new OneDeltaClient(config, { fetchImpl });
+    expect(await client.getUsdyMarketPriceUsdc()).toBe(0n);
+  });
+
   // ── AUSD PoR — 1delta has no feed, always "unknown" (0) ───────────────────
 
   it("returns 0 (unknown) for AUSD backing — no 1delta PoR feed", async () => {

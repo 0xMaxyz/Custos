@@ -51,12 +51,36 @@ export function yieldSpreadBps(usdyImpliedApyBps: number, aaveSupplyApyBps: numb
 
 /**
  * Whether the oracle NAV is stale: past its range end, or (if a timestamp is
- * known) older than ORACLE_MAX_AGE.
+ * known) older than ORACLE_MAX_AGE. Accepts just the two oracle fields so the
+ * cheap breach poll (which has no full snapshot) can reuse it.
  */
-export function isOracleStale(snapshot: MarketSnapshot, nowSec: number): boolean {
+export function isOracleStale(
+  snapshot: Pick<MarketSnapshot, "oracleRangeEnd" | "oracleUpdatedAt">,
+  nowSec: number,
+): boolean {
   const pastRangeEnd = snapshot.oracleRangeEnd > 0 && nowSec > snapshot.oracleRangeEnd;
   const aged = snapshot.oracleUpdatedAt > 0 && nowSec - snapshot.oracleUpdatedAt > ORACLE_MAX_AGE;
   return pastRangeEnd || aged;
+}
+
+/**
+ * Whether the cheap peg/oracle inputs alone already force a de-risk — the exact
+ * condition `assess()` uses to set `forceDeRisk` (oracle staleness OR peg deviation
+ * at/above the de-risk threshold). Lets the 30s breach poll (#3) decide whether to
+ * escalate to a full cycle WITHOUT reading vault state. Reuses the same primitives
+ * as `assess()` so the two can never drift.
+ */
+export interface PegInputs {
+  readonly usdyOracleNavUsdc: bigint;
+  readonly usdyDexSpotUsdc: bigint;
+  readonly oracleRangeEnd: number;
+  readonly oracleUpdatedAt: number;
+}
+
+export function isForceDeRiskCondition(peg: PegInputs, nowSec: number): boolean {
+  const deviation = pegDeviationBps(peg.usdyOracleNavUsdc, peg.usdyDexSpotUsdc);
+  const stale = isOracleStale(peg, nowSec);
+  return stale || deviation >= PEG_DE_RISK_BPS;
 }
 
 /** Whether the oracle is within ORACLE_RANGE_END_BUFFER of its range end. */

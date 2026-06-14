@@ -4,7 +4,7 @@ import { Bucket, MAX_SLIPPAGE_BPS, TOKENS, PROTOCOLS } from "@custos/shared";
 import type { AgentConfig } from "../config.js";
 import type { ChainClients } from "../chain/clients.js";
 import { yieldVaultWriteAbi, yieldVaultAbi } from "../chain/abis.js";
-import { assess } from "../risk/engine.js";
+import { assess, isForceDeRiskCondition } from "../risk/engine.js";
 import { validateProposal, applyVerdict, type ChainContext } from "../risk/validator.js";
 import { runSignalLayer } from "../llm/signals.js";
 import { AnthropicClient } from "../llm/anthropic.js";
@@ -84,12 +84,34 @@ export class Executor {
     this.pin = opts.pin ?? pinRationale;
   }
 
-  async runCycle(): Promise<CycleResult> {
+  /**
+   * Run one cycle.
+   *
+   * `full` (default true) runs the complete pipeline — snapshot → assess → LLM →
+   * rebalance/deRisk — and is what the periodic (yield-optimisation) loop uses.
+   *
+   * `full: false` is the cheap 30s breach poll (#3): it reads ONLY the peg/oracle
+   * inputs and short-circuits unless they already force a de-risk, so a quiet poll
+   * costs a single oracle read instead of the full vault-state snapshot. On a real
+   * breach it escalates to the full pipeline below (with fresh vault state).
+   */
+  async runCycle(opts: { full?: boolean } = {}): Promise<CycleResult> {
+    const full = opts.full ?? true;
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    if (!full) {
+      const peg = await this.snapshotter.pegInputs();
+      if (!isForceDeRiskCondition(peg, nowSec)) {
+        return { submitted: false, reason: "No breach detected (poll)" };
+      }
+      // Breach suspected → fall through to the full pipeline, which re-snapshots
+      // with fresh vault state before sizing/executing the de-risk.
+    }
+
     // 1. Snapshot.
     const snapshot = await this.snapshotter.snapshot();
 
     // 2. Deterministic risk assessment.
-    const nowSec = Math.floor(Date.now() / 1000);
     const assessment = assess(snapshot, { nowSec });
 
     // 3. LLM signal layer (tighten-only; null = fallback to deterministic).
@@ -211,6 +233,9 @@ export class Executor {
       },
       { kind: "rebalance", deRiskRequired },
     );
+    // The trade changed on-chain weights/TVL — drop the cache so the next cycle
+    // (and any /snapshot reader) sees fresh state rather than the pre-trade values.
+    this.snapshotter.invalidate();
     const hash = receipt.transactionHash;
     const decisionId = extractDecisionId(receipt);
 
@@ -264,6 +289,8 @@ export class Executor {
       },
       { kind: "derisk", deRiskRequired: true },
     );
+    // Post-trade on-chain weights/TVL changed — invalidate so the next snapshot is fresh.
+    this.snapshotter.invalidate();
     const hash = receipt.transactionHash;
     const decisionId = extractDecisionId(receipt);
 

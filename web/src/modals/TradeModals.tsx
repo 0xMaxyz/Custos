@@ -45,13 +45,13 @@ function invalidateVaultReads(qc: QueryClient): void {
 
 function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
-    <div className="stepper">
+    <div className="cs-stepper">
       {steps.map((s, i) => (
         <div key={s} style={{ display: "contents" }}>
-          <div className={"step" + (i < current ? " done" : i === current ? " active" : "")}>
-            <span className="step-num">{i < current ? <Icon name="check" size={13} /> : i + 1}</span>{s}
+          <div className={"cs-step" + (i < current ? " done" : i === current ? " active" : "")}>
+            <span className="cs-step-num">{i < current ? <Icon name="check" size={13} /> : i + 1}</span>{s}
           </div>
-          {i < steps.length - 1 && <div className="step-line" />}
+          {i < steps.length - 1 && <div className="cs-step-line" />}
         </div>
       ))}
     </div>
@@ -75,7 +75,7 @@ function TxResult({ kind, title, lines, tx, onClose }: { kind: "confirmed" | "fa
           <a className="linklike" href={explorer + "/tx/" + tx} target="_blank" rel="noreferrer" style={{ justifyContent: "center" }}>View on Mantlescan <Icon name="external-link" size={14} /></a>
         </div>}
       </div>
-      <button className="btn btn-ghost btn-block" style={{ marginTop: 16 }} onClick={onClose}>Done</button>
+      <button className="cs-btn cs-btn-ghost cs-btn-block" style={{ marginTop: 16 }} onClick={onClose}>Done</button>
     </Modal>
   );
 }
@@ -209,7 +209,7 @@ export function DepositModal({ wallet, vault, usdcAddress, onClose, onToast }: {
           Resolving token address… please wait a moment.
         </p>
       )}
-      <button className="btn btn-primary btn-block btn-lg" style={{ marginTop: 16 }} disabled={!valid || busy || (isDeployed && !usdcAddress)} onClick={run}>
+      <button className="cs-btn cs-btn-primary cs-btn-block cs-btn-lg" style={{ marginTop: 16 }} disabled={!valid || busy || (isDeployed && !usdcAddress)} onClick={run}>
         {busy ? <><Spinner /> {phase === "approving" ? "Approving…" : "Depositing…"}</> : phase === "approved" ? "Confirm deposit" : valid ? "Approve & deposit" : "Enter an amount"}
       </button>
     </Modal>
@@ -315,7 +315,7 @@ export function WithdrawModal({ position, vault, onClose, onToast }: {
           ? `Large withdrawal — exceeds ${fmt.usd(instant, { cents: false })} instant liquidity, so part may unwind USDY with up to 0.5% slippage.`
           : `Served from instant liquidity (${fmt.usd(instant, { cents: false })} available).`}
       </p>
-      <button className="btn btn-primary btn-block btn-lg" style={{ marginTop: 16 }} disabled={!valid || busy} onClick={run}>
+      <button className="cs-btn cs-btn-primary cs-btn-block cs-btn-lg" style={{ marginTop: 16 }} disabled={!valid || busy} onClick={run}>
         {busy ? <><Spinner />Withdrawing…</> : valid ? "Withdraw" : "Enter an amount"}
       </button>
     </Modal>

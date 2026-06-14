@@ -17,17 +17,17 @@
 .wallet-btn:hover { background: var(--primary-hover); }
 .wallet-chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 12px; border-radius: var(--rounded-btn); border: 1px solid var(--border-strong); background: var(--base-100); font-weight: 600; font-size: 0.875rem; color: var(--base-content); }
 .wallet-chip:hover { background: var(--base-200); }
-.avatar { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, var(--primary), var(--info)); }
+.cs-avatar { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, var(--primary), var(--info)); }
 
 .banner { display: flex; align-items: center; gap: 12px; padding: 11px 24px; font-size: 0.9375rem; font-weight: 500; border-bottom: 1px solid; }
 .banner-inner { max-width: 1120px; margin: 0 auto; width: 100%; display: flex; align-items: center; gap: 12px; }
 .banner.warn { background: var(--warning-soft); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
 .banner.err { background: var(--error-soft); color: var(--error); border-color: color-mix(in srgb, var(--error) 30%, transparent); }
 
-.footer { border-top: 1px solid var(--border); background: var(--base-100); }
-.footer-inner { max-width: 1120px; margin: 0 auto; padding: 22px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 0.8125rem; }
-.footer a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-.footer a:hover { color: var(--base-content); }
+.cs-footer { border-top: 1px solid var(--border); background: var(--base-100); }
+.cs-footer-inner { max-width: 1120px; margin: 0 auto; padding: 22px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 0.8125rem; }
+.cs-footer a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+.cs-footer a:hover { color: var(--base-content); }
 
 /* mobile bottom tab bar */
 .mobile-nav { display: none; }

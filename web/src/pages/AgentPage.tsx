@@ -20,7 +20,7 @@ function IdentityCard() {
   const deRiskCount = decisions.filter((d) => d.kind === 1).length;
   return (
     <Card>
-      <span className="card-title"><Icon name="fingerprint" size={14} />Agent identity · ERC-8004</span>
+      <span className="cs-card-title"><Icon name="fingerprint" size={14} />Agent identity · ERC-8004</span>
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div className="agent-nft" aria-hidden="true">
           <Icon name="shield-check" size={34} />
@@ -38,7 +38,7 @@ function IdentityCard() {
           </div>
         </div>
       </div>
-      <hr className="divider" />
+      <hr className="cs-divider" />
       <div className="grid track" style={{ gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
         {[
           { l: "Decisions", v: String(decisionCount) },
@@ -62,7 +62,7 @@ function WatchlistPanel() {
   const rows = snapshot.live ? buildLiveWatchlist(snapshot) : watchlist;
   return (
     <Card>
-      <span className="card-title"><Icon name="eye" size={14} />What I'm watching</span>
+      <span className="cs-card-title"><Icon name="eye" size={14} />What I'm watching</span>
       <div style={{ display: "grid", gap: 2 }}>
         {rows.map((w, i) => {
           const r = RISK[w.status];
@@ -93,8 +93,8 @@ function GuardrailsPanel() {
   const items = isLive ? rows : guardrails;
   return (
     <Card>
-      <div className="card-hl">
-        <span className="card-title" style={{ margin: 0 }}><Icon name="lock" size={14} />The limits · on-chain guardrails</span>
+      <div className="cs-card-hl">
+        <span className="cs-card-title" style={{ margin: 0 }}><Icon name="lock" size={14} />The limits · on-chain guardrails</span>
         <span className="chip role-success" style={{ height: 22 }}><Icon name="shield-check" size={12} />Immutable</span>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: "0.875rem", color: "var(--muted)", lineHeight: 1.5 }}>
@@ -129,8 +129,8 @@ function AgentEconomicsPanel() {
   const priceUsdc = offer ? (Number(offer.priceBaseUnits) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 }) : undefined;
   return (
     <Card>
-      <div className="card-hl">
-        <span className="card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Agent economics · x402</span>
+      <div className="cs-card-hl">
+        <span className="cs-card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Agent economics · x402</span>
         <span className="chip role-neutral" style={{ height: 22 }} title="x402 payments never move vault deposits.">outside custody</span>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: "0.875rem", color: "var(--muted)", lineHeight: 1.5 }}>
@@ -218,7 +218,7 @@ function AskPanel() {
         <form onSubmit={submit} style={{ display: "flex", gap: 8 }}>
           <input value={input} onChange={(e) => setInput(e.target.value)} disabled={typing} placeholder="Ask why, what changed, what's watched…"
             aria-label="Ask the agent" style={{ flex: 1, height: 40, border: "1px solid var(--border-strong)", borderRadius: "var(--rounded-btn)", padding: "0 13px", background: "var(--base-100)", color: "var(--base-content)", fontSize: "0.875rem", fontFamily: "inherit", outline: "none" }} />
-          <button className="btn btn-primary" type="submit" disabled={typing || !input.trim()} aria-label="Send"><Icon name="send" size={16} /></button>
+          <button className="cs-btn cs-btn-primary" type="submit" disabled={typing || !input.trim()} aria-label="Send"><Icon name="send" size={16} /></button>
         </form>
         <div style={{ fontSize: "0.6875rem", color: "var(--faint)", marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
           <Icon name="info" size={12} />Explanations only. The agent acts solely within on-chain guardrails — it never takes orders from chat.

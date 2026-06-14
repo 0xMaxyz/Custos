@@ -1,21 +1,25 @@
 /* Modals & overlays (§6). */
 .overlay { position: fixed; inset: 0; z-index: 60; background: rgba(8, 11, 22, 0.5); backdrop-filter: blur(2px); display: flex; align-items: flex-start; justify-content: center; padding: 7vh 16px 16px; overflow-y: auto; animation: fadeIn var(--dur) var(--ease); }
-.modal { background: var(--base-100); border: 1px solid var(--border); border-radius: var(--rounded-box); box-shadow: var(--shadow-pop); width: 100%; max-width: 460px; animation: popIn 0.2s var(--ease); }
-.modal-lg { max-width: 720px; }
-.modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
-.modal-title { font-size: 1.0625rem; font-weight: 600; margin: 0; flex: 1; }
-.modal-body { padding: 20px; }
-.modal-foot { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+/* Namespaced (cs-) so the custom dialog does not collide with daisyUI's own
+   `.modal` component class — daisyUI's `.modal` sets opacity:0 / pointer-events:none
+   until toggled open, which (loaded after this file via @tailwind components) would
+   otherwise win the cascade and render our modal invisible. */
+.cs-modal { background: var(--base-100); border: 1px solid var(--border); border-radius: var(--rounded-box); box-shadow: var(--shadow-pop); width: 100%; max-width: 460px; animation: popIn 0.2s var(--ease); }
+.cs-modal-lg { max-width: 720px; }
+.cs-modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.cs-modal-title { font-size: 1.0625rem; font-weight: 600; margin: 0; flex: 1; }
+.cs-modal-body { padding: 20px; }
+.cs-modal-foot { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
 
 /* stepper */
-.stepper { display: flex; align-items: center; gap: 0; margin-bottom: 18px; }
-.step { display: flex; align-items: center; gap: 9px; font-size: 0.875rem; font-weight: 600; color: var(--muted); }
-.step-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; border: 1.5px solid var(--border-strong); color: var(--muted); background: var(--base-100); }
-.step.active .step-num { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
-.step.done .step-num { border-color: var(--success); color: #fff; background: var(--success); }
-.step.active { color: var(--base-content); }
-.step-line { flex: 1; height: 1.5px; background: var(--border); margin: 0 12px; }
-.step.done + .step-line { background: var(--success); }
+.cs-stepper { display: flex; align-items: center; gap: 0; margin-bottom: 18px; }
+.cs-step { display: flex; align-items: center; gap: 9px; font-size: 0.875rem; font-weight: 600; color: var(--muted); }
+.cs-step-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; border: 1.5px solid var(--border-strong); color: var(--muted); background: var(--base-100); }
+.cs-step.active .cs-step-num { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.cs-step.done .cs-step-num { border-color: var(--success); color: #fff; background: var(--success); }
+.cs-step.active { color: var(--base-content); }
+.cs-step-line { flex: 1; height: 1.5px; background: var(--border); margin: 0 12px; }
+.cs-step.done + .cs-step-line { background: var(--success); }
 
 /* amount input */
 .amount-field { border: 1px solid var(--border-strong); border-radius: var(--rounded-btn); padding: 14px 16px; background: var(--base-200); transition: border-color var(--dur); }
@@ -40,9 +44,9 @@
 .tx-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; margin: 4px auto 16px; }
 
 /* toast */
-.toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 80; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
-@media (max-width: 720px) { .toast-wrap { bottom: 86px; left: 16px; right: 16px; max-width: none; } }
-.toast { display: flex; align-items: flex-start; gap: 11px; background: var(--base-100); border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: var(--rounded-btn); box-shadow: var(--shadow-md); padding: 12px 14px; animation: fadeUp 0.22s var(--ease); }
-.toast.success { border-left-color: var(--success); }
-.toast.error { border-left-color: var(--error); }
-.toast.info { border-left-color: var(--info); }
+.cs-toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 80; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
+@media (max-width: 720px) { .cs-toast-wrap { bottom: 86px; left: 16px; right: 16px; max-width: none; } }
+.cs-toast { display: flex; align-items: flex-start; gap: 11px; background: var(--base-100); border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: var(--rounded-btn); box-shadow: var(--shadow-md); padding: 12px 14px; animation: fadeUp 0.22s var(--ease); }
+.cs-toast.success { border-left-color: var(--success); }
+.cs-toast.error { border-left-color: var(--error); }
+.cs-toast.info { border-left-color: var(--info); }

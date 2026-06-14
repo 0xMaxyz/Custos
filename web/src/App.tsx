@@ -43,9 +43,9 @@ function useHashRoute(): [Route, (r: Route) => void] {
 
 function Toasts({ items, dismiss }: { items: Toast[]; dismiss: (id: number) => void }) {
   return (
-    <div className="toast-wrap" aria-live="polite">
+    <div className="cs-toast-wrap" aria-live="polite">
       {items.map((t) => (
-        <div key={t.id} className={"toast " + (t.kind || "info")} role="status">
+        <div key={t.id} className={"cs-toast " + (t.kind || "info")} role="status">
           <Icon name={t.kind === "success" ? "check-circle" : t.kind === "error" ? "alert-triangle" : "info"} size={17}
             style={{ color: `var(--${t.kind === "success" ? "success" : t.kind === "error" ? "error" : "info"})`, flexShrink: 0, marginTop: 1 }} />
           <div style={{ flex: 1, minWidth: 0 }}>

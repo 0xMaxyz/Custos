@@ -99,9 +99,9 @@ export const vault = {
 export const position = {
   shares: "30000.00", valueUsdc: "30142.50", sharePrice: "1.0047",
   allTimeYieldUsdc: "142.50", depositedUsdc: "30000.00",
-  // Vault share-token decimals (18 post-offset; contract I1). Used to convert the
-  // human share amount back to raw share-wei for redeem(). Fixture default 18.
-  shareDecimals: 18,
+  // Vault share-token decimals (12 = asset 6 + _decimalsOffset 6). Used to convert the
+  // human share amount back to raw share-wei for redeem(). Fixture default 12.
+  shareDecimals: 12,
 };
 
 export type VaultState = typeof vault;

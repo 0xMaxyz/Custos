@@ -139,7 +139,14 @@ export function makeSwapQuoteHandler(deps: SwapQuoteDeps): SwapQuoteHandler {
       }
     }
 
-    const quote = await oneDelta.getSwapQuote(tokenIn, tokenOut, amountIn, adapter, MAX_SLIPPAGE_BPS);
+    // The swap build (~11s through thin USDY pools) and the USDY DEX spot (~3s) are
+    // independent 1delta calls — fetch them concurrently so the spot doesn't stack its
+    // latency on top of the build (~3s saved per USDY quote). USDY weight increases need
+    // the spot for the on-chain depeg guard; AUSD doesn't, so skip it there.
+    const [quote, spot] = await Promise.all([
+      oneDelta.getSwapQuote(tokenIn, tokenOut, amountIn, adapter, MAX_SLIPPAGE_BPS),
+      isUsdy ? oneDelta.getUsdyDexSpotUsdc().catch(() => 0n) : Promise.resolve(0n),
+    ]);
 
     // Fail-closed: the calldata must target the one pinned router. The adapter enforces
     // this on-chain too, but rejecting it here keeps bad calldata from ever reaching the UI.
@@ -147,12 +154,7 @@ export function makeSwapQuoteHandler(deps: SwapQuoteDeps): SwapQuoteHandler {
       throw new Error(`swap-quote: router mismatch (got ${quote.router}, expected pinned ${pinnedRouter})`);
     }
 
-    // USDY weight increases need the DEX spot for the on-chain depeg guard; AUSD doesn't.
-    let usdyDexSpotUsdc = "0";
-    if (isUsdy) {
-      const spot = await oneDelta.getUsdyDexSpotUsdc().catch(() => 0n);
-      usdyDexSpotUsdc = spot.toString();
-    }
+    const usdyDexSpotUsdc = isUsdy ? spot.toString() : "0";
 
     return {
       router: quote.router,

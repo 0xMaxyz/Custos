@@ -19,6 +19,7 @@
     "@anthropic-ai/sdk": "^0.100.1",
     "@custos/shared": "workspace:*",
     "fastify": "^5.2.0",
+    "unpdf": "^1.6.2",
     "viem": "^2.21.55",
     "zod": "^3.24.1"
   },

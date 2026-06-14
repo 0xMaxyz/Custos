@@ -111,8 +111,10 @@ export interface SwapQuote {
 
 export interface OneDeltaClientOptions {
   readonly fetchImpl?: FetchLike;
-  /** Per-request timeout in ms. */
+  /** Per-request timeout in ms for the cheap data reads. */
   readonly timeoutMs?: number;
+  /** Timeout in ms for the heavier swap-build call; defaults to config. */
+  readonly swapTimeoutMs?: number;
 }
 
 export class OneDeltaClient {
@@ -120,12 +122,14 @@ export class OneDeltaClient {
   private readonly apiKey: string | undefined;
   private readonly fetchImpl: FetchLike;
   private readonly timeoutMs: number;
+  private readonly swapTimeoutMs: number;
 
   constructor(config: AgentConfig, options: OneDeltaClientOptions = {}) {
     this.baseUrl = config.oneDeltaBaseUrl.replace(/\/$/, "");
     this.apiKey = config.oneDeltaApiKey;
     this.fetchImpl = options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
     this.timeoutMs = options.timeoutMs ?? 10_000;
+    this.swapTimeoutMs = options.swapTimeoutMs ?? config.oneDeltaSwapTimeoutMs;
   }
 
   /**
@@ -238,7 +242,9 @@ export class OneDeltaClient {
       `&amount=${amountIn.toString()}&slippage=${slippageBps}&tradeType=0` +
       // account builds the tx (pulls tokenIn from `to`); receiver lands tokenOut on `to`.
       `&account=${lc(to)}&receiver=${lc(to)}`;
-    const parsed = spotSwapSchema.parse(await this.getJson(`/v1/actions/swap/spot${qs}`));
+    // The swap build routes through thin USDY/AUSD pools and is far slower than the
+    // data reads — give it the longer swap timeout so legitimate builds don't abort.
+    const parsed = spotSwapSchema.parse(await this.getJson(`/v1/actions/swap/spot${qs}`, this.swapTimeoutMs));
 
     if (!parsed.success || parsed.actions === null) {
       throw new Error("1delta swap: no actions returned (quote-only or failure)");
@@ -266,7 +272,7 @@ export class OneDeltaClient {
     };
   }
 
-  private async getJson(path: string): Promise<unknown> {
+  private async getJson(path: string, timeoutMs: number = this.timeoutMs): Promise<unknown> {
     const headers: Record<string, string> = { accept: "application/json" };
     // 1delta authenticates via the `x-api-key` header (lifts the unauthenticated
     // 10-req/15-min rate limit); endpoints are otherwise public.
@@ -275,7 +281,7 @@ export class OneDeltaClient {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
-    }, this.timeoutMs);
+    }, timeoutMs);
 
     try {
       const res = await this.fetchImpl(`${this.baseUrl}${path}`, {

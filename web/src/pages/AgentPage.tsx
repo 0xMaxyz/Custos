@@ -157,12 +157,45 @@ function AgentEconomicsPanel() {
 
 interface Msg { role: "user" | "agent"; text: string; asOf?: string; }
 
+// Persist the chat so a returning visitor sees their own questions + the answers.
+// Capped to the most recent messages to keep localStorage bounded.
+const CHAT_STORAGE_KEY = "custos-agent-chat";
+const MAX_STORED_MSGS = 50;
+
+function loadChat(): Msg[] {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (m): m is Msg => !!m && typeof m === "object" && (m.role === "user" || m.role === "agent") && typeof m.text === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
 function AskPanel() {
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  // Initialise from permanent storage so prior-visit messages are restored.
+  const [msgs, setMsgs] = useState<Msg[]>(loadChat);
   const [typing, setTyping] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
   useEffect(() => { if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [msgs, typing]);
+
+  // Persist on every change (most-recent MAX_STORED_MSGS). Failures (private mode,
+  // quota) are non-fatal — the chat still works in-session.
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_STORED_MSGS)));
+    } catch { /* storage unavailable — keep going in-memory */ }
+  }, [msgs]);
+
+  const clearChat = () => {
+    setMsgs([]);
+    try { localStorage.removeItem(CHAT_STORAGE_KEY); } catch { /* ignore */ }
+  };
 
   const ask = (q: string) => {
     if (typing) return;
@@ -189,6 +222,12 @@ function AskPanel() {
           <div style={{ fontWeight: 600 }}>Ask the agent</div>
           <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Explains its reasoning · read-only, never executes</div>
         </div>
+        {msgs.length > 0 && (
+          <button className="linklike" style={{ marginLeft: "auto", fontSize: "0.75rem", background: "none", border: 0, display: "inline-flex", alignItems: "center", gap: 4 }}
+            onClick={clearChat} disabled={typing} title="Clear saved chat history">
+            <Icon name="x" size={13} />Clear
+          </button>
+        )}
       </div>
       <div className="ask-body" ref={scroller}>
         {msgs.length === 0 && !typing && (

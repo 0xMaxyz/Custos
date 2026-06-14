@@ -7,6 +7,7 @@ import { AnthropicExplainer, type ExplainContext } from "./llm/explain.js";
 import { computeFreshContext } from "./context.js";
 import { AlertNotifier } from "./alerts.js";
 import { assertChainId, makeClients } from "./chain/clients.js";
+import { resolveMantleRpcUrls } from "./chain/rpcList.js";
 import { GovernanceWatcher } from "./governanceWatch.js";
 import { isCycleFailure } from "./executor/errors.js";
 import { reconcileJournal } from "./executor/txjournal.js";
@@ -26,7 +27,15 @@ if (!result.ok) {
   process.exit(1);
 }
 
-const config = result.config;
+// Resolve the agent's RPC rotation ONCE at startup, before any client is built:
+// PREMIUM_MANTLE_RPC first, then the live community list + the static MANTLE_RPC_URL(s),
+// composed into a comma-separated value that makeTransport turns into a viem `fallback`
+// (chain/rpcList.ts). A GitHub/network failure here can't stop boot — the resolver
+// falls back to a pinned list, then to the static config.
+const baseConfig = result.config;
+const rpcUrls = await resolveMantleRpcUrls(baseConfig);
+const config = { ...baseConfig, mantleRpcUrl: rpcUrls.join(",") };
+process.stderr.write(`Mantle RPC rotation: ${rpcUrls.length} endpoint(s) configured\n`);
 
 // The conversational `/ask` endpoint (A3.1) needs a data snapshotter + an LLM
 // explainer. Build the explainer when an Anthropic key is present; build the

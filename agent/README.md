@@ -15,7 +15,8 @@ pnpm -C agent test    # vitest unit + integration tests
 Copy `.env.example` from the repo root and fill in:
 
 ```bash
-MANTLE_RPC_URL=          # required for on-chain reads
+MANTLE_RPC_URL=          # required for on-chain reads (one url or comma-separated list)
+PREMIUM_MANTLE_RPC=      # optional — pinned first in the RPC rotation (e.g. goldsky)
 ANTHROPIC_API_KEY=       # required for LLM rationale
 ALLOCATOR_PRIVATE_KEY=   # optional — enables autonomous rebalance/de-risk loop
 VAULT_ADDRESS=           # optional — set to enable on-chain execution
@@ -24,6 +25,15 @@ ONEDELTA_API_KEY=        # optional — Aave/market data breadth
 
 The agent runs **read-only** without `ALLOCATOR_PRIVATE_KEY`/`VAULT_ADDRESS` — useful
 for monitoring, `/snapshot`, and `/ask` without any custody risk.
+
+**RPC resilience.** At startup the agent composes an RPC rotation
+(`src/chain/rpcList.ts`): `PREMIUM_MANTLE_RPC` first (serves all traffic while
+healthy), then a shuffled merge of the live [1delta rpc-tester
+list](https://github.com/1delta-DAO/rpc-tester/blob/main/rpcs/5000.json) (refreshed
+~twice daily) and the static `MANTLE_RPC_URL`(s). These become a viem `fallback`
+transport that abandons a 429'd/erroring endpoint for the next one, so no single
+rate-limited provider can stall the agent. A failed list fetch falls back to a
+pinned snapshot, then to the static config — it never blocks boot.
 
 ## Endpoints
 

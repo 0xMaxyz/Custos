@@ -55,7 +55,13 @@ export interface ChainClients {
  */
 export function makeTransport(rpcUrl: string): Transport {
   const urls = rpcUrl.split(",").map((u) => u.trim()).filter(Boolean);
-  return urls.length > 1 ? fallback(urls.map((u) => http(u))) : http(urls[0]);
+  if (urls.length <= 1) return http(urls[0]);
+  // Multiple providers → fail over across them. `retryCount: 1` per transport so a
+  // rate-limited (429) endpoint is abandoned for the next one quickly instead of
+  // being hammered with the default 3 retries — the whole point of the rotation is
+  // to spread load, not to retry one throttled provider. Order is significant: the
+  // premium endpoint is placed first (see chain/rpcList.ts), the public pool after.
+  return fallback(urls.map((u) => http(u, { retryCount: 1 })));
 }
 
 export function makeClients(config: AgentConfig): ChainClients {

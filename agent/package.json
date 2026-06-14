@@ -10,6 +10,7 @@
     "card:pin": "tsx src/scripts/pinAgentCard.ts",
     "rebalance": "tsx src/scripts/rebalance.ts",
     "demo:derisk-dryrun": "tsx src/scripts/demoDeRiskDryRun.ts",
+    "demo:derisk": "tsx src/scripts/demoDeRisk.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "build": "tsc",

@@ -32,14 +32,14 @@ export function Modal({ title, icon, onClose, children, footer, size }: {
   // would otherwise become its containing block and the modal would render off-screen.
   return createPortal(
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={"modal" + (size === "lg" ? " modal-lg" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
-        <div className="modal-head">
+      <div className={"cs-modal" + (size === "lg" ? " cs-modal-lg" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+        <div className="cs-modal-head">
           {icon && <span className="brand-mark" style={{ width: 30, height: 30, background: "var(--primary-soft)", color: "var(--primary)" }}><Icon name={icon} size={17} /></span>}
-          <h2 className="modal-title">{title}</h2>
+          <h2 className="cs-modal-title">{title}</h2>
           <button className="iconbtn" onClick={onClose} aria-label="Close"><Icon name="x" size={17} /></button>
         </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-foot">{footer}</div>}
+        <div className="cs-modal-body">{children}</div>
+        {footer && <div className="cs-modal-foot">{footer}</div>}
       </div>
     </div>,
     document.body,

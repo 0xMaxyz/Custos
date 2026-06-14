@@ -113,8 +113,8 @@ export function Footer() {
   const vault = resolveDeployment(chainId).vault || resolveDeployment(5000).vault;
   const vaultUrl = vault ? `${explorer}/address/${vault}` : explorer;
   return (
-    <footer className="footer">
-      <div className="footer-inner">
+    <footer className="cs-footer">
+      <div className="cs-footer-inner">
         <span>Custos — autonomous, on-chain risk-guardian vault on Mantle.</span>
         <span style={{ flex: 1 }} />
         <span style={{ display: "inline-flex", alignItems: "center", gap: 16, flexWrap: "nowrap" }}>

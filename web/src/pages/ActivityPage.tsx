@@ -60,7 +60,7 @@ function DecisionItem({ d, onOpen }: { d: Decision; onOpen: (d: Decision) => voi
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div className="card-title" style={{ marginBottom: 10 }}>{title}</div>
+      <div className="cs-card-title" style={{ marginBottom: 10 }}>{title}</div>
       {children}
     </div>
   );
@@ -225,7 +225,7 @@ export function ActivityPage({ loading, activityError }: ActivityPageProps) {
       ) : activityError ? (
         <Card><ErrorState title="Couldn't load decisions" body="The agent history couldn't be fetched. Check your connection and try again." /></Card>
       ) : list.length === 0 ? (
-        <Card><EmptyState icon="scroll-text" title="No decisions match" body="No decisions yet for this filter — the agent is monitoring." action={<button className="btn btn-ghost btn-sm" onClick={() => { setFilter("all"); setRisk("all"); }}>Clear filters</button>} /></Card>
+        <Card><EmptyState icon="scroll-text" title="No decisions match" body="No decisions yet for this filter — the agent is monitoring." action={<button className="cs-btn cs-btn-ghost cs-btn-sm" onClick={() => { setFilter("all"); setRisk("all"); }}>Clear filters</button>} /></Card>
       ) : (
         <div className="grid" style={{ gap: 12 }}>
           {list.map((d) => <DecisionItem key={d.id} d={d} onOpen={setOpenDecision} />)}

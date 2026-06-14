@@ -7,7 +7,7 @@ import { SIGNAL_TYPES, SEVERITY, FLAGS, RISK, JOB_STATUS, explorer, type SignalT
 
 // ---------- Card ----------
 export function Card({ children, className = "", pad = true, style }: { children: ReactNode; className?: string; pad?: boolean; style?: CSSProperties }) {
-  return <div className={"card " + (pad ? "card-pad " : "") + className} style={style}>{children}</div>;
+  return <div className={"cs-card " + (pad ? "cs-card-pad " : "") + className} style={style}>{children}</div>;
 }
 
 // ---------- StatCard ----------
@@ -17,7 +17,7 @@ export function StatCard({ label, value, sub, mono = true, accent, icon, role }:
       <div className="stat-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {icon && <Icon name={icon} size={14} />}{label}
       </div>
-      <div className={"stat-value " + (mono ? "mono " : "")} style={{ marginTop: 6, color: accent ?? (role ? `var(--${role})` : undefined) }}>{value}</div>
+      <div className={"cs-stat-value " + (mono ? "mono " : "")} style={{ marginTop: 6, color: accent ?? (role ? `var(--${role})` : undefined) }}>{value}</div>
       {sub && <div className="stat-sub">{sub}</div>}
     </div>
   );
@@ -165,7 +165,7 @@ export function OutcomeStrip({ outcome, compact = false }: { outcome: Outcome | 
 
 // ---------- Skeleton ----------
 export function Skeleton({ w = "100%", h = 16, r = 6, style }: { w?: string | number; h?: number; r?: number; style?: CSSProperties }) {
-  return <span className="skeleton" style={{ display: "block", width: w, height: h, borderRadius: r, ...style }} />;
+  return <span className="cs-skeleton" style={{ display: "block", width: w, height: h, borderRadius: r, ...style }} />;
 }
 
 // ---------- EmptyState ----------
@@ -187,7 +187,7 @@ export function ErrorState({ title = "Something went wrong", body, onRetry }: { 
       <div className="empty-icon" style={{ color: "var(--error)", background: "var(--error-soft)" }}><Icon name="alert-triangle" size={22} /></div>
       <div style={{ fontWeight: 600, color: "var(--base-content)", fontSize: "1rem" }}>{title}</div>
       {body && <div style={{ marginTop: 6 }}>{body}</div>}
-      {onRetry && <div style={{ marginTop: 16 }}><button className="btn btn-ghost btn-sm" onClick={onRetry}><Icon name="refresh-cw" size={14} />Retry</button></div>}
+      {onRetry && <div style={{ marginTop: 16 }}><button className="cs-btn cs-btn-ghost cs-btn-sm" onClick={onRetry}><Icon name="refresh-cw" size={14} />Retry</button></div>}
     </div>
   );
 }

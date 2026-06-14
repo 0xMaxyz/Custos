@@ -21,7 +21,7 @@ function AgentStatusCard({ go }: { go: (r: Route) => void }) {
   const decision = decisions[0];
   if (!decision) return (
     <Card className="agent-status">
-      <span className="card-title"><Icon name="shield-check" size={14} />Agent status</span>
+      <span className="cs-card-title"><Icon name="shield-check" size={14} />Agent status</span>
       <p style={{ color: "var(--muted)", margin: "10px 0 0", fontSize: "0.9375rem" }}>No decisions recorded yet — the agent is monitoring.</p>
     </Card>
   );
@@ -31,7 +31,7 @@ function AgentStatusCard({ go }: { go: (r: Route) => void }) {
       <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 280px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <span className="card-title" style={{ margin: 0 }}><Icon name="shield-check" size={14} />Agent status</span>
+            <span className="cs-card-title" style={{ margin: 0 }}><Icon name="shield-check" size={14} />Agent status</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span className="dot dot-pulse" style={{ width: 12, height: 12, background: `var(--${r.role})`, boxShadow: `0 0 0 4px color-mix(in srgb, var(--${r.role}) 18%, transparent)` }} />
@@ -65,8 +65,8 @@ function BaselineCounter({ baseline: b }: { baseline: VaultData["baseline"] }) {
   const summary = computeBaseline(b);
   return (
     <Card className="baseline">
-      <div className="card-hl">
-        <span className="card-title" style={{ margin: 0 }}><Icon name="trending-up" size={14} />Custos vs passive USDY holder</span>
+      <div className="cs-card-hl">
+        <span className="cs-card-title" style={{ margin: 0 }}><Icon name="trending-up" size={14} />Custos vs passive USDY holder</span>
         <InfoTip text="Performance versus a 100% USDY buy-and-hold, since the last benchmark, from the on-chain AgentBenchmark." />
       </div>
       <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
@@ -107,39 +107,42 @@ function PositionCard({ connected, empty, paused, killed, vault, position, metri
   vault: VaultState; position: PositionState; metricsUnavailable: boolean;
   onDeposit: () => void; onWithdraw: () => void; onConnect: () => void;
 }) {
+  // Deposit is green (adds funds), Withdraw is red (removes funds). Withdraw enables
+  // only when the position actually holds shares — same dynamic rule in every state,
+  // so it stays disabled on an empty position and enables once the user has a balance.
+  const canWithdraw = parseFloat(position.shares) > 0;
+  const depositTitle = killed ? "Disabled — emergency withdraw-only" : paused ? "Disabled — deposits paused" : undefined;
+  const withdrawTitle = canWithdraw ? undefined : "No shares to withdraw";
   if (!connected) {
     return (
       <Card>
-        <span className="card-title"><Icon name="wallet" size={14} />Your position</span>
+        <span className="cs-card-title"><Icon name="wallet" size={14} />Your position</span>
         <EmptyState icon="wallet" title="Connect to deposit"
           body="Connect a wallet to deposit USDC and let the agent manage your risk-adjusted yield."
-          action={<button className="btn btn-primary" onClick={onConnect}><Icon name="wallet" size={16} />Connect wallet</button>} />
+          action={<button className="cs-btn cs-btn-primary" onClick={onConnect}><Icon name="wallet" size={16} />Connect wallet</button>} />
       </Card>
     );
   }
   if (empty) {
     return (
       <Card>
-        <span className="card-title"><Icon name="coins" size={14} />Your position</span>
+        <span className="cs-card-title"><Icon name="coins" size={14} />Your position</span>
         <EmptyState icon="plus" title="Make your first deposit"
           body="You haven't deposited yet. Deposit USDC to start earning the agent-managed blended yield."
           action={
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button className="btn btn-primary" disabled={paused || killed} onClick={onDeposit}><Icon name="plus" size={16} />Deposit USDC</button>
-              <button className="btn btn-ghost" disabled title="No shares to withdraw"><Icon name="minus" size={16} />Withdraw</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="cs-btn cs-btn-success cs-btn-block" disabled={paused || killed} onClick={onDeposit} title={depositTitle}><Icon name="plus" size={16} />Deposit USDC</button>
+              <button className="cs-btn cs-btn-danger cs-btn-block" disabled={!canWithdraw} onClick={onWithdraw} title={withdrawTitle}><Icon name="minus" size={16} />Withdraw</button>
             </div>
           } />
       </Card>
     );
   }
   const yld = parseFloat(position.allTimeYieldUsdc);
-  // Withdraw is always shown for a funded position, disabled only when there are no
-  // shares — larger withdrawals beyond instant liquidity unwind USDY on request.
-  const canWithdraw = parseFloat(position.shares) > 0;
   return (
     <Card>
-      <div className="card-hl">
-        <span className="card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Your position</span>
+      <div className="cs-card-hl">
+        <span className="cs-card-title" style={{ margin: 0 }}><Icon name="coins" size={14} />Your position</span>
         {metricsUnavailable
           ? <span className="chip" style={{ height: 22 }} title="Live APY comes from the agent — start it (VITE_AGENT_API_URL)">blended APY —</span>
           : <span className="chip role-success" style={{ height: 22 }}>{fmt.bpsToPct(vault.blendedApyBps)} blended APY</span>}
@@ -159,11 +162,10 @@ function PositionCard({ connected, empty, paused, killed, vault, position, metri
         <div className="kvrow"><span className="k">Share price</span><span className="v mono">{fmt.price(position.sharePrice)}</span></div>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-        <button className="btn btn-primary btn-block" disabled={paused || killed} onClick={onDeposit}
-          title={killed ? "Disabled — emergency withdraw-only" : paused ? "Disabled — deposits paused" : undefined}>
+        <button className="cs-btn cs-btn-success cs-btn-block" disabled={paused || killed} onClick={onDeposit} title={depositTitle}>
           <Icon name="plus" size={16} />Deposit
         </button>
-        <button className="btn btn-ghost btn-block" disabled={!canWithdraw} onClick={onWithdraw} title={canWithdraw ? undefined : "No shares to withdraw"}><Icon name="minus" size={16} />Withdraw</button>
+        <button className="cs-btn cs-btn-danger cs-btn-block" disabled={!canWithdraw} onClick={onWithdraw} title={withdrawTitle}><Icon name="minus" size={16} />Withdraw</button>
       </div>
     </Card>
   );
@@ -178,7 +180,7 @@ function AllocationCard({ vault }: { vault: VaultState }) {
   const ok = !hasTvl || instantPct >= 15;
   return (
     <Card>
-      <span className="card-title"><Icon name="layout-dashboard" size={14} />Allocation</span>
+      <span className="cs-card-title"><Icon name="layout-dashboard" size={14} />Allocation</span>
       <div style={{ display: "flex", gap: 22, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <AllocationChart weightsBps={vault.weightsBps} />
@@ -209,7 +211,7 @@ function VaultStatsCard({ vault, metricsUnavailable }: { vault: VaultState; metr
   const usedPct = Math.round((tvl / cap) * 100);
   return (
     <Card>
-      <span className="card-title"><Icon name="gauge" size={14} />Vault stats</span>
+      <span className="cs-card-title"><Icon name="gauge" size={14} />Vault stats</span>
       <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         <div>
           <div className="stat-label">TVL / cap</div>
@@ -233,7 +235,7 @@ function VaultStatsCard({ vault, metricsUnavailable }: { vault: VaultState; metr
           )}
         </div>
       </div>
-      <hr className="divider" />
+      <hr className="cs-divider" />
       <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         <div>
           <div className="stat-label" style={{ marginBottom: 8 }}>USDY peg</div>

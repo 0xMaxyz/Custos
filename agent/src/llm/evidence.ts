@@ -76,6 +76,17 @@ async function fetchSummary(
   }
 }
 
+export interface EvidenceFetcherOptions {
+  /**
+   * Demo-only override (docs/demo.md): swaps the curated `ondo-usdy-attestation`
+   * feed's URL for a staged document hosting a concrete, cited USDY threat, so the
+   * LLM-driven de-risk can be demonstrated on camera. `id`, `type`, and `source`
+   * are kept unchanged — so the staged item still resolves to a trusted source and
+   * stays de-risk-eligible under N2. Unset = production behaviour, untouched.
+   */
+  readonly demoEvidenceUrl?: string | undefined;
+}
+
 /**
  * Build a production {@link EvidenceFetcher} that hits the curated USDY/AUSD
  * attestation and PoR feeds and returns parseable summaries for the LLM.
@@ -85,12 +96,24 @@ async function fetchSummary(
  * will receive whatever evidence is available, and `noopEvidence` handles the
  * empty case gracefully.
  */
-export function buildEvidenceFetcher(fetchImpl: FetchLike = fetch): EvidenceFetcher {
+export function buildEvidenceFetcher(
+  fetchImpl: FetchLike = fetch,
+  options: EvidenceFetcherOptions = {},
+): EvidenceFetcher {
+  // Demo override: re-point ONLY the ondo attestation feed; everything else
+  // (id/type/source, all other feeds) is identical, so production is unaffected
+  // when `demoEvidenceUrl` is unset.
+  const feeds = options.demoEvidenceUrl
+    ? FEEDS.map((f) =>
+        f.id === "ondo-usdy-attestation" ? { ...f, url: options.demoEvidenceUrl as string } : f,
+      )
+    : FEEDS;
+
   return async (): Promise<EvidenceItem[]> => {
     const today = new Date().toISOString().slice(0, 10);
 
     const results = await Promise.allSettled(
-      FEEDS.map(async (feed): Promise<EvidenceItem | null> => {
+      feeds.map(async (feed): Promise<EvidenceItem | null> => {
         const summary = await fetchSummary(feed.url, fetchImpl);
         if (!summary) return null;
         return {

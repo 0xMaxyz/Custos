@@ -69,7 +69,7 @@ export async function runSignalLayer(
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
-function buildLLMInput(
+export function buildLLMInput(
   snapshot: MarketSnapshot,
   assessment: RiskAssessment,
   evidence: EvidenceItem[],

@@ -129,6 +129,29 @@ Pick the most reliable available at record time:
 3. **Deterministic replay:** a "scenario mode" that feeds a recorded depeg snapshot
    to the agent so the on-chain decision fires on demand (clearly the same code path;
    data is staged, logic is real).
+4. **LLM-driven de-risk on staged evidence (preferred for the AI×RWA story):** the
+   agent reads a synthetic-but-concrete USDY threat document, the LLM judges it a
+   de-risk-worthy issuer event, and that judgment drives a real on-chain `rebalance`
+   (USDY→USDC). Setup:
+   - Host the staged page (committed at [`web/public/demo/derisk-evidence.html`](../web/public/demo/derisk-evidence.html))
+     — served at `https://trycustos.xyz/demo/derisk-evidence.html`. Its `<title>` +
+     `<meta name="description">` carry the cited threat (a redemption pause / NAV
+     review); the agent reads only those two tags.
+   - Set `DEMO_DERISK_EVIDENCE_URL` to that page. The evidence fetcher then swaps the
+     curated `ondo-usdy-attestation` feed's URL to it, keeping `id`/`type`/`source` so
+     it stays de-risk-eligible (N2). Unset = zero behaviour change.
+   - **Pre-flight before filming:** `ANTHROPIC_API_KEY=… DEMO_DERISK_EVIDENCE_URL=… pnpm -C agent demo:derisk-dryrun`
+     dry-runs the signal layer and asserts a clamped `deRisk:true` verdict citing the
+     evidence — tune the document wording until it passes reliably (temp is 0.1).
+   - **Vault pre-stage** (the LLM path goes through `rebalance()`, not the cap-exempt
+     `deRisk()`): keep USDY ≤ ~45% (`maxRebalanceMoveBps` caps a single move at 50%),
+     no rebalance in the prior hour (`minRebalanceInterval`), and a small absolute USDY
+     position so the thin-pool sell clears the 50bps oracle-NAV `minOut` at peg.
+   - **After filming:** unset `DEMO_DERISK_EVIDENCE_URL` (and optionally rebalance back
+     into USDY for re-takes).
+   - **Disclose honestly:** state on-camera that the triggering document is synthetic;
+     the fetch, the AI judgment, the guardrail validation, and the on-chain de-risk are
+     all real.
 
 Always show the resulting **on-chain** tx on mantlescan so it's verifiable.
 

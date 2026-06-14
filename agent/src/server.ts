@@ -209,6 +209,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const allowSwap = makeRateLimiter(options.swapRateLimit ?? 30, options.swapRateWindowMs ?? 60_000);
 
     app.post<{ Body: SwapQuoteBody }>("/swap/quote", async (req, reply) => {
+      // Origin lock: unlike the read-only endpoints, this one spends the agent's 1delta
+      // quota, so when CORS is locked down (CORS_ALLOWED_ORIGINS != "*") reject a
+      // cross-origin browser whose Origin isn't allow-listed BEFORE doing any work —
+      // a same-origin call (no Origin header) still passes. Defense-in-depth only (a
+      // non-browser client can spoof Origin); pair with the rate limit. Set an explicit
+      // allowlist in production so this isn't an open quota faucet.
+      const origin = req.headers.origin;
+      if (!allowAllOrigins && origin && !allowedOrigins.includes(origin)) {
+        return reply.code(403).send({ error: "Origin not allowed." });
+      }
+
       if (!allowSwap()) {
         return reply.code(429).send({ error: "Too many quote requests — slow down and try again shortly." });
       }

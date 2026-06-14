@@ -196,9 +196,11 @@ export const VAULT_ABI = [
     outputs: [{ name: "", type: "uint64" }],
   },
   {
-    // ALLOCATOR-only manual rebalance. The web UI only ever moves funds between IDLE
-    // and AAVE (swapData all-empty, USDY/AUSD held at current) — buckets that need a
-    // 1delta swap stay with the off-chain agent, which owns the swap-routing boundary.
+    // ALLOCATOR-only manual rebalance (Allocator page). Idle/Aave moves carry empty
+    // swapData; USDY (slot 2) / AUSD (slot 3) legs carry 1delta calldata the UI fetches
+    // from the agent's /swap/quote (the 1delta key stays server-side). The calldata is
+    // inert until it runs here, where the adapter's pinned-router + balance-delta minOut
+    // bind on-chain — so the swap-routing boundary still holds.
     name: "rebalance",
     type: "function",
     stateMutability: "nonpayable",

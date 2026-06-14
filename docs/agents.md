@@ -55,7 +55,9 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
    sizes a USDC↔USDY/AUSD leg for a known adapter, re-asserts the **pinned router** before
    returning, and returns calldata that is still inert until an ALLOCATOR runs it through
    the vault (where the adapter's balance-delta `minOut` and pinned-router checks bind on
-   chain). It is rate-limited like `/ask` and never moves funds.
+   chain). It is rate-limited like `/ask`, origin-locked when `CORS_ALLOWED_ORIGINS` is
+   set (a disallowed cross-origin browser is 403'd before any 1delta call, to protect the
+   key's quota), and never moves funds.
    **mUSD converter leg (USDY↔mUSD):** the RWA core (bucket 2) may be held as USDY or
    its rebasing $1 form mUSD. `UsdyAdapter` converts between them via the **Ondo mUSD
    contract's `wrap`/`unwrap`** — which IS the "Ondo Token Converter" (verified

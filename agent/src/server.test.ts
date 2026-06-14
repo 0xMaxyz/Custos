@@ -385,3 +385,38 @@ describe("agent server — /swap/quote (allocator UI)", () => {
     await app.close();
   });
 });
+
+describe("agent server — /swap/quote origin lock", () => {
+  const goodResult: SwapQuoteResult = {
+    router: "0x5C019a146758287C614FE654CaEC1ba1CaF05F4E",
+    calldata: "0xabcd",
+    amountOut: "1",
+    bucketIndex: 2,
+    usdyDexSpotUsdc: "0",
+  };
+  const payload = { bucket: "USDY", side: "deposit", usdcAmount: "1000000" };
+
+  it("rejects a cross-origin browser not on the allowlist with 403", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload, headers: { origin: "https://evil.example" } });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("allows an allow-listed origin", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload, headers: { origin: "https://app.custos.xyz" } });
+    expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it("allows a same-origin call with no Origin header", async () => {
+    const app = buildServer({ swapQuote: async () => goodResult, allowedOrigins: ["https://app.custos.xyz"] });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/swap/quote", payload });
+    expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+});

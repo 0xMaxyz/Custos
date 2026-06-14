@@ -54,15 +54,20 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-interface Args {
+export interface Args {
   weights: readonly [number, number, number, number];
   reason: string;
   envPath: string;
   force: boolean;
 }
 
-/** Parse the 4 positional bps weights plus the optional flags. */
-function parseArgs(argv: string[]): Args {
+/**
+ * Parse the 4 positional bps weights plus the optional flags. THROWS on any
+ * malformed input (wrong arg count, non-integer/out-of-range weight, or weights
+ * that don't sum to 10000) so the parse is pure + unit-testable; `main` converts a
+ * throw into a non-zero exit via `fail`.
+ */
+export function parseArgs(argv: string[]): Args {
   const positional: string[] = [];
   let reason = "Manual ALLOCATOR rebalance";
   let envArg: string | undefined;
@@ -77,18 +82,18 @@ function parseArgs(argv: string[]): Args {
   }
 
   if (positional.length !== 4) {
-    fail(
+    throw new Error(
       "expected 4 weight args (bps): <idle> <aave> <usdy> <ausd>\n" +
         "  e.g. pnpm rebalance 2000 8000 0 0   (20% idle / 80% Aave)",
     );
   }
   const nums = positional.map((p) => {
     const n = Number(p);
-    if (!Number.isInteger(n) || n < 0 || n > 10_000) fail(`invalid weight "${p}" — want an integer 0..10000 (bps)`);
+    if (!Number.isInteger(n) || n < 0 || n > 10_000) throw new Error(`invalid weight "${p}" — want an integer 0..10000 (bps)`);
     return n;
   });
   const sum = nums[0]! + nums[1]! + nums[2]! + nums[3]!;
-  if (sum !== 10_000) fail(`weights must sum to 10000 bps (got ${sum})`);
+  if (sum !== 10_000) throw new Error(`weights must sum to 10000 bps (got ${sum})`);
 
   const envPath = envArg ? resolve(process.cwd(), envArg) : resolve(REPO_ROOT, ".env");
   return { weights: nums as [number, number, number, number] as Args["weights"], reason, envPath, force };
@@ -251,4 +256,10 @@ async function main(): Promise<void> {
   process.stdout.write(`  tx:         ${hash}\n`);
 }
 
-main().catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
+// Only auto-run when invoked directly (e.g. `tsx src/scripts/rebalance.ts`), not when
+// imported by a test — so unit tests can exercise parseArgs without signing anything.
+const invokedDirectly =
+  process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  main().catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
+}

@@ -1,4 +1,5 @@
 import { extractText, getDocumentProxy } from "unpdf";
+import { USDY_MIN_COLLATERAL_BPS } from "@custos/shared";
 
 import type { DropboxReader } from "./dropbox.js";
 
@@ -41,6 +42,16 @@ export interface AttestationFacts {
   readonly wamDays: number;
   /** Estimated blended yield of permitted assets, percent (e.g. 3.61). */
   readonly estYieldPct: number;
+}
+
+/**
+ * Deterministic issuer backstop: the reserves no longer fully back the tokens
+ * (backing ratio below the {@link USDY_MIN_COLLATERAL_BPS} floor). When true the
+ * agent forces USDY -> 0 regardless of the LLM (tighten-only; the model can't loosen
+ * it). A clean report (ratio >= floor) is no-signal.
+ */
+export function isAttestationBreach(facts: AttestationFacts): boolean {
+  return facts.collateralRatioBps < USDY_MIN_COLLATERAL_BPS;
 }
 
 /** Extract the report's flat text from raw PDF bytes (pure-JS; no native deps). */

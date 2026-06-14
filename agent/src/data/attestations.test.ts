@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { readAttestation, parseAttestationFacts, fetchLatestAttestation } from "./attestations.js";
+import { readAttestation, parseAttestationFacts, fetchLatestAttestation, isAttestationBreach, type AttestationFacts } from "./attestations.js";
 import type { DropboxReader, DropboxEntry } from "./dropbox.js";
 
 const FIXTURE = fileURLToPath(
@@ -40,6 +40,30 @@ describe("attestation parser", () => {
     const facts = parseAttestationFacts(text);
     expect(facts?.date).toBe("2026-06-09");
     expect(facts?.collateralRatioBps).toBe(10_050);
+  });
+});
+
+// ── Issuer breach (deterministic guardrail) ──────────────────────────────────
+
+describe("isAttestationBreach", () => {
+  const base: AttestationFacts = {
+    date: "2026-06-09",
+    tokenPrincipalOutstanding: 2_000_000_000,
+    permittedAssetsMarketValue: 2_010_000_000,
+    collateralRatioBps: 10_055,
+    tbillPct: 99.86,
+    wamDays: 164.02,
+    estYieldPct: 3.61,
+  };
+
+  it("is false for a healthy report (>= 99% backed)", () => {
+    expect(isAttestationBreach(base)).toBe(false);
+    expect(isAttestationBreach({ ...base, collateralRatioBps: 9_900 })).toBe(false); // exactly at floor
+  });
+
+  it("is true when backing drops below the 99% floor", () => {
+    expect(isAttestationBreach({ ...base, collateralRatioBps: 9_899 })).toBe(true);
+    expect(isAttestationBreach({ ...base, collateralRatioBps: 9_500 })).toBe(true);
   });
 });
 

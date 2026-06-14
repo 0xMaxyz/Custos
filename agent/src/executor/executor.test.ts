@@ -9,6 +9,7 @@ import { Bucket } from "@custos/shared";
 import { isCycleFailure, type CycleFailureError } from "./errors.js";
 import type { MarketSnapshot, WeightsBps } from "../types.js";
 import type { RiskVerdict, EvidenceType } from "../llm/types.js";
+import type { AttestationFacts } from "../data/attestations.js";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
 
@@ -316,6 +317,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
   async function makeExecutor(
     snap: MarketSnapshot,
     env: Record<string, string> = {},
+    attestationProvider?: () => Promise<AttestationFacts | null>,
   ) {
     const { Executor } = await import("./index.js");
     const { loadConfig } = await import("../config.js");
@@ -327,7 +329,7 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
       ...env,
     });
     const clients = { publicClient, walletClient } as never;
-    const executor = new Executor({ config, clients, snapshotter: makeSnapshotter(snap) });
+    const executor = new Executor({ config, clients, snapshotter: makeSnapshotter(snap), attestationProvider });
     return { executor, writeContract };
   }
 
@@ -387,6 +389,55 @@ describe("Executor.runCycle() routing (mocked writeContract)", () => {
     // CycleResult carries the submitted rebalance decision (with final weights).
     expect(result.decision?.kind).toBe("REBALANCE");
     expect(result.decision?.weightsBps?.[Bucket.USDY]).toBe(0);
+  });
+
+  it("attestation breach: forces USDY→0 via rebalance, deterministically (no LLM)", async () => {
+    // Healthy peg (no forceDeRisk) and LLM disabled — the ONLY trigger is an
+    // under-collateralized reserve attestation (98% backed < 99% floor). The agent
+    // must still de-risk USDY→0 through rebalance, independent of the model.
+    const breached: AttestationFacts = {
+      date: "2026-06-09",
+      tokenPrincipalOutstanding: 2_000_000_000,
+      permittedAssetsMarketValue: 1_960_000_000,
+      collateralRatioBps: 9_800, // < USDY_MIN_COLLATERAL_BPS (9_900) → breach
+      tbillPct: 99.86,
+      wamDays: 164.02,
+      estYieldPct: 3.61,
+    };
+    const snap = baseSnapshot(); // currentWeightsBps includes 5000bps USDY
+    const { executor, writeContract } = await makeExecutor(snap, {}, async () => breached);
+
+    const result = await executor.runCycle();
+
+    expect(result.submitted).toBe(true);
+    expect(result.kind).toBe("rebalance");
+    const call = (writeContract.mock.calls[0] as unknown as [{ functionName: string; args: unknown[] }])[0];
+    expect(call.functionName).toBe("rebalance");
+    expect((call.args[0] as readonly number[])[Bucket.USDY]).toBe(0);
+    expect(result.decision?.riskLevel).toBe("DERISK");
+    expect(result.decision?.rationale).toContain("ISSUER_UNDERCOLLATERAL");
+  });
+
+  it("clean attestation: no forced de-risk (USDY weight preserved)", async () => {
+    const clean: AttestationFacts = {
+      date: "2026-06-09",
+      tokenPrincipalOutstanding: 2_127_768_031.64,
+      permittedAssetsMarketValue: 2_139_527_002.7,
+      collateralRatioBps: 10_055, // healthy, >= floor
+      tbillPct: 99.86,
+      wamDays: 164.02,
+      estYieldPct: 3.61,
+    };
+    const snap = baseSnapshot();
+    const { executor, writeContract } = await makeExecutor(snap, {}, async () => clean);
+
+    const result = await executor.runCycle();
+    // A clean report adds no ISSUER tightening; nothing forces USDY to 0.
+    if (result.submitted) {
+      const call = (writeContract.mock.calls[0] as unknown as [{ args: unknown[] }])[0];
+      expect((call.args[0] as readonly number[])[Bucket.USDY]).toBeGreaterThan(0);
+    }
+    expect(result.decision?.rationale ?? "").not.toContain("ISSUER_UNDERCOLLATERAL");
   });
 
   it("oracle stale: calls deRisk via deterministic forceDeRisk", async () => {

@@ -13,7 +13,7 @@ import { pinRationale, type RationaleBundle, type PaidEvidenceReceipt } from "./
 import { CycleFailureError } from "./errors.js";
 import { writeJournal, clearJournal } from "./txjournal.js";
 import type { PaidEvidenceFetcher } from "../payments/evidence.js";
-import type { AttestationFacts } from "../data/attestations.js";
+import { isAttestationBreach, type AttestationFacts } from "../data/attestations.js";
 import { OneDeltaClient } from "../data/oneDelta.js";
 import type { Snapshotter } from "../data/snapshot.js";
 import type { WeightsBps, RiskSignal, Decision } from "../types.js";
@@ -121,7 +121,29 @@ export class Executor {
     const snapshot = await this.snapshotter.snapshot();
 
     // 2. Deterministic risk assessment.
-    const assessment = assess(snapshot, { nowSec });
+    let assessment = assess(snapshot, { nowSec });
+
+    // 2b. Deterministic issuer backstop: an under-collateralized reserve attestation
+    //     (backing ratio < USDY_MIN_COLLATERAL_BPS) forces USDY→0 regardless of the
+    //     LLM. Applied to the assessment BEFORE the model, so the zeroed candidate and
+    //     0 ceiling also bound it (tighten-only). Facts come from the same memoized
+    //     provider the evidence fetcher uses (no extra fetch); the 30s breach-poll
+    //     returns earlier, so this never runs on the cheap path.
+    const attestationFacts = this.attestationProvider
+      ? await this.attestationProvider().catch(() => null)
+      : null;
+    const attestationDeRisk = attestationFacts !== null && isAttestationBreach(attestationFacts);
+    if (attestationDeRisk) {
+      const c = assessment.candidateWeightsBps;
+      assessment = {
+        ...assessment,
+        // Move USDY weight to idle USDC so the de-risk holds even with no LLM verdict.
+        candidateWeightsBps: { ...c, [Bucket.IDLE]: c[Bucket.IDLE] + c[Bucket.USDY], [Bucket.USDY]: 0 },
+        maxUsdyWeightBpsAllowed: 0,
+        riskLevel: "DERISK",
+        flags: [...assessment.flags.filter((f) => f !== "NONE"), "ISSUER_UNDERCOLLATERAL"],
+      };
+    }
 
     // 3. LLM signal layer (tighten-only; null = fallback to deterministic).
     let verdict = null;
@@ -168,7 +190,10 @@ export class Executor {
 
     // 5. Merge verdict with deterministic assessment.
     // If LLM requested deRisk (news path), force maxUsdy=0 so applyVerdict zeros USDY.
+    // An attestation breach (2b) already zeroed the candidate deterministically; either
+    // way the resulting USDY→0 rebalance is a REQUIRED de-risk (pages on failure, O1).
     const llmDeRisk = verdict?.deRisk === true;
+    const deRiskRequired = llmDeRisk || attestationDeRisk;
     const effectiveVerdict = llmDeRisk && verdict
       ? { ...verdict, usdyMaxWeightBps: 0 }
       : verdict;
@@ -206,10 +231,10 @@ export class Executor {
       return { submitted: false, reason: "No allocation change needed" };
     }
 
-    // An LLM `deRisk` verdict routed through rebalance is still a REQUIRED de-risk:
-    // a failure here must page the operator (O1), not log quietly.
+    // An LLM- or attestation-driven deRisk routed through rebalance is still a
+    // REQUIRED de-risk: a failure here must page the operator (O1), not log quietly.
     return this._sendRebalance(
-      snapshot, assessment, effectiveVerdict, evidence, finalWeights, payments, llmDeRisk,
+      snapshot, assessment, effectiveVerdict, evidence, finalWeights, payments, deRiskRequired,
     );
   }
 

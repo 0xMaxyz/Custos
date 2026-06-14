@@ -34,7 +34,9 @@ export type RiskFlag =
   | "ORACLE_STALE"
   | "ORACLE_NEAR_RANGE_END"
   | "LOW_LIQUIDITY"
-  | "AUSD_POR_WARN";
+  | "AUSD_POR_WARN"
+  // USDY reserve attestation shows backing < USDY_MIN_COLLATERAL_BPS → force de-risk.
+  | "ISSUER_UNDERCOLLATERAL";
 
 /** Severity buckets for a risk signal (SPEC §3.2). */
 export type Severity = "LOW" | "MEDIUM" | "HIGH";

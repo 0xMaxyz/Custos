@@ -124,7 +124,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* skeleton shimmer */
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.skeleton {
+.cs-skeleton {
   background: var(--skeleton);
   background-size: 400% 100%;
   animation: shimmer 1.3s ease-in-out infinite;

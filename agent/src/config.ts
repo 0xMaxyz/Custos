@@ -32,6 +32,11 @@ const configSchema = z.object({
       },
       { message: "must be one or more comma-separated http(s) RPC URLs" },
     ),
+  // Optional premium endpoint (e.g. goldsky). When set it is pinned FIRST in the
+  // agent's RPC rotation (chain/rpcList.ts) so it serves all traffic while healthy,
+  // with the community + static lists as failover. Keeps a single rate-limited
+  // public RPC from stalling the agent.
+  premiumMantleRpc: z.string().url().optional(),
   // How long to wait for a submitted tx's receipt before treating the cycle as a
   // loud failure (O2). Bounded waiting only — no fee-bump/replacement machinery.
   txReceiptTimeoutMs: z.coerce.number().int().positive().default(120_000),
@@ -155,6 +160,7 @@ function toSchemaShape(env: EnvRecord): Record<string, unknown> {
   };
   return {
     mantleRpcUrl: pick("MANTLE_RPC_URL"),
+    premiumMantleRpc: pick("PREMIUM_MANTLE_RPC"),
     txReceiptTimeoutMs: pick("TX_RECEIPT_TIMEOUT_MS"),
     agentStatePath: pick("AGENT_STATE_PATH"),
     anthropicApiKey: pick("ANTHROPIC_API_KEY"),

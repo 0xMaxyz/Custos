@@ -18,7 +18,10 @@ import { buildPaidEvidenceFetcher, type PaidEvidenceFetcher } from "./payments/e
 import { DropboxClient } from "./data/dropbox.js";
 import { fetchLatestAttestation, type AttestationFacts } from "./data/attestations.js";
 import { makeIdentityOwnerReader, resolveX402PayTo, PayeeConfigError, type ResolvedPayee } from "./identity/payee.js";
-import { MANTLE_MAINNET_CHAIN_ID } from "@custos/shared";
+import { MANTLE_MAINNET_CHAIN_ID, getDeployment } from "@custos/shared";
+import { getAddress } from "viem";
+import { dirname, join } from "node:path";
+import { buildDecisionFeed, DecisionFeedCache } from "./data/decisionFeed.js";
 import type { Decision } from "./types.js";
 
 // Validate configuration at startup; fail fast with a readable error.
@@ -196,8 +199,25 @@ const swapQuote = pipeline
   ? makeSwapQuoteHandler({ config, oneDelta: pipeline.oneDelta, publicClient: pipeline.clients.publicClient })
   : undefined;
 
+// Cached decision feed (Activity perf): scan the chain once on the agent, serve the
+// built feed from `GET /decisions` so the browser never backfills getLogs itself.
+// Wired whenever a vault is configured; reuses the pipeline's read client when present.
+let decisionFeed: { get: (refresh: boolean) => Promise<unknown> } | undefined;
+if (config.vaultAddress) {
+  const publicClient = pipeline?.clients.publicClient ?? makeClients(config).publicClient;
+  const deployBlock = BigInt(getDeployment(MANTLE_MAINNET_CHAIN_ID).vaultDeployBlock || 0);
+  const vault = getAddress(config.vaultAddress);
+  const guardrails = config.guardrailsAddress ? getAddress(config.guardrailsAddress) : undefined;
+  const cache = new DecisionFeedCache({
+    build: () => buildDecisionFeed({ publicClient, vault, deployBlock, guardrails }),
+    persistPath: config.agentStatePath ? join(dirname(config.agentStatePath), "decision-feed.json") : undefined,
+  });
+  void cache.hydrate();
+  decisionFeed = { get: (refresh) => cache.get(refresh) };
+}
+
 const allowedOrigins = config.corsAllowedOrigins.split(",").map((o) => o.trim()).filter(Boolean);
-const app = buildServer({ explainClient, getContext, x402, swapQuote, allowedOrigins });
+const app = buildServer({ explainClient, getContext, x402, swapQuote, decisions: decisionFeed, allowedOrigins });
 
 if (x402) {
   app.log.info(

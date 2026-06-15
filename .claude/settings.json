@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-cloud-session-setup.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/claude-cloud-session-setup.sh\""
           }
         ]
       }

@@ -64,6 +64,13 @@ export interface ServerOptions {
   readonly swapRateLimit?: number | undefined;
   readonly swapRateWindowMs?: number | undefined;
   /**
+   * When set, exposes `GET /decisions` (cached on-chain decision feed for the Activity
+   * page) and `POST /decisions/resync` (force a rebuild). `get(refresh)` returns the
+   * cached feed, rebuilding from chain when cold/stale or when `refresh` is true. Moves
+   * the expensive getLogs backfill off the browser's hot path.
+   */
+  readonly decisions?: { get: (refresh: boolean) => Promise<unknown> } | undefined;
+  /**
    * CORS allowlist for the public endpoints. `["*"]` (default) allows any origin —
    * fine for the read-only/x402 surface today. Provide explicit origins to lock it
    * down before adding any authenticated/mutating endpoint (L5).
@@ -243,6 +250,30 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       } catch (err) {
         req.log.error({ err }, "swap-quote failed");
         return reply.code(502).send({ error: "Could not fetch a swap route right now — try again shortly." });
+      }
+    });
+  }
+
+  // ── Cached decision feed (Activity perf) ───────────────────────────────────
+  // The browser used to backfill the whole decision history via getLogs on every load;
+  // now it fetches this cached, server-built feed. `?refresh=1` (and POST /resync) force
+  // a rebuild — e.g. the web watch fires it when a new on-chain decision lands.
+  const { decisions } = options;
+  if (decisions) {
+    app.get<{ Querystring: { refresh?: string } }>("/decisions", async (req, reply) => {
+      try {
+        return await decisions.get(req.query?.refresh === "1");
+      } catch (err) {
+        req.log.error({ err }, "decision feed build failed");
+        return reply.code(503).send({ error: "Decision feed unavailable — try again shortly." });
+      }
+    });
+    app.post("/decisions/resync", async (req, reply) => {
+      try {
+        return await decisions.get(true);
+      } catch (err) {
+        req.log.error({ err }, "decision feed resync failed");
+        return reply.code(503).send({ error: "Resync failed — try again shortly." });
       }
     });
   }

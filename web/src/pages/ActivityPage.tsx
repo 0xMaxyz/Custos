@@ -8,6 +8,7 @@ import { Modal } from "../modals/Modals";
 import * as fmt from "../lib/fmt";
 import { RISK, explorer, type Decision } from "../lib/data";
 import { useDecisions } from "../lib/useGuardianData";
+import { useDecisionBundle } from "../lib/useDecisionBundle";
 import { resolveDecisionUri } from "../lib/decisionUri";
 
 const KIND: Record<number, { label: string; icon: string }> = {
@@ -39,7 +40,7 @@ function DecisionItem({ d, onOpen }: { d: Decision; onOpen: (d: Decision) => voi
           {d.signals.map((s, i) => <SignalBadge key={i} type={s.type} severity={s.severity} />)}
           {d.payments?.map((p) => <PaidEvidenceBadge key={p.evidenceId} receipt={p} />)}
           {d.job && <JobStatusChip status={d.job.status} />}
-          {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual</span> : <ConfidenceMeter value={d.confidence} compact />}
+          {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual</span> : d.confidence > 0 ? <ConfidenceMeter value={d.confidence} compact /> : null}
           <GuardrailsMark small />
         </div>
         <div className="decision-foot">
@@ -72,17 +73,24 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
   const r = RISK[d.riskLevel];
   const evById = Object.fromEntries(d.evidence.map((e) => [e.id, e]));
   const paidById = Object.fromEntries((d.payments ?? []).map((p) => [p.evidenceId, p]));
+  // The on-chain event is thin (hash + URI); fetch the pinned bundle to surface the
+  // real model confidence + rationale (signals/evidence stay behind the bundle link —
+  // their agent-side enums don't map to the web SignalTypeKey set). Falls back to the
+  // on-chain decision while loading or if the bundle predates the confidence field.
+  const { bundle } = useDecisionBundle(d.decisionURI);
+  const confidence = bundle?.confidence ?? d.confidence;
+  const rationale = bundle?.rationale ?? d.rationale;
   return (
     <Modal title={`Decision #${d.id}`} icon={KIND[d.kind]?.icon ?? "refresh-cw"} onClose={onClose} size="lg">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
         <KindBadge kind={d.kind} />
         <RiskLevelChip level={d.riskLevel} />
-        {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual allocator action</span> : <ConfidenceMeter value={d.confidence} />}
+        {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual allocator action</span> : <ConfidenceMeter value={confidence} />}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{fmt.dateTime(d.timestamp)}</span>
       </div>
       <Section title="Rationale">
-        <p style={{ margin: 0, fontSize: "0.9375rem", lineHeight: 1.55 }}>{d.rationale}</p>
+        <p style={{ margin: 0, fontSize: "0.9375rem", lineHeight: 1.55 }}>{rationale}</p>
       </Section>
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 240px" }}>
@@ -92,7 +100,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
                 <span className="dot" style={{ background: `var(--${r.role})` }} />
                 <strong style={{ color: `var(--${r.role})` }}>{r.status}</strong>
               </div>
-              <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 6 }}>{r.means}.{d.isManual ? "" : ` Confidence ${d.confidence.toFixed(2)}.`}</div>
+              <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 6 }}>{r.means}.{d.isManual || confidence <= 0 ? "" : ` Confidence ${confidence.toFixed(2)}.`}</div>
             </div>
           </Section>
         </div>
@@ -104,7 +112,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
         </div>
       </div>
       <Section title="Allocation — before → after">
-        <div style={{ maxWidth: 460, marginBottom: 8 }}><WeightBars pre={d.preWeightsBps} post={d.postWeightsBps} /></div>
+        <div style={{ maxWidth: 460, marginBottom: 8 }}><WeightBars pre={d.preWeightsBps} post={d.postWeightsBps} legend /></div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <GuardrailsMark small />
           <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>Ceiling in force: max USDY <span className="mono">{fmt.bpsToWeight(d.maxUsdyWeightBpsAllowed)}%</span></span>
@@ -196,7 +204,12 @@ export function ActivityPage({ loading, activityError }: ActivityPageProps) {
   const [risk, setRisk] = useState("all");
   const [openDecision, setOpenDecision] = useState<Decision | null>(null);
 
-  const { decisions } = useDecisions();
+  const { decisions, loading: decisionsLoading, error: decisionsError } = useDecisions();
+  // The real loading/error come from the decisions fetch itself — OR them with the
+  // page-level prop so the skeleton shows while the on-chain backfill is in flight
+  // (otherwise the page reads "No decisions" mid-load and looks empty/broken).
+  const showLoading = loading || decisionsLoading;
+  const showError = activityError || decisionsError;
   let list = decisions;
   if (filter === "derisk") list = list.filter((d) => d.kind === 1);
   else if (filter === "rebalance") list = list.filter((d) => d.kind === 0);
@@ -224,9 +237,9 @@ export function ActivityPage({ loading, activityError }: ActivityPageProps) {
           ))}
         </div>
       </div>
-      {loading ? (
+      {showLoading ? (
         <div className="grid" style={{ gap: 12 }}>{[0, 1, 2].map((i) => <Skeleton key={i} h={190} r={14} />)}</div>
-      ) : activityError ? (
+      ) : showError ? (
         <Card><ErrorState title="Couldn't load decisions" body="The agent history couldn't be fetched. Check your connection and try again." /></Card>
       ) : list.length === 0 ? (
         <Card><EmptyState icon="scroll-text" title="No decisions match" body="No decisions yet for this filter — the agent is monitoring." action={<button className="cs-btn cs-btn-ghost cs-btn-sm" onClick={() => { setFilter("all"); setRisk("all"); }}>Clear filters</button>} /></Card>

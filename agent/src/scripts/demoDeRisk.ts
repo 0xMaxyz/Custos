@@ -293,6 +293,7 @@ async function main(): Promise<void> {
     candidateWeightsBps: zeroUsdyWeights,
     riskLevel: "DERISK",
     asOf: snapshot.asOf,
+    confidence: raw.confidence,
   };
   const { uri, rationaleHash } = await pinRationale(bundle, config);
   out(`\nDecision bundle: ${uri}\n`);

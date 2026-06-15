@@ -254,6 +254,7 @@ export class Executor {
       candidateWeightsBps: weights,
       riskLevel: assessment.riskLevel,
       asOf: snapshot.asOf,
+      ...(verdict?.confidence !== undefined ? { confidence: verdict.confidence } : {}),
       ...(payments.length > 0 ? { payments } : {}),
     };
 
@@ -302,6 +303,7 @@ export class Executor {
       candidateWeightsBps: assessment.candidateWeightsBps,
       riskLevel: "DERISK",
       asOf: snapshot.asOf,
+      ...(verdict?.confidence !== undefined ? { confidence: verdict.confidence } : {}),
       ...(payments.length > 0 ? { payments } : {}),
     };
 

@@ -77,7 +77,7 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
   // real model confidence + rationale (signals/evidence stay behind the bundle link —
   // their agent-side enums don't map to the web SignalTypeKey set). Falls back to the
   // on-chain decision while loading or if the bundle predates the confidence field.
-  const { bundle } = useDecisionBundle(d.decisionURI);
+  const { bundle, loading: bundleLoading } = useDecisionBundle(d.decisionURI);
   const confidence = bundle?.confidence ?? d.confidence;
   const rationale = bundle?.rationale ?? d.rationale;
   return (
@@ -85,12 +85,18 @@ function DecisionDetailModal({ decision: d, onClose }: { decision: Decision; onC
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
         <KindBadge kind={d.kind} />
         <RiskLevelChip level={d.riskLevel} />
-        {d.isManual ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual allocator action</span> : <ConfidenceMeter value={confidence} />}
+        {d.isManual
+          ? <span className="chip role-neutral"><Icon name="gauge" size={12} />Manual allocator action</span>
+          : bundleLoading
+            ? <Skeleton w={92} h={14} />
+            : confidence > 0 ? <ConfidenceMeter value={confidence} /> : null}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>{fmt.dateTime(d.timestamp)}</span>
       </div>
       <Section title="Rationale">
-        <p style={{ margin: 0, fontSize: "0.9375rem", lineHeight: 1.55 }}>{rationale}</p>
+        {bundleLoading
+          ? <div style={{ display: "grid", gap: 6 }}><Skeleton h={14} /><Skeleton w="80%" h={14} /></div>
+          : <p style={{ margin: 0, fontSize: "0.9375rem", lineHeight: 1.55 }}>{rationale}</p>}
       </Section>
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 240px" }}>

@@ -207,8 +207,9 @@ if (config.vaultAddress) {
   const publicClient = pipeline?.clients.publicClient ?? makeClients(config).publicClient;
   const deployBlock = BigInt(getDeployment(MANTLE_MAINNET_CHAIN_ID).vaultDeployBlock || 0);
   const vault = getAddress(config.vaultAddress);
+  const guardrails = config.guardrailsAddress ? getAddress(config.guardrailsAddress) : undefined;
   const cache = new DecisionFeedCache({
-    build: () => buildDecisionFeed({ publicClient, vault, deployBlock }),
+    build: () => buildDecisionFeed({ publicClient, vault, deployBlock, guardrails }),
     persistPath: config.agentStatePath ? join(dirname(config.agentStatePath), "decision-feed.json") : undefined,
   });
   void cache.hydrate();

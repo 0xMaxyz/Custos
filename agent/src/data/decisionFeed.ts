@@ -128,6 +128,7 @@ export function buildDecisions(
   postById: Map<number, Weights>,
   toBucketById: Map<number, number>,
   tsByBlock: Map<bigint, number>,
+  maxUsdyWeightBpsAllowed = 6000,
 ): FeedDecision[] {
   const ascending = [...decoded].sort((a, b) => a.id - b.id);
   let prev: Weights = IDLE_ONLY;
@@ -148,7 +149,7 @@ export function buildDecisions(
       preWeightsBps: prev,
       postWeightsBps: post,
       flags: [],
-      maxUsdyWeightBpsAllowed: 6000,
+      maxUsdyWeightBpsAllowed,
       summary: `${isManual ? "Manual" : "Agent"} ${kindLabel} → ${describeWeights(post)}`,
       rationale: isManual
         ? "Manual ALLOCATOR action, submitted on-chain within the guardrails. No model rationale — this was an operator decision."
@@ -187,10 +188,37 @@ async function getLogsPaged(
   return out;
 }
 
+// Minimal Guardrails ABI — only the USDY weight ceiling out of config().maxWeightBps[2].
+const guardrailsConfigAbi = [
+  {
+    name: "config", type: "function", stateMutability: "view", inputs: [],
+    outputs: [{ name: "", type: "tuple", components: [
+      { name: "maxWeightBps", type: "uint16[4]" }, { name: "minIdleBps", type: "uint16" }, { name: "minInstantLiquidityBps", type: "uint16" },
+      { name: "maxUsdyNotionalUsdc", type: "uint256" }, { name: "maxSlippageBps", type: "uint16" }, { name: "maxRebalanceMoveBps", type: "uint16" },
+      { name: "minRebalanceInterval", type: "uint32" }, { name: "tvlCap", type: "uint256" }, { name: "perTxDepositCap", type: "uint256" },
+      { name: "addStrategyTimelock", type: "uint32" }, { name: "pegWarnBps", type: "uint16" }, { name: "pegBlockBps", type: "uint16" },
+      { name: "pegDeRiskBps", type: "uint16" }, { name: "oracleMaxAge", type: "uint32" }, { name: "oracleRangeEndBuffer", type: "uint32" },
+    ] }],
+  },
+] as const;
+
 export interface BuildDeps {
   publicClient: PublicClient;
   vault: `0x${string}`;
   deployBlock: bigint;
+  /** Guardrails address — read the live USDY weight ceiling for the modal. Optional. */
+  guardrails?: `0x${string}` | undefined;
+}
+
+/** Read the live USDY weight ceiling (bps); fail-open to the 6000 default on any error. */
+async function readUsdyCeilingBps(client: PublicClient, guardrails: `0x${string}` | undefined): Promise<number> {
+  if (!guardrails) return 6000;
+  try {
+    const cfg = (await client.readContract({ address: guardrails, abi: guardrailsConfigAbi, functionName: "config" })) as { maxWeightBps: readonly number[] };
+    return Number(cfg.maxWeightBps[2] ?? 6000);
+  } catch {
+    return 6000;
+  }
 }
 
 /** Scan the chain from the vault deploy block and build the full decision feed. */
@@ -198,10 +226,11 @@ export async function buildDecisionFeed(deps: BuildDeps): Promise<DecisionFeed> 
   const { publicClient: client, vault, deployBlock } = deps;
   const head = await client.getBlockNumber();
 
-  const [decLogs, rebLogs, derLogs] = await Promise.all([
+  const [decLogs, rebLogs, derLogs, usdyCeilingBps] = await Promise.all([
     getLogsPaged(client, vault, DECISION_RECORDED_EVENT, deployBlock, head),
     getLogsPaged(client, vault, REBALANCED_EVENT, deployBlock, head),
     getLogsPaged(client, vault, DERISKED_EVENT, deployBlock, head),
+    readUsdyCeilingBps(client, deps.guardrails),
   ]);
 
   const postById = new Map<number, Weights>();
@@ -225,7 +254,7 @@ export async function buildDecisionFeed(deps: BuildDeps): Promise<DecisionFeed> 
   }));
 
   return {
-    decisions: buildDecisions(decoded, postById, toBucketById, tsByBlock),
+    decisions: buildDecisions(decoded, postById, toBucketById, tsByBlock, usdyCeilingBps),
     lastSyncedBlock: Number(head),
     builtAt: new Date().toISOString(),
     isLive: true,

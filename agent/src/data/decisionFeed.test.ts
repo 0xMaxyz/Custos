@@ -61,6 +61,12 @@ describe("buildDecisions", () => {
     expect(d2.isManual).toBe(false);
     expect(d2.timestamp).toBe(new Date(2_000 * 1000).toISOString());
   });
+
+  it("applies the supplied USDY weight ceiling (defaults to 6000)", () => {
+    const decoded = [{ id: 1, kind: 0, rationaleHash: "0x", decisionURI: "ipfs://b", txHash: "0xt", blockNumber: 1n }];
+    expect(buildDecisions(decoded, new Map(), new Map(), new Map())[0]!.maxUsdyWeightBpsAllowed).toBe(6000);
+    expect(buildDecisions(decoded, new Map(), new Map(), new Map(), 9000)[0]!.maxUsdyWeightBpsAllowed).toBe(9000);
+  });
 });
 
 describe("DecisionFeedCache", () => {

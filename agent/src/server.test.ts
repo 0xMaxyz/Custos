@@ -77,6 +77,20 @@ describe("agent server — /decisions (Activity feed)", () => {
     const res = await app.inject({ method: "GET", url: "/decisions" });
     expect(res.statusCode).toBe(503);
   });
+
+  it("rate-limits forced rebuilds but never the cache-hit GET", async () => {
+    const feed = { decisions: [], lastSyncedBlock: 1, builtAt: "x", isLive: true };
+    const app = buildServer({ decisions: { get: vi.fn().mockResolvedValue(feed) }, decisionsRefreshLimit: 1 });
+
+    // Plain GETs (cache hits) are never throttled.
+    expect((await app.inject({ method: "GET", url: "/decisions" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/decisions" })).statusCode).toBe(200);
+
+    // First forced rebuild passes; the second (over the cap) is rejected.
+    expect((await app.inject({ method: "GET", url: "/decisions?refresh=1" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/decisions?refresh=1" })).statusCode).toBe(429);
+    expect((await app.inject({ method: "POST", url: "/decisions/resync" })).statusCode).toBe(429);
+  });
 });
 
 describe("agent server — /ask (A3.1)", () => {

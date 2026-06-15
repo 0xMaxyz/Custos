@@ -71,6 +71,14 @@ export interface ServerOptions {
    */
   readonly decisions?: { get: (refresh: boolean) => Promise<unknown> } | undefined;
   /**
+   * Max FORCED rebuilds (`?refresh=1` / POST /decisions/resync) per window — a forced
+   * rebuild does the expensive full-chain getLogs scan, so cap it to stop a public
+   * caller from hammering the RPC. Cache-hit reads (plain GET) are NOT limited. Default
+   * 6 / minute; 0 disables.
+   */
+  readonly decisionsRefreshLimit?: number | undefined;
+  readonly decisionsRefreshWindowMs?: number | undefined;
+  /**
    * CORS allowlist for the public endpoints. `["*"]` (default) allows any origin —
    * fine for the read-only/x402 surface today. Provide explicit origins to lock it
    * down before adding any authenticated/mutating endpoint (L5).
@@ -260,15 +268,26 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // a rebuild — e.g. the web watch fires it when a new on-chain decision lands.
   const { decisions } = options;
   if (decisions) {
+    // Throttle only the forced-rebuild path (the expensive full-chain scan); plain
+    // cache-hit GETs are cheap and stay unlimited so the UI loads freely.
+    const allowRefresh = makeRateLimiter(options.decisionsRefreshLimit ?? 6, options.decisionsRefreshWindowMs ?? 60_000);
+
     app.get<{ Querystring: { refresh?: string } }>("/decisions", async (req, reply) => {
+      const refresh = req.query?.refresh === "1";
+      if (refresh && !allowRefresh()) {
+        return reply.code(429).send({ error: "Too many refreshes — the cached feed is still served on a plain GET." });
+      }
       try {
-        return await decisions.get(req.query?.refresh === "1");
+        return await decisions.get(refresh);
       } catch (err) {
         req.log.error({ err }, "decision feed build failed");
         return reply.code(503).send({ error: "Decision feed unavailable — try again shortly." });
       }
     });
     app.post("/decisions/resync", async (req, reply) => {
+      if (!allowRefresh()) {
+        return reply.code(429).send({ error: "Too many resyncs — slow down and try again shortly." });
+      }
       try {
         return await decisions.get(true);
       } catch (err) {

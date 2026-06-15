@@ -11,8 +11,6 @@
 | [ui.md](./ui.md) | UI/UX design spec, component inventory, data dictionary, fixtures |
 | [agents.md](./agents.md) | Operating guide for AI coding agents and human contributors |
 | [deploy.md](./deploy.md) | End-to-end deployment runbook (contracts, agent, web, ops) |
-| [demo.md](./demo.md) | Demo video production guide _(launch artifact)_ |
-| [marketing.md](./marketing.md) | Marketing copy, tweet thread, screenshot guide _(launch artifact)_ |
 
 ## Quick orientation
 

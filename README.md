@@ -330,9 +330,9 @@ forge test --root contracts -vvv --match-test test_deRisk
 ```
 
 Test files are in `contracts/test/`:
-- `Phase*.t.sol` — offline unit tests (guardrails, vault accounting, adapter math)
-- `ForkPhase*.t.sol` — fork integration tests against live Mantle state (adapter swaps,
-  Aave interactions, Ondo oracle/converter wiring)
+- Offline unit tests (no RPC) — guardrails, vault accounting, adapter math.
+- `Fork*.t.sol` — fork integration tests against live Mantle state (adapter swaps,
+  Aave interactions, Ondo oracle/converter wiring); require `MANTLE_RPC_URL`.
 
 ### TypeScript (Vitest)
 

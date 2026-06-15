@@ -4,54 +4,51 @@ Design spec for the frontend. Stack is fixed: **React + Vite + Tailwind + daisyU
 **RainbowKit + wagmi + viem**. Read alongside [architecture.md](./architecture.md) and [spec.md](./spec.md).
 
 > **Render real data, not invented numbers.** Every screen's field names, enums, and
-> example values are pinned in **§15 (taxonomy)**, **§16 (data dictionary)**, and
-> **§17 (example fixtures)** — drawn from the live contracts (`YieldVault`,
+> example values are pinned in **§13 (taxonomy)**, **§14 (data dictionary)**, and
+> **§15 (example fixtures)** — drawn from the live contracts (`YieldVault`,
 > `Guardrails`, `AgentBenchmark`) and the agent schema (see [spec.md §3](./spec.md)).
 > Use them verbatim so generated screens show the values the app actually emits.
 
 **Design intent:** clean, simple, professional. No fancy colors or fonts. Standard
 palette with a **purple** accent. **Light + dark** themes.
 
-> Defaults chosen (flag if you disagree): typeface **Inter** (neutral, professional)
+> Defaults: typeface **Inter** (neutral, professional)
 > + monospace for numbers/addresses; primary purple in the **violet** family; chains
 > **Mantle mainnet 5000** + **Mantle Sepolia testnet 5003**.
 
 ---
 
-## 0. Status — what's shipped (the latest app)
+## 0. Current implementation
 
-> This section records the **as-built** state, so the spec below reads as intent.
-> **Where they differ, this section wins.** Last synced after the dashboard
-> live-metrics work (PR #28/#30) and the **Sentinel → Custos** rename (PR #27).
+> This section describes the app as it currently works; the detailed spec that follows
+> captures design intent and rationale. Where they differ, this section is authoritative.
 
 **App name & brand.** The product is **Custos** (Latin *guardian / keeper*, echoing
-*custody*) — the earlier working name "Sentinel" is fully retired (theme key, registry
-labels, and copy all migrated). The shipped brand mark is a lucide **`shield-check`**
-glyph + the **"Custos"** wordmark in the topbar; it's a placeholder for the generated
-mark briefed in [`Design/LOGO_PROMPT.md`](../Design/LOGO_PROMPT.md) — a shield fused with
-a watchful **aperture / eye**, violet `#7C3AED`. Tagline: *the guardian that proves
-every move.* Title/tab: "Custos — AI risk-guardian real-yield".
+*custody*). The brand mark is a lucide **`shield-check`** glyph + the **"Custos"**
+wordmark in the topbar, violet `#7C3AED`. Tagline: *the guardian that proves every
+move.* Title/tab: "Custos — AI risk-guardian real-yield".
 
-**Pages & surfaces — all shipped** on the four hash routes: **Dashboard**, **Activity**
-(risk-guardian feed + decision-detail modal), **Agent** (identity · watchlist ·
-guardrails/limits · **Agent economics** A4 panel · Ask-the-agent), **Insights** (risk
-radar). Deposit/Withdraw are modals. The A4 + mUSD components shipped too —
-`RwaFormSplit`, `PaidEvidenceBadge`, `JobStatusChip`, `AgentEconomicsPanel`.
+**Pages & surfaces.** Four hash routes — **Dashboard**, **Activity** (risk-guardian
+feed + decision-detail modal), **Agent** (identity · watchlist · guardrails/limits ·
+agent-economics panel · Ask-the-agent), **Insights** (risk radar). Deposit/Withdraw are
+modals. The agent-economics and mUSD components — `RwaFormSplit`, `PaidEvidenceBadge`,
+`JobStatusChip`, `AgentEconomicsPanel` — are part of the build.
 
 **Live data by default.** Reads hit the **deployed contracts** via wagmi/viem and fall
-back to the §17 fixtures only in *demo mode* (no deployment/RPC configured):
+back to the §15 fixtures only in *demo mode* (no deployment/RPC configured):
 - `useVaultData` reads the live **`YieldVault`** (TVL/`totalAssets`, share price, the
   caller's position, kill-switch), each **adapter's `totalAssets`** (allocation donut +
   instant-liquidity), and the latest **`AgentBenchmark`** outcome (baseline headline),
   resolved from `packages/shared/deployments`.
 - `useGuardianData` indexes the vault's **`DecisionRecorded`** logs (the Activity feed)
   and resolves the **ERC-8004 `tokenURI`** (agent card) when `VITE_AGENT_ID` is set.
-- **Deployment:** **Mantle Sepolia 5003 is live and wired**; **mainnet 5000 switches on
-  automatically** once ROADMAP 5.2 records its addresses (consumers unchanged).
-- **Guardrails are fixture-displayed, not read on-chain (yet).** The Agent page "the
-  limits" panel renders the typed `web/src/lib/data.ts` array; its values mirror the
-  immutable `packages/shared` constants (identical to on-chain `Guardrails`), but no
-  `Guardrails.sol` call is made — a future seam (see Deferred).
+- **Deployment resolution:** the app resolves vault/adapter/benchmark addresses from
+  `packages/shared/deployments` for the active chain (Mantle mainnet **5000** and Sepolia
+  testnet **5003**); `VITE_VAULT_ADDRESS` overrides and `VITE_DEMO_MODE=true` forces
+  fixtures.
+- **Guardrails limits panel** renders the typed `web/src/lib/data.ts` array, whose values
+  mirror the immutable `packages/shared` constants (identical to on-chain `Guardrails`);
+  it is fixture-displayed rather than read directly from `Guardrails.sol`.
 - **Agent-computed metrics** (blended APY, USDY peg = NAV vs DEX spot, oracle status) are
   overlaid from the agent's **`GET /snapshot`**. When the agent is offline the dashboard
   shows an explicit **"—" / "metrics unavailable"** state — it never paints demo numbers
@@ -60,7 +57,7 @@ back to the §17 fixtures only in *demo mode* (no deployment/RPC configured):
 - **Ask-the-agent** calls the live **`POST /ask`** endpoint when `VITE_AGENT_API_URL`
   is set (showing grounding freshness), else returns fixture answers.
 
-**Stack realities (these differ from the forward-looking notes in §3/§4/§13):**
+**Stack realities (these differ from the design notes in §3/§4):**
 - **Routing is hash-based** (`#dashboard` … `#insights`) via a tiny in-app router —
   *not* react-router (no such dependency ships).
 - **Charts are hand-built inline SVG** (`AllocationChart` donut, `WeightBars`,
@@ -69,18 +66,10 @@ back to the §17 fixtures only in *demo mode* (no deployment/RPC configured):
 - **Network status & switching is RainbowKit's `ConnectButton`** (`chainStatus="icon"`),
   not a separate "network pill"; the wrong-network **banner** + disabled writes still apply.
 - **Themes** ship as **daisyUI-equivalent CSS custom properties** on
-  `.app-root[data-theme]` (the daisyUI config in §2.2 is present in `tailwind.config.ts`).
-  The choice persists under **`custos-theme`** (one-time migration from the legacy
-  `sentinel-theme` key); default follows `prefers-color-scheme`.
+  `.app-root[data-theme]` (the daisyUI config in §2.2 is present in `tailwind.config.ts`),
+  persisted under the **`custos-theme`** key; default follows `prefers-color-scheme`.
 - A **dev-only "Demo states" panel** toggles the §8 edge cases (paused / kill-switch /
   wrong-network / empty position / activity error).
-
-**Deferred (behind the existing `use*Data` seams):**
-per-decision **bundle enrichment** in the feed — signals · evidence · confidence ·
-outcome · accurate timestamps · txHash from the `decisionURI` (the `DecisionRecorded`
-*index* already ships live; each item is a minimal record until enriched); the identity
-**track-record** stats + the baseline **series**; a live **`Guardrails.sol`** read for the
-limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-backed.
 
 ---
 
@@ -131,10 +120,10 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
   }
 }
 ```
-- Theme persisted under the **`custos-theme`** `localStorage` key (with a one-time
-  migration from the legacy `sentinel-theme` key) and applied via `data-theme` on `<html>`
-  + the `.app-root` wrapper; default follows `prefers-color-scheme`. RainbowKit theme is
-  matched (lightTheme/darkTheme with `accentColor` = primary) and switched in lockstep.
+- Theme persisted under the **`custos-theme`** `localStorage` key and applied via
+  `data-theme` on `<html>` + the `.app-root` wrapper; default follows
+  `prefers-color-scheme`. RainbowKit theme is matched (lightTheme/darkTheme with
+  `accentColor` = primary) and switched in lockstep.
 
 ### 2.3 Typography
 - **UI:** Inter (variable), system fallback `ui-sans-serif, system-ui, sans-serif`.
@@ -164,7 +153,7 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
 └ Footer (links: repo, docs, contract on mantlescan) ─────┘
 ```
 - **Routes (hash-based):** `#dashboard` Dashboard · `#activity` Risk-Guardian feed ·
-  `#agent` Agent · `#insights` Risk radar (Should). Deposit/withdraw are **modals**,
+  `#agent` Agent · `#insights` Risk radar. Deposit/withdraw are **modals**,
   not routes. (Ships as a small in-app hash router — not react-router.)
 - **Topbar** persistent: nav tabs, **theme toggle**, and the **RainbowKit
   ConnectButton** (`chainStatus="icon"`) — it surfaces the current chain and opens the
@@ -208,7 +197,7 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
   (`realizedYieldBps`). Render as a paired stat ("Passive USDY +X bps · Custos
   +Y bps · avoided −Z bps drawdown") with a small sparkline. This is the single most
   important number on the page; legible disconnected (vault-wide) and personalized to
-  the user's position when connected. Source: `AgentBenchmark` outcomes (§16).
+  the user's position when connected. Source: `AgentBenchmark` outcomes (§14).
 - **Allocation card:** donut or stacked bar across IDLE / AAVE / USDY / AUSD with %
   and USD; legend; "instantly withdrawable" figure (idle + Aave) called out and
   checked against the **15% instant-liquidity floor**. The **USDY (RWA core) slice is
@@ -221,7 +210,7 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
   weighs), **USDY peg** (oracle NAV vs DEX spot, deviation in bps against the
   0.3 / 0.5 / 1.0% thresholds), and **oracle status** (range-based: "valid until
   〈date〉" / "range ends in 2 days" — **not** a Chainlink "last-updated" staleness;
-  see §15.3).
+  see §13.3).
 - **States:** not-connected (position card → connect CTA, vault stats still visible
   read-only), loading skeletons, empty (no deposit yet → "Make your first deposit").
 
@@ -234,21 +223,21 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
   - allocation **before → after** mini-bars (all four buckets, `preWeightsBps` →
     `postWeightsBps`).
   - **evidence/signal chips** typed by signal (**Peg · Oracle · Liquidity ·
-    Attestation · News**, §15.1) with **severity** (Low/Med/High) coloring; each
+    Attestation · News**, §13.1) with **severity** (Low/Med/High) coloring; each
     links its source. Evidence the agent **paid for via x402** carries a small
     **"Paid"** badge with the settlement receipt (amount + tx).
   - **confidence** indicator (the agent's `confidence`, 0–1) and a small **"guardrails
     enforced"** mark (the action stayed within on-chain limits).
   - **Verifiable-Job chip (ERC-8183)** on de-risk items: the escrowed-Job status
     (`Funded → Submitted → Completed`/`Rejected`) showing the de-risk was **settled by
-    the deterministic guardrail Evaluator**; links the reputation entry it wrote (§15.4).
+    the deterministic guardrail Evaluator**; links the reputation entry it wrote (§13.4).
   - **outcome strip** once measured: realized bps, **passive-delta bps**, drawdown
     avoided — or "measuring…" while `measuredAt == 0`.
   - tx link (mantlescan), `rationaleHash`.
 - **Filters:** All / De-risk only / Rebalance (+ by risk level). **Decision detail
   modal** on click: full **rationale** text, **risk verdict** (`riskLevel` +
   `confidence`), the **deterministic flags** that fired (PEG_WARN /
-  ORACLE_NEAR_RANGE_END / LOW_LIQUIDITY, §15.2), **all signals** (type · severity ·
+  ORACLE_NEAR_RANGE_END / LOW_LIQUIDITY, §13.2), **all signals** (type · severity ·
   summary) each tied to its **evidence** (source · publishedAt · link), **before →
   after** weights for all four buckets, the **guardrail ceiling** in force that cycle
   (`maxUsdyWeightBpsAllowed`), and the **outcome** (`realizedYieldBps` ·
@@ -266,21 +255,20 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
   threshold** + status dot (Normal/Caution/De-risk): **USDY peg** (DEX spot vs oracle
   NAV, bps, vs 30 / 50 / 100), **oracle** (range end & age vs `oracleMaxAge` ~28h and
   `oracleRangeEndBuffer` 24h), **Aave utilization** (bps) & **withdrawable** liquidity,
-  **instant-liquidity buffer** (IDLE + Aave vs the 15% floor), **AUSD proof-of-reserves**
-  (Should).
+  **instant-liquidity buffer** (IDLE + Aave vs the 15% floor), **AUSD proof-of-reserves**.
 - **Guardrails / "the limits" panel (trust surface):** the immutable on-chain bounds
   the agent can never cross — **max USDY 60% · max Aave 90% · min idle 2% · min
   instant-liquidity 15% · max slippage 0.5% · max rebalance move 50% · min rebalance
   interval 1h · peg warn/block/de-risk 0.3 / 0.5 / 1.0% · TVL cap $50k · per-tx deposit
   cap $10k · add-strategy timelock 48h**. Makes the "AI proposes, guardrails dispose —
   the model is never the last line of defense" thesis concrete. Source: `packages/shared`
-  constants, identical to on-chain `Guardrails.config()` (§16) — currently
-  **fixture-displayed** from `web/src/lib/data.ts`, not yet a live `Guardrails.sol` read
-  (see §0).
-- **Ask the agent (Should):** chat panel — "Why am I in AUSD right now?", "What
+  constants, identical to on-chain `Guardrails.config()` (§14) —
+  **fixture-displayed** from `web/src/lib/data.ts` rather than read live from
+  `Guardrails.sol` (see §0).
+- **Ask the agent:** chat panel — "Why am I in AUSD right now?", "What
   changed today?" — answered from decision history + current snapshot. Clearly
   labeled as explanations (read-only; the agent never takes orders from chat).
-- **Agent economics (Could):** a compact panel that makes the agent a verifiable
+- **Agent economics:** a compact panel that makes the agent a verifiable
   economic actor, **clearly labelled as outside the vault custody path**:
   - **x402:** "buys its evidence, sells its judgment." Show premium feeds the
     agent **paid** for (per-call x402 receipts, amount + tx) and the **paid endpoint**
@@ -291,10 +279,10 @@ limits panel; and **x402 / ERC-8183-job** indexing — all currently fixture-bac
 - **States:** loading, not-registered (testnet placeholder), chat empty/typing/error;
   the economics panel is hidden when x402 isn't configured / no jobs exist yet.
 
-### 5.4 `/insights` — Risk radar (Should)
+### 5.4 `/insights` — Risk radar
 **Purpose:** the insight layer.
 - Charts/cards: USDY **NAV vs DEX price** (peg) over time; **oracle range-end**
-  timeline (range-based, per §15.3 — not Chainlink staleness); **AUSD
+  timeline (range-based, per §13.3 — not Chainlink staleness); **AUSD
   proof-of-reserves** status; **Aave USDC utilization & APY**.
 - Each chart has a **data-table fallback** for accessibility.
 - **States:** loading, error, "data delayed" notice if 1delta lags.
@@ -404,14 +392,14 @@ receipt), **JobStatusChip** (ERC-8183 Open/Funded/Submitted/Completed/Rejected/E
 
 ## 12. Tech implementation notes
 
-- **Libs (as shipped):** @rainbow-me/rainbowkit, wagmi, viem, @tanstack/react-query
+- **Libs:** @rainbow-me/rainbowkit, wagmi, viem, @tanstack/react-query
   (via wagmi), tailwindcss + daisyui, lucide-style inline icons. **Routing is a small
   hash router** (no react-router). **Charts are hand-built inline SVG** with a
   "Show data table" fallback (no recharts/visx at runtime). **Backend/agent also use
   viem** (no ethers).
 - **Theming:** two daisyUI-equivalent themes (§2.2) as CSS custom properties toggled via
   `data-theme` on `.app-root`; RainbowKit `lightTheme`/`darkTheme` matched to primary;
-  persisted under `custos-theme` (one-time migration from the legacy `sentinel-theme`).
+  persisted under `custos-theme`.
 - **Data layer:** wagmi hooks (reads) + viem wallet client (writes); contract ABIs &
   addresses imported from `packages/shared/deployments` (**live by default**; fixtures
   only in demo mode). Agent/API endpoints (Fastify): **`GET /snapshot`** (agent-computed
@@ -421,31 +409,11 @@ receipt), **JobStatusChip** (ERC-8183 Open/Funded/Submitted/Completed/Rejected/E
 
 ---
 
-## 13. Build order
-
-1. **Shell + theming + wallet** (topbar, two themes, theme toggle, RainbowKit/wagmi config, network guard).
-2. **Dashboard reads** (agent status, position, allocation, vault stats).
-3. **Deposit/Withdraw modals** (steppers, previews, tx status).
-4. **Risk-Guardian feed + decision detail.**
-5. **Identity card.**
-6. **Risk radar + Ask-the-agent** (Should).
-
-> Build with mock data first (typed fixtures), then wire to chain/agent so screens
-> can be designed and reviewed before contracts land on testnet. The fixtures in §17
-> are the canonical mock set — design and review against those exact values.
->
-> **Status:** this fixtures-first build order is complete. Screens now read **live by
-> default** from the deployed contracts + the agent `/snapshot`, with the §17 fixtures as
-> the demo-mode fallback (see §0). Remaining live wiring (decision-event indexing, live
-> registry/benchmark reads) lands with the mainnet deploy, behind the same `use*Data` seams.
-
----
-
-## 14. Risk-signal, severity & flag taxonomy (enums the UI binds to)
+## 13. Risk-signal, severity & flag taxonomy (enums the UI binds to)
 
 These are closed enum sets — design one swatch/badge per value, don't invent others.
 
-### 14.1 Signal & evidence types
+### 13.1 Signal & evidence types
 The agent's verdict carries `signals[]` and each links an `evidence[]` item. Type set:
 
 | `type` | Meaning | Default icon (lucide) |
@@ -459,13 +427,13 @@ The agent's verdict carries `signals[]` and each links an `evidence[]` item. Typ
 Each signal has a **severity** → color: `LOW` → info/neutral · `MEDIUM` → warning ·
 `HIGH` → error. Evidence item fields: `{ id, type, source, url, publishedAt, summary }`.
 
-### 14.2 Deterministic flags (from the risk engine, pre-LLM)
+### 13.2 Deterministic flags (from the risk engine, pre-LLM)
 Shown on the decision detail and "what I'm watching". Closed set:
 `NONE` · `PEG_WARN` (peg ≥ 0.3%) · `ORACLE_NEAR_RANGE_END` (within 24h of range end) ·
 `LOW_LIQUIDITY` (instant buffer < 15%). These are **deterministic**, not AI — label
 them as such (they are not the LLM's opinion).
 
-### 14.3 Risk level → stance, color, oracle wording
+### 13.3 Risk level → stance, color, oracle wording
 | `riskLevel` (0/1/2) | Status color | Agent-status label | What it means |
 |---------------------|--------------|--------------------|---------------|
 | `NORMAL` | success (green) | **Active · Monitoring** | Within tolerance; earning |
@@ -478,7 +446,7 @@ that one-directionality in copy. **Oracle wording:** USDY's oracle is *range-bas
 Say **"oracle valid until 〈date〉"** or **"range ends in 2 days"**; only a frozen/paused
 oracle or one past its range end is "stale".
 
-### 14.4 ERC-8183 Job status (de-risk verifiable jobs)
+### 13.4 ERC-8183 Job status (de-risk verifiable jobs)
 Closed enum on the de-risk Job (`JobStatusChip`). Color by terminal outcome:
 
 | `status` | Meaning | Color |
@@ -493,7 +461,7 @@ Closed enum on the de-risk Job (`JobStatusChip`). Color by terminal outcome:
 The Evaluator is the deterministic guardrail check (`Guardrails.evaluateUsdyRisk`), never
 a human or the LLM — label it as such. Jobs are **outside the vault custody path**.
 
-### 14.5 x402 paid-evidence receipt
+### 13.5 x402 paid-evidence receipt
 Evidence the agent bought carries a `PaidEvidenceBadge` from the settlement receipt
 `{ success, transaction, network, payer, amount, resource }` (x402 "exact" scheme). Show
 amount in the asset's units (e.g. `0.01 USDC`) + a `transaction` explorer link; `resource`
@@ -501,7 +469,7 @@ binds the receipt to the evidence item it paid for. Never imply a payment moved 
 
 ---
 
-## 15. Data dictionary (UI element → field → unit → example → source)
+## 14. Data dictionary (UI element → field → unit → example → source)
 
 Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR** =
 `Guardrails.config()` / `packages/shared` constants · **BM** = `AgentBenchmark` ·
@@ -592,12 +560,12 @@ Bind to these exact names. Sources: **VAULT** = `YieldVault` read/event · **GR*
 
 ---
 
-## 16. Canonical example fixtures (design & review against these)
+## 15. Canonical example fixtures (design & review against these)
 
 Typed mock data for the screens. Numbers are internally consistent (USDC 6-dec,
 USDY 18-dec, chain 5000). Use verbatim.
 
-### 16.1 Chain & token facts
+### 15.1 Chain & token facts
 ```jsonc
 {
   "chains": { "mainnet": 5000, "testnet": 5003 },
@@ -615,7 +583,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 }
 ```
 
-### 16.2 Vault stats + connected position (Dashboard)
+### 15.2 Vault stats + connected position (Dashboard)
 ```jsonc
 {
   "tvlUsdc": "30000.00", "tvlCapUsdc": "50000.00",
@@ -632,7 +600,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 }
 ```
 
-### 16.3 Baseline counter (Dashboard hero)
+### 15.3 Baseline counter (Dashboard hero)
 ```jsonc
 {
   "passiveDeltaBps": 180,            // Custos +1.80% vs a 100%-USDY holder
@@ -642,7 +610,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 }
 ```
 
-### 16.4 Decision — NORMAL rebalance (Activity item + detail)
+### 15.4 Decision — NORMAL rebalance (Activity item + detail)
 ```jsonc
 {
   "id": 13, "kind": 0, "timestamp": "2026-06-10T12:00:00Z",
@@ -665,7 +633,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 }
 ```
 
-### 16.5 Decision — DE-RISK (the hero moment)
+### 15.5 Decision — DE-RISK (the hero moment)
 ```jsonc
 {
   "id": 14, "kind": 1, "timestamp": "2026-06-11T09:30:00Z",
@@ -688,7 +656,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 }
 ```
 
-### 16.6 Watchlist snapshot (Agent §5.3)
+### 15.6 Watchlist snapshot (Agent §5.3)
 ```jsonc
 [
   { "label": "USDY peg",            "value": "20 bps below NAV", "threshold": "warn 30 / block 50 / derisk 100", "status": "NORMAL" },
@@ -699,7 +667,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 ]
 ```
 
-### 16.7 Identity card (Agent §5.3)
+### 15.7 Identity card (Agent §5.3)
 ```jsonc
 {
   "agentId": 7, "name": "Custos Risk-Guardian",
@@ -709,7 +677,7 @@ USDY 18-dec, chain 5000). Use verbatim.
 }
 ```
 
-### 16.8 RWA-core form split + agent economics
+### 15.8 RWA-core form split + agent economics
 ```jsonc
 {
   "rwaCore": {                          // bucket 2 held as USDY and/or mUSD
@@ -733,3 +701,4 @@ USDY 18-dec, chain 5000). Use verbatim.
   ]
 }
 ```
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            

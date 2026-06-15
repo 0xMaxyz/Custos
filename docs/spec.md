@@ -22,7 +22,7 @@ Concrete specifications for Custos. Three parts, in order:
 | 2 | `USDY` | RWA yield core — **USDY or mUSD** (Ondo; convertible via Ondo Token Converter) | No (DEX unwind) |
 | 3 | `AUSD` | reserve-backed safe asset | Partial (DEX) |
 
-### 1.2 Allocation limits (initial defaults)
+### 1.2 Allocation limits (deployed defaults)
 | Param | Default | Meaning |
 |-------|---------|---------|
 | `maxWeightBps[USDY]` | `6000` (60%) | Max share in the RWA yield core |
@@ -33,7 +33,7 @@ Concrete specifications for Custos. Three parts, in order:
 | `minInstantLiquidityBps` | `1500` (15%) | `IDLE + Aave-withdrawable` ≥ 15% of TVL after any rebalance |
 | weights sum | `== 10000` | Target weights must total 100% |
 
-### 1.3 Execution safety (initial defaults)
+### 1.3 Execution safety (deployed defaults)
 | Param | Default | Meaning |
 |-------|---------|---------|
 | `maxSlippageBps` | `50` (0.5%) | Per-swap `minOut` tolerance (enforced on-chain) |
@@ -42,9 +42,9 @@ Concrete specifications for Custos. Three parts, in order:
 | `tvlCap` | `$50,000` | Max vault TVL for the mainnet demo (deposit cap) |
 | `perTxDepositCap` | `$10,000` | Max single deposit during demo |
 | `addStrategyTimelock` | `172800s` (2d) | Delay before a newly-added strategy is usable; also the queue delay for config/guardrails changes |
-| `MIN_TIMELOCK` (constant) | `3600s` (1h) | Hard floor on `addStrategyTimelock` — the delay can never be queued below this (M5) |
+| `MIN_TIMELOCK` (constant) | `3600s` (1h) | Hard floor on `addStrategyTimelock` — the delay can never be queued below this |
 
-### 1.4 USDY risk thresholds (initial defaults)
+### 1.4 USDY risk thresholds (deployed defaults)
 | Param | Default | Action |
 |-------|---------|--------|
 | `pegWarnBps` | `30` (0.3%) | \|DEX spot − oracle NAV\| ≥ → surface a CAUTION signal |
@@ -83,11 +83,11 @@ is a secondary guard against a frozen oracle; tune against real cadence.
   contract itself** (`0xab575258d37EaA5C8956EfABe71F4eE8F6397cF3` on Mantle, 18 dec) —
   it hosts `wrap(uint256)` (USDY→mUSD) and `unwrap(uint256)` (mUSD→USDY); there is no
   separate converter. `UsdyAdapter` pins it as an immutable and only ever calls
-  `wrap`/`unwrap` on it (never arbitrary calldata). See `ForkPhase2d.t.sol`.
+  `wrap`/`unwrap` on it (never arbitrary calldata), verified on a Mantle fork test.
 
 ---
 
-## 2. Contract interfaces (proposed sketch)
+## 2. Contract interfaces
 
 > Foundry/Solidity ^0.8.24, OpenZeppelin where possible. Custom errors, NatSpec,
 > reentrancy guards on fund-moving funcs. `assets`/amounts are USDC-denominated
@@ -128,7 +128,7 @@ and/or its rebasing $1 form **mUSD**. `UsdyAdapter` extends `IStrategyAdapter` w
 `IUsdyAdapter` and pins the mUSD contract as an immutable `MUSD` (`address(0)` = USDY-
 only). Conversion is **oracle-priced and value-neutral** (no DEX, no slippage beyond
 rounding), so `totalAssets()` values USDY at oracle NAV + mUSD at $1 face and is
-conserved across a conversion. Verified on-chain (`ForkPhase2d.t.sol`).
+conserved across a conversion. Verified on a Mantle fork test.
 
 ```solidity
 // The "Ondo Token Converter" is the mUSD token itself (wrap/unwrap host).
@@ -191,7 +191,7 @@ interface IYieldVault /* is IERC4626 */ {
     function unpause() external;       // GUARDIAN
     function kill() external;          // GUARDIAN
 
-    // Swapping the guardrail brain is the most sensitive admin action → timelocked (H3).
+    // Swapping the guardrail brain is the most sensitive admin action → timelocked.
     function queueGuardrails(address) external;         // ADMIN, queue
     function activateGuardrails() external;             // ADMIN, after addStrategyTimelock
     function addStrategy(uint8 bucket, address adapter) external;   // ADMIN, timelocked
@@ -225,25 +225,25 @@ interface IGuardrails {
 
     struct MarketState {
         uint256 usdyOracleNav;   // USDC per USDY, oracle
-        uint256 usdyDexSpot;     // USDC per USDY — TRUSTED allocator-supplied input (H2)
-        uint64  oracleUpdatedAt; // INERT on Mantle: no on-chain updatedAt source (H1)
-        uint64  oracleRangeEnd;  // INERT on Mantle: currentRange() reverts → 0 (H1)
+        uint256 usdyDexSpot;     // USDC per USDY — TRUSTED allocator-supplied input
+        uint64  oracleUpdatedAt; // INERT on Mantle: no on-chain updatedAt source
+        uint64  oracleRangeEnd;  // INERT on Mantle: currentRange() reverts → 0
         uint256 aaveWithdrawable;
         uint256 totalAssets;
         uint64  lastRebalanceAt;
         bool    oracleDown;      // set by the vault when oracleData() reverts while RWA
                                  // exposure > 0 → forces de-risk so the autonomous
-                                 // defense still works during an oracle outage (M4)
+                                 // defense still works during an oracle outage
     }
 
     function config() external view returns (Config memory);
 
-    // Config governance (H3): setConfig is a one-shot bootstrap at deploy (applies
+    // Config governance: setConfig is a one-shot bootstrap at deploy (applies
     // instantly, then seals); every later change — tighten OR loosen — is timelocked.
     function setConfig(Config calldata newConfig) external;   // ADMIN, one-shot bootstrap
     function queueConfig(Config calldata newConfig) external; // ADMIN, queue (delay >= MIN_TIMELOCK floor)
     function activateConfig() external;                       // ADMIN, after addStrategyTimelock
-    function cancelConfig() external;                         // ADMIN, abort a pending config (M5)
+    function cancelConfig() external;                         // ADMIN, abort a pending config
 
     /// @return ok / reason selector. Pure check of a proposed allocation vs config + state.
     function validateRebalance(
@@ -260,7 +260,7 @@ interface IGuardrails {
 }
 ```
 
-**Oracle-staleness trust model on Mantle (H1).** `_evaluateUsdyRisk` has two staleness
+**Oracle-staleness trust model on Mantle.** `_evaluateUsdyRisk` has two staleness
 checks — `oracleStale` (via `oracleRangeEnd`) and `oracleAged` (via `oracleUpdatedAt`).
 Both are **inert on Mantle**: the deployed Ondo oracle exposes only `getPrice()` +
 `currentRange()` (no round/`updatedAt` accessor), and `currentRange()` reverts so the
@@ -269,11 +269,11 @@ adapter returns `oracleRangeEnd = 0`. The real staleness guards are therefore
 deposit/withdraw/convert) plus the off-chain engine's `oracleUpdatedAt` check. The
 on-chain peg-deviation branch (NAV vs DEX spot) remains the active de-risk trigger.
 
-**Peg-input trust model (H2).** `MarketState.usdyDexSpot` is supplied by the ALLOCATOR
+**Peg-input trust model.** `MarketState.usdyDexSpot` is supplied by the ALLOCATOR
 on `rebalance`/`deRisk`, so the depeg guard that gates new USDY is fed by the same hot
 key it constrains. Exposure is bounded by the $5k USDY notional and 60% weight caps; a
 compromised allocator passing `spot == nav` only *clears* the gate (it cannot raise the
-caps). An on-chain DEX TWAP cross-check is deferred to Phase 2b.
+caps). An on-chain DEX TWAP cross-check is not part of the current design.
 
 ### 2.4 `AgentBenchmark`
 ```solidity
@@ -320,7 +320,7 @@ interface IAgentBenchmark {
 
 The canonical 0x8004 singletons **are deployed on Mantle** (confirmed via `extcodesize > 0`),
 so the **production path calls them**. Their real ABIs are declared in
-`contracts/src/interfaces/IERC8004Canonical.sol` and proven on a fork in `ForkPhase4a.t.sol`.
+`contracts/src/interfaces/IERC8004Canonical.sol` and proven on a Mantle fork test.
 The `Custos*` registries (implementing the simplified `IERC8004.sol` below) are the
 **fallback** for chains where the singletons are absent.
 
@@ -401,7 +401,7 @@ Signing + settlement are injectable so the protocol is testable offline.
 The receipt is bound to the evidence it bought via `resource`; the decision bundle
 carries `payments: [{ evidenceId, receipt }]` (hashed into `rationaleHash`, pinned to IPFS).
 
-**Outbound spend cap** (N1): `maxAmountRequired` is supplied by the counterparty's 402
+**Outbound spend cap:** `maxAmountRequired` is supplied by the counterparty's 402
 response, so the agent **never** signs it blindly. `createPayment` rejects any required
 amount above `X402_MAX_PRICE_BASE_UNITS` *before* signing, and that env var is **required**
 whenever `X402_PREMIUM_FEED_URL` is set (config `superRefine`) — a compromised feed URL
@@ -415,7 +415,7 @@ just structure. With `X402_SETTLE_ONCHAIN=true` + an ALLOCATOR wallet it then **
 on-chain** by submitting `transferWithAuthorization` (returning the real tx hash);
 otherwise it verifies the signature and delegates settlement to a facilitator. In that
 verify-only mode nothing consumes the EIP-3009 nonce on-chain, so `replayGuardedVerifier`
-tracks spent `(from, nonce)` pairs in memory until `validBefore` and rejects replays (N3);
+tracks spent `(from, nonce)` pairs in memory until `validBefore` and rejects replays;
 the on-chain path needs no guard since the consumed nonce makes settlement single-use. The
 dev-only `shapeOnlyVerifier` is retained for tests, never wired into the running agent.
 
@@ -501,7 +501,7 @@ guardrails own all hard limits.
 ### 3.3 Validation & clamping (TS, before anything is signed)
 - Reject if JSON fails the zod schema → **fall back to the deterministic allocation**.
 - `usdyMaxWeightBps = min(model.usdyMaxWeightBps, deterministic.maxUsdyWeightBpsAllowed)`.
-- If `deRisk == true`, require ≥1 `signals[*]` with a resolvable `evidenceId` **whose evidence `source` is on the trusted allow-list** (`CURATED_EVIDENCE_SOURCES`, the vetted first-party RWA feeds); else ignore the de-risk request. Un-vetted/scraped sources can inform the model as context but cannot, on their own, unlock a de-risk (N2).
+- If `deRisk == true`, require ≥1 `signals[*]` with a resolvable `evidenceId` **whose evidence `source` is on the trusted allow-list** (`CURATED_EVIDENCE_SOURCES`, the vetted first-party RWA feeds); else ignore the de-risk request. Un-vetted/scraped sources can inform the model as context but cannot, on their own, unlock a de-risk.
 - The model may only **tighten**: final USDY weight = `min(deterministic.candidate.USDY, model.usdyMaxWeightBps)`. It can never increase USDY or any bucket above the deterministic candidate.
 - `rationale` + `signals` (with resolved evidence URLs) are hashed (`rationaleHash`) and bundled to IPFS (`decisionURI`) before calling `rebalance`/`deRisk`.
 

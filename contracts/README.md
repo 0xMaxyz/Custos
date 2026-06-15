@@ -37,7 +37,7 @@ src/
   CustosReputationRegistry.sol ERC-8004 fallback reputation registry
   Roles.sol                   ADMIN / ALLOCATOR / GUARDIAN role constants
   AggregatorSwapLib.sol       Balance-delta minOut helper for 1delta swap calldata
-  Custos.sol                  Compile-time MANTLE_CHAIN_ID constant / scaffold marker
+  Custos.sol                  Library holding the MANTLE_CHAIN_ID compile-time constant
   interfaces/                 Canonical ABIs (ERC-8004, ERC-8183, IMusd, IStrategyAdapter…)
 
 script/
@@ -47,8 +47,8 @@ script/
   ActivateStrategies.s.sol    Strategy activation after add-strategy timelock
 
 test/
-  Phase*.t.sol                Offline unit tests (no RPC)
-  ForkPhase*.t.sol            Fork tests — skipped in CI; require MANTLE_RPC_URL
+  *.t.sol                     Offline unit tests (no RPC)
+  Fork*.t.sol                 Fork integration tests — require MANTLE_RPC_URL (skipped in CI)
 ```
 
 ## Deployed addresses

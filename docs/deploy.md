@@ -6,8 +6,7 @@ backend agent, frontend, and the Caddy reverse proxy. Written for Mantle mainnet
 
 > **Current state:** Mainnet (5000) contracts are already deployed — see
 > [`deployments/5000.json`](../deployments/5000.json). This guide serves for
-> **fresh testnet deployments, re-deploys, or local fork rehearsals**. Skip phases
-> already completed.
+> **fresh testnet deployments, re-deploys, or local fork rehearsals**.
 
 > **Read first:** `docs/agents.md` §2 (non-negotiables), `docs/spec.md` §1 (guardrail
 > parameters & roles). Never commit secrets; everything sensitive lives in a
@@ -28,7 +27,7 @@ backend agent, frontend, and the Caddy reverse proxy. Written for Mantle mainnet
 
 | What | Env var | Notes |
 |---|---|---|
-| Deployer EOA | `DEPLOYER_PRIVATE_KEY` | Funds: ~2–5 MNT for gas. Used ONLY to deploy; on mainnet it renounces all admin at the end of the script (H4). |
+| Deployer EOA | `DEPLOYER_PRIVATE_KEY` | Funds: ~2–5 MNT for gas. Used ONLY to deploy; on mainnet it renounces all admin at the end of the script. |
 | Admin multisig | `ADMIN_ADDRESS` | **Required on mainnet, must differ from deployer.** Create a [Safe](https://safe.global) on Mantle first (2/3 recommended). Receives `DEFAULT_ADMIN_ROLE` + `ADMIN` on Guardrails, YieldVault, AgentBenchmark. |
 | Allocator hot key | `ALLOCATOR_PRIVATE_KEY` / `ALLOCATOR_ADDRESS` | The agent's tx signer. Guardrail-bounded; fund with a small amount of MNT (it only pays gas). Use a dedicated fresh key, never the deployer. |
 | Guardian | `GUARDIAN_ADDRESS` | Can `pause`/`unpause`/`kill`/`emergencyExit`. Recommended: the Safe, or a hardware-wallet EOA that is NOT the allocator. |
@@ -37,14 +36,14 @@ backend agent, frontend, and the Caddy reverse proxy. Written for Mantle mainnet
 | Mantlescan | `MANTLESCAN_API_KEY` | Contract verification. |
 | IPFS pinning | `IPFS_API_URL` / `IPFS_PINNING_JWT` | Optional — falls back to `data:` URIs. Pinata or a Kubo node. |
 | WalletConnect | `VITE_WALLETCONNECT_PROJECT_ID` | Optional for injected-only wallets. |
-| Alerts | `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID` and/or `DISCORD_WEBHOOK_URL` | **Strongly recommended on mainnet** — de-risk success AND failure alerts (O1) are wired through these. |
+| Alerts | `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID` and/or `DISCORD_WEBHOOK_URL` | **Strongly recommended on mainnet** — de-risk success AND failure alerts are wired through these. |
 
 **Funding for the demo/smoke tests:** a small amount of USDC on Mantle (e.g. $100–500)
 on a separate test-user wallet for deposits.
 
 ---
 
-## 1. Phase 0 — verify external addresses on-chain
+## 1. Verify external addresses on-chain
 
 Per `docs/agents.md` §2.6, treat every external address as unverified until confirmed.
 The canonical set lives in `packages/shared/src/addresses.ts`; cross-check each against
@@ -97,19 +96,19 @@ pnpm -r test                     # agent + shared + web unit tests
 
 ## 3. Contracts — mainnet deploy
 
-### 3.1 Decide the launch timelock (v1 guarded launch)
+### 3.1 Decide the launch timelock
 
 `Guardrails.addStrategyTimelock` gates adapter activation **and** every post-bootstrap
-config/guardrails change. The on-chain floor is `MIN_TIMELOCK = 1h` (M5); the default
-is 48h. For the first mainnet window we recommend a short delay so operational fixes
-don't take two days, then raising it:
+config/guardrails change. The on-chain floor is `MIN_TIMELOCK = 1h`; the default
+is 48h. You can start with a short delay so operational fixes don't take two days, then
+raise it:
 
 ```bash
 # .env — guarded-launch window (6h). Unset/0 keeps the 48h default.
 INITIAL_TIMELOCK_SECONDS=21600
 ```
 
-This is only acceptable because (a) admin is a multisig from block one (H4), (b) TVL
+This is only acceptable because (a) admin is a multisig from block one, (b) TVL
 is capped at $50k with $10k/tx, and (c) `ConfigQueued` events are watched (see §8).
 **Schedule the raise back to 172800 (48h) as part of launch — see §3.5.**
 
@@ -132,7 +131,7 @@ What the script does (and what it deliberately does NOT do):
 3. Deploys `AaveV3Adapter`, `UsdyAdapter` (with the mUSD leg), `AusdAdapter`, and
    **queues** each via `addStrategy` — they are NOT active yet.
 4. Grants `ALLOCATOR` and `GUARDIAN`.
-5. **Admin handoff (H4):** grants `DEFAULT_ADMIN_ROLE`+`ADMIN` on all three
+5. **Admin handoff:** grants `DEFAULT_ADMIN_ROLE`+`ADMIN` on all three
    admin-bearing contracts to `ADMIN_ADDRESS`, then the deployer renounces its own.
    On mainnet the script reverts if `ADMIN_ADDRESS` is unset or equals the deployer.
 
@@ -208,7 +207,7 @@ pnpm install && pnpm -r build
 node agent/dist/index.js   # or: docker compose up agent
 ```
 
-- Startup asserts the RPC serves chainId 5000 (O6) — a wrong RPC fails fast.
+- Startup asserts the RPC serves chainId 5000 — a wrong RPC fails fast.
 - Check `GET /snapshot` returns live NAV/spot/Aave data and sane weights.
 - Check `GET /agent-card`, and `/ask` if `ANTHROPIC_API_KEY` is set.
 
@@ -223,9 +222,9 @@ Add to `.env`: `ALLOCATOR_PRIVATE_KEY`, `VAULT_ADDRESS`, alert channels
 
 Operational behavior to know:
 
-- One cycle at a time (O3 mutex); receipt waits are bounded and a **required de-risk
-  that fails to confirm fires a CRITICAL alert** (O1/O2) — page on that.
-- State is in-memory (O4): after a crash/restart, check the vault's last txs on
+- One cycle at a time (single mutex); receipt waits are bounded and a **required de-risk
+  that fails to confirm fires a CRITICAL alert** — page on that.
+- State is in-memory: after a crash/restart, check the vault's last txs on
   Mantlescan before assuming the agent's view is complete.
 - The autonomous de-risk target is **USDC (idle)**; AUSD is a guardian-managed
   escape hatch (`emergencyExit` / manual rebalance).

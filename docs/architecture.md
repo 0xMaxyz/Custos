@@ -141,28 +141,22 @@ We do **not** put AI where a deterministic algorithm is better. The AI is the **
 
 ## 7. Scope
 
-### Core features (shipped)
+### What the system includes
 
-- ERC-4626 `YieldVault` + `UsdyAdapter` (incl. mUSD leg) + `AaveV3Adapter` + `AusdAdapter` + idle buffer + `Guardrails` (depeg/oracle guard)
-- `Decision` + `AgentBenchmark` ledger with **agent-vs-passive-USDY baseline**
-- AI risk-guardian service: 1delta+RPC ingestion → deterministic risk engine → **LLM rationale (hero path: news/attestation → structured risk signal)** → guardrail validator → on-chain rebalance + event-triggered de-risk
-- Anthropic LLM client behind a thin, mockable `LLMClient` interface
-- ERC-8004 identity (canonical 0x8004 singletons on Mantle)
-- Frontend: account dashboard + risk-guardian feed (rationale + evidence) + deposit/withdraw + identity card + baseline counter
-- Deployed on Mantle mainnet (5000) and Sepolia testnet (5003) — see [`deployments/`](../deployments/) and [`packages/shared/src/deployments.ts`](../packages/shared/src/deployments.ts)
+- ERC-4626 `YieldVault` + `UsdyAdapter` (incl. mUSD leg) + `AaveV3Adapter` + `AusdAdapter` + idle buffer + `Guardrails` (depeg/oracle guard).
+- `Decision` + `AgentBenchmark` ledger with the **agent-vs-passive-USDY baseline**.
+- AI risk-guardian service: 1delta + RPC ingestion → deterministic risk engine → **LLM rationale (the hero path: news/attestation → structured risk signal)** → guardrail validator → on-chain rebalance + event-triggered de-risk.
+- Anthropic LLM client behind a thin, mockable `LLMClient` interface.
+- ERC-8004 identity (canonical 0x8004 singletons on Mantle) and a second safety bucket (`AusdAdapter`) with the AUSD proof-of-reserves signal.
+- RWA risk radar (USDY peg, oracle freshness, AUSD PoR, Aave utilization) and the conversational agent ("why am I in AUSD?", "what changed?") with Telegram/Discord alerts.
+- **Agent micropayments (x402) + verifiable jobs (ERC-8183):** the agent pays per-call for premium risk feeds, exposes its RWA risk signal as an x402-paid endpoint, and models each de-risk as an ERC-8183 escrowed Job whose evaluator is the deterministic guardrail validator, feeding ERC-8004 reputation.
+- RWA-core mUSD leg — `UsdyAdapter` also holds/routes the mUSD form, convertible via Ondo wrap/unwrap.
+- Frontend: account dashboard + risk-guardian feed (rationale + evidence) + deposit/withdraw + identity card + baseline counter.
+- Deployed on Mantle mainnet (5000) and Sepolia testnet (5003) — see [`deployments/`](../deployments/) and [`packages/shared/src/deployments.ts`](../packages/shared/src/deployments.ts).
 
-### Additional features (shipped)
+### Out of scope (by design)
 
-In priority order:
-1. `AusdAdapter` (second safety bucket for de-risk) + AUSD proof-of-reserves signal
-2. RWA risk radar viz (USDY peg, oracle freshness, AUSD PoR, Aave utilization)
-3. Conversational agent ("why am I in AUSD?", "what changed?") + Telegram/Discord alerts
-4. **Agent micropayments (x402) + verifiable jobs (ERC-8183)** — the agent pays per-call for premium risk feeds; exposes its RWA risk signal as an x402-paid endpoint; each de-risk modelled as an ERC-8183 escrowed Job whose evaluator is the deterministic guardrail validator, feeding ERC-8004 reputation.
-5. RWA core mUSD leg — `UsdyAdapter` also holds/routes the mUSD form, convertible via Ondo wrap/unwrap.
-
-### Out of scope
-
-RWA looping/leverage (no market on Mantle supports it); cross-chain; KYC'd USDY minting; syrup/MI4 (unavailable/permissioned); production audit.
+RWA looping/leverage (no market on Mantle supports it); cross-chain execution; KYC'd USDY minting; syrup/MI4 (unavailable/permissioned).
 
 ---
 

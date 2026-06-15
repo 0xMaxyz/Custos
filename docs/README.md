@@ -9,7 +9,7 @@
 | [architecture.md](./architecture.md) | Product design, assets & allocation, AI vs algorithm split, scope |
 | [spec.md](./spec.md) | Guardrail parameters, contract interfaces, LLM prompt schema |
 | [ui.md](./ui.md) | UI/UX design spec, component inventory, data dictionary, fixtures |
-| [agents.md](./agents.md) | Operating guide for AI coding agents and human contributors |
+| [agents.md](./agents.md) | Conventions & constraints — non-negotiable system rules, tech stack, coding conventions |
 | [deploy.md](./deploy.md) | End-to-end deployment runbook (contracts, agent, web, ops) |
 
 ## Quick orientation
@@ -19,7 +19,7 @@
 - **Work on the AI agent** → [spec.md](./spec.md) §3 + [agent/README.md](../agent/README.md)
 - **Build the frontend** → [ui.md](./ui.md) + [web/README.md](../web/README.md)
 - **Deploy to mainnet/testnet** → [deploy.md](./deploy.md)
-- **Contributor or coding-agent rules** → [agents.md](./agents.md)
+- **Conventions & constraints** → [agents.md](./agents.md)
 
 ## Package docs
 

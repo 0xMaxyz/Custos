@@ -1,15 +1,14 @@
-# agents.md — Operating Guide (canonical)
+# agents.md — Conventions & Constraints
 
-This file is the **single source of truth** for how any AI agent (Claude, Cursor,
-Codex, etc.) or human contributor must work in this repository. `CLAUDE.md` and
-`.cursor/rules/project.mdc` point here. **Before executing, read:
-[`docs/architecture.md`](./architecture.md) (project design & decisions),
-[`docs/spec.md`](./spec.md) (guardrail parameters, contract interfaces, Claude prompt +
-risk-signal schema), and [`docs/ui.md`](./ui.md) (UI/UX plan). This file defines the
-rules you must follow while executing them.**
+This file is the **conventions and constraints reference** for anyone — human or AI —
+working in this repository. It captures the non-negotiable system rules, the tech
+stack, and the coding conventions. For the surrounding context, read
+[`docs/architecture.md`](./architecture.md) (design & decisions),
+[`docs/spec.md`](./spec.md) (guardrail parameters, contract interfaces, LLM prompt +
+risk-signal schema), and [`docs/ui.md`](./ui.md) (UI/UX).
 
-If a request conflicts with these rules, **stop and ask** rather than silently
-deviating.
+The rules in §2 are non-negotiable: anything touching guardrails, custody, the 1delta
+boundary, or scope must respect them.
 
 ---
 
@@ -102,12 +101,9 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
 8. **Secrets.** Never commit secrets (RPC keys, Anthropic API keys, 1delta API key,
    deployer/ALLOCATOR private keys, WalletConnect projectId if private). Use `.env`
    (git-ignored) + documented `.env.example`. Never log secrets.
-9. **Scope discipline.** Finish all **Must** items before any **Should**; **Should**
-   before **Could**. Keep changes focused; don't introduce speculative features or
-   premature abstractions.
-10. **Definition of done.** A feature is not done until its test passes, it doesn't
-    violate any rule in §2, and the relevant docs in [`docs/`](.) are updated to
-    reflect the change.
+9. **Scope discipline.** Keep changes focused; don't introduce speculative features
+   or premature abstractions. Anything touching guardrails, custody, or the 1delta
+   boundary keeps the system's safety properties as the deciding factor.
 
 ---
 
@@ -131,8 +127,7 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
 - **Solidity:** explicit visibility, custom errors over revert strings, NatSpec on
   external/public functions, checks-effects-interactions, reentrancy guards on
   fund-moving functions. Prefer well-audited libraries (OpenZeppelin/Solmate).
-  Match the interface sketches in [`docs/spec.md`](./spec.md) §2 (refine as needed;
-  keep names stable).
+  Match the contract interfaces in [`docs/spec.md`](./spec.md) §2 (keep names stable).
 - **Naming:** contracts `PascalCase`; TS files `kebab-case`; React components
   `PascalCase`. Be descriptive.
 - **Comments:** explain non-obvious intent/trade-offs/constraints only. Do **not**
@@ -147,27 +142,7 @@ autonomous defense** is the product. See [`docs/architecture.md`](./architecture
 
 ---
 
-## 5. Git & workflow
-
-- **Branches:** Always use `claude/features` if it is available (reset to `origin/main`
-  to pick up merged work if needed). If `claude/features` has unmerged commits that
-  haven't landed in `main`, create a new branch (e.g. `claude/features-<slug>`) rather
-  than overwriting in-progress work. Never develop directly on `main`.
-- **Commits:** one logical change per commit, clear messages. Do not force-push or
-  amend unless explicitly asked.
-- **Push:** `git push -u origin <branch>`; retry network failures with backoff.
-- **PRs:** **Create a GitHub PR after every completed task or logical step.** PR body
-  must state: what was built, which tests pass, and any doc updates. Keep
-  [`docs/architecture.md`](./architecture.md), [`docs/spec.md`](./spec.md),
-  [`docs/ui.md`](./ui.md), [`docs/agents.md`](./agents.md), `CLAUDE.md`, and the Cursor
-  rule in sync when the plan changes.
-- **Cursor review comments:** When tagging Cursor for re-review on a PR comment,
-  always use `@cursor` (e.g. `@cursor All items from your review are addressed.`).
-  This ensures the automation picks up the request.
-
----
-
-## 6. When in doubt
+## 5. When in doubt
 
 - Re-read [`docs/architecture.md`](./architecture.md) (strategy & design),
   [`docs/spec.md`](./spec.md) (params & interfaces), [`docs/ui.md`](./ui.md)

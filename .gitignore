@@ -41,3 +41,10 @@ e2e
 web/repro-modal.mjs
 web/rename-classes.cjs
 web/shot-*.png
+
+# local-only dev / demo / launch artifacts — kept on disk, out of git.
+# Whole dirs ignored by path; for individual files, prefix the name with `local.`
+# (e.g. docs/local.demo.md) so one pattern covers them without per-file lines.
+/Design/
+/reports/
+**/local.*

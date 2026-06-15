@@ -1,36 +1,20 @@
 # scripts/
 
-Standalone operational scripts. No build step — run directly with Node 22+.
+Operational scripts that must live in the repo — the Claude cloud environment clones
+it and runs them to bootstrap. No build step.
 
-## check-mantle-liquidity.mjs
+## claude-cloud-environment-setup.sh
 
-Live liquidity + peg probe for Custos's RWA legs (USDY, mUSD, AUSD, USDC) on
-Mantle. Answers "is there real DEX liquidity for USDY/mUSD on Mantle right now,
-and are the stables at peg?" — the question that decides whether the de-risk
-swaps Custos relies on are actually executable.
+One-time environment provisioning for the Claude cloud agent (toolchain, submodules,
+dependencies). Invoked by the cloud platform when the environment is first created.
 
-```sh
-node scripts/check-mantle-liquidity.mjs              # human-readable report
-node scripts/check-mantle-liquidity.mjs --json       # machine-readable JSON
-node scripts/check-mantle-liquidity.mjs --write      # write reports/mantle-liquidity.{json,md}
-node scripts/check-mantle-liquidity.mjs --min=250000 # exit 1 if RWA DEX liquidity < $250k (CI alert)
-```
+## claude-cloud-session-setup.sh
 
-Token addresses (USDC/USDY/AUSD/WMNT/mUSD) are read from
-`packages/shared/src/tokens.ts` — the single source of truth.
+Per-session setup (submodule init, `pnpm install`, offline contract build). Wired as
+the `SessionStart` hook in [`.claude/settings.json`](../.claude/settings.json), so it
+**must stay tracked** for cloud sessions to start cleanly.
 
-Optional env:
+---
 
-- `MANTLE_RPC_URL` — defaults to `https://rpc.mantle.xyz`.
-- `MIN_LIQUIDITY_USD` (CI) — when set, the monitor workflow fails on thin liquidity.
-
-**Scope:** DeFiLlama pool TVL measures _breadth_, not executable USDC↔USDY swap
-depth at vault sizes. The authoritative liquidity gate is the Foundry fork test
-`testLiquidityGateUsdy` (`contracts/test/Fork.t.sol`); treat this script as
-monitoring / early-warning only.
-
-Sources (all read-only, no API keys): DeFiLlama yields (pool TVL), DeFiLlama
-coins (peg), Mantle RPC (`totalSupply()` for tokenized supply).
-
-`.github/workflows/liquidity-monitor.yml` runs this weekly (and on demand) from
-a networked runner and commits the snapshot to `reports/`.
+Local-only dev tools (e.g. the Mantle liquidity probe) are kept out of git via the
+`local.` filename prefix — see the root `.gitignore`.

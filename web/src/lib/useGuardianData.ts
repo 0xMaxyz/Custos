@@ -21,6 +21,10 @@ import { resolveDeployment } from "./deployment";
 // fromBlock→latest query can exceed the per-call limit and fail (N5). Page the range.
 const MAX_LOG_RANGE = 10_000n;
 
+// Agent API base. When set, the decision feed is fetched from the agent's cached
+// /decisions endpoint (built server-side once) instead of scanned in the browser.
+const AGENT_API_URL = (import.meta.env.VITE_AGENT_API_URL ?? "").replace(/\/+$/, "");
+
 /**
  * Fetch logs over `[fromBlock, latest]` in `maxRange`-sized pages, concatenated in
  * order. `getBlockNumber` resolves the head; `getLogsRange` runs one bounded query.
@@ -171,6 +175,10 @@ export interface GuardianFeed {
   decisions: Decision[];
   /** true once the feed comes from chain; false while served from fixtures. */
   isLive: boolean;
+  /** true while the on-chain backfill is still in flight (deployed vault, no data yet). */
+  loading: boolean;
+  /** true when the log fetch failed outright. */
+  error: boolean;
 }
 
 export function useDecisions(): GuardianFeed {
@@ -181,6 +189,7 @@ export function useDecisions(): GuardianFeed {
   const deployBlock = dep.vaultDeployBlock;
   // null = loading (deployed, fetch in progress); [] = loaded but empty
   const [liveDecisions, setLiveDecisions] = useState<Decision[] | null>(isDeployed ? null : []);
+  const [error, setError] = useState(false);
   // Bump to re-run the loader (used by the live watch when a new event arrives).
   const [reloadKey, setReloadKey] = useState(0);
   const client = usePublicClient();
@@ -196,11 +205,32 @@ export function useDecisions(): GuardianFeed {
       return;
     }
     let cancelled = false;
+    setError(false); // initial liveDecisions is already null (loading); refetches keep the
+    // current list visible and swap it in when ready — no skeleton flash on live updates.
+
+    // Fast path: the agent serves a cached, server-built feed at /decisions, so the
+    // browser skips the expensive multi-page getLogs backfill entirely. A reload (new
+    // on-chain decision via the watch below) forces a server resync with ?refresh=1.
+    // Falls back to the direct on-chain scan when the agent API is unset or unreachable.
+    const fromEndpoint = async (): Promise<boolean> => {
+      if (!AGENT_API_URL) return false;
+      try {
+        const res = await fetch(`${AGENT_API_URL}/decisions${reloadKey > 0 ? "?refresh=1" : ""}`);
+        if (!res.ok) return false;
+        const data = (await res.json()) as { decisions?: Decision[] };
+        if (!Array.isArray(data.decisions)) return false;
+        if (!cancelled) setLiveDecisions(data.decisions);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     const head = () => client.getBlockNumber();
     const range = (event: typeof DECISION_RECORDED_EVENT | typeof REBALANCED_EVENT | typeof DERISKED_EVENT) =>
       getLogsPaged(head, ({ fromBlock, toBlock }) => client.getLogs({ address: VAULT_ADDRESS, event, fromBlock, toBlock }), deployBlock);
 
-    Promise.all([range(DECISION_RECORDED_EVENT), range(REBALANCED_EVENT), range(DERISKED_EVENT)])
+    const fromChain = () => Promise.all([range(DECISION_RECORDED_EVENT), range(REBALANCED_EVENT), range(DERISKED_EVENT)])
       .then(async ([decLogs, rebLogs, derLogs]) => {
         // id → resulting weights / destination bucket.
         const postById = new Map<number, W>();
@@ -246,9 +276,13 @@ export function useDecisions(): GuardianFeed {
           prev = post;
         }
         built.reverse(); // most-recent first
-        setLiveDecisions(built);
-      })
-      .catch(() => { if (!cancelled) setLiveDecisions([]); });
+        if (!cancelled) setLiveDecisions(built);
+      });
+
+    // Try the cached endpoint first; on miss/failure, scan the chain directly.
+    fromEndpoint()
+      .then((ok) => (ok ? undefined : fromChain()))
+      .catch(() => { if (!cancelled) { setLiveDecisions([]); setError(true); } });
 
     return () => { cancelled = true; };
   }, [client, VAULT_ADDRESS, isDeployed, deployBlock, reloadKey]);
@@ -264,10 +298,10 @@ export function useDecisions(): GuardianFeed {
     },
   });
 
-  if (!isDeployed) return { decisions: fixtureDecisions, isLive: false };
+  if (!isDeployed) return { decisions: fixtureDecisions, isLive: false, loading: false, error: false };
   // liveDecisions === null means getLogs still in flight. Return empty live feed
   // (not demo fixtures) so a deployed vault never shows fictional de-risk history.
-  return { decisions: liveDecisions ?? [], isLive: true };
+  return { decisions: liveDecisions ?? [], isLive: true, loading: liveDecisions === null, error };
 }
 
 /** Look up a single decision by id (detail view). */

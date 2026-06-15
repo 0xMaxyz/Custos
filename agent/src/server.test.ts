@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, beforeAll } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildServer } from "./server.js";
 import type { ExplainClient, ExplainContext } from "./llm/explain.js";
@@ -46,6 +46,50 @@ describe("agent server — /health", () => {
   it("does not register /ask when no explainer is wired", async () => {
     const res = await app.inject({ method: "POST", url: "/ask", payload: { question: "hi" } });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("agent server — /decisions (Activity feed)", () => {
+  it("is not registered when no decisions provider is wired", async () => {
+    const app = buildServer();
+    expect((await app.inject({ method: "GET", url: "/decisions" })).statusCode).toBe(404);
+  });
+
+  it("serves the provider's feed and forwards refresh=1", async () => {
+    const feed = { decisions: [], lastSyncedBlock: 42, builtAt: "x", isLive: true };
+    const get = vi.fn().mockResolvedValue(feed);
+    const app = buildServer({ decisions: { get } });
+
+    const res = await app.inject({ method: "GET", url: "/decisions" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(feed);
+    expect(get).toHaveBeenCalledWith(false);
+
+    await app.inject({ method: "GET", url: "/decisions?refresh=1" });
+    expect(get).toHaveBeenCalledWith(true);
+
+    await app.inject({ method: "POST", url: "/decisions/resync" });
+    expect(get).toHaveBeenLastCalledWith(true);
+  });
+
+  it("returns 503 when the build fails", async () => {
+    const app = buildServer({ decisions: { get: vi.fn().mockRejectedValue(new Error("rpc down")) } });
+    const res = await app.inject({ method: "GET", url: "/decisions" });
+    expect(res.statusCode).toBe(503);
+  });
+
+  it("rate-limits forced rebuilds but never the cache-hit GET", async () => {
+    const feed = { decisions: [], lastSyncedBlock: 1, builtAt: "x", isLive: true };
+    const app = buildServer({ decisions: { get: vi.fn().mockResolvedValue(feed) }, decisionsRefreshLimit: 1 });
+
+    // Plain GETs (cache hits) are never throttled.
+    expect((await app.inject({ method: "GET", url: "/decisions" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/decisions" })).statusCode).toBe(200);
+
+    // First forced rebuild passes; the second (over the cap) is rejected.
+    expect((await app.inject({ method: "GET", url: "/decisions?refresh=1" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/decisions?refresh=1" })).statusCode).toBe(429);
+    expect((await app.inject({ method: "POST", url: "/decisions/resync" })).statusCode).toBe(429);
   });
 });
 

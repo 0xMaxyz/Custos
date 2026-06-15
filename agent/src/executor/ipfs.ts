@@ -25,6 +25,12 @@ export interface RationaleBundle {
   readonly candidateWeightsBps: WeightsBps;
   readonly riskLevel: string;
   readonly asOf: string;
+  /**
+   * Model confidence (0–1) for this decision. Pinned so the UI can surface it — it is
+   * NOT recorded on-chain (only the rationaleHash + decisionURI are), so the decision
+   * bundle is the single source for it. Optional: deterministic/no-LLM decisions omit it.
+   */
+  readonly confidence?: number;
   /** x402 receipts for any premium evidence the agent paid for (A4.1). Optional. */
   readonly payments?: PaidEvidenceReceipt[];
 }

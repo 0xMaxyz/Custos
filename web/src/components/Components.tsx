@@ -146,9 +146,13 @@ export function OutcomeStrip({ outcome, compact = false, manual = false }: { out
     return <span className="chip role-neutral" title="Manual allocator action — not scored against the passive baseline">manual · not benchmarked</span>;
   }
   if (!outcome?.measuredAt) {
+    // No measured outcome yet. A live decision is benchmarked later (the agent records
+    // it, then scores it against the passive baseline at the next measurement). Show a
+    // calm, static "awaiting measurement" — NOT a pulsing spinner that implies the page
+    // is mid-fetch and never resolves.
     return (
-      <span className="chip role-info">
-        <span className="dot dot-pulse" style={{ background: "var(--info)" }} />measuring…
+      <span className="chip role-neutral" title="The agent recorded this decision on-chain; it is scored against the passive-USDY baseline at the next benchmark measurement.">
+        <span className="dot" style={{ background: "var(--muted)" }} />awaiting measurement
       </span>
     );
   }

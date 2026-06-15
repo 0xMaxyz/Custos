@@ -57,7 +57,7 @@ export function AllocationLegend({ weightsBps, tvlUsdc }: { weightsBps: WeightsB
 }
 
 // ---------- WeightBars: before → after mini stacked bars ----------
-export function WeightBars({ pre, post }: { pre: WeightsBps; post: WeightsBps }) {
+export function WeightBars({ pre, post, legend = false }: { pre: WeightsBps; post: WeightsBps; legend?: boolean }) {
   const Bar = ({ w, label }: { w: WeightsBps; label: string }) => (
     <div style={{ flex: 1 }}>
       <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
@@ -70,10 +70,30 @@ export function WeightBars({ pre, post }: { pre: WeightsBps; post: WeightsBps })
     </div>
   );
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-      <Bar w={pre} label="Before" />
-      <Icon name="arrow-right" size={15} style={{ color: "var(--faint)", marginBottom: 1 }} />
-      <Bar w={post} label="After" />
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+        <Bar w={pre} label="Before" />
+        <Icon name="arrow-right" size={15} style={{ color: "var(--faint)", marginBottom: 1 }} />
+        <Bar w={post} label="After" />
+      </div>
+      {legend && <WeightBarsLegend pre={pre} post={post} />}
+    </div>
+  );
+}
+
+// Color key for the before→after bars — only the buckets that actually appear (so a
+// USDY→USDC de-risk shows just the relevant colors). Without it the stacked bars are
+// unlabelled and the viewer can't tell which colour is which token.
+function WeightBarsLegend({ pre, post }: { pre: WeightsBps; post: WeightsBps }) {
+  const present = BUCKETS.filter((b) => (pre[b] || 0) > 0 || (post[b] || 0) > 0);
+  return (
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
+      {present.map((b) => (
+        <span key={b} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--muted)" }}>
+          <span className="dot" style={{ background: bucketColor[b], width: 9, height: 9 }} />
+          {BUCKET_LABEL[b]}
+        </span>
+      ))}
     </div>
   );
 }
